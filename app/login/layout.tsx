@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'Login — Accedi al tuo Account',
-  description: 'Accedi al gestionale contabile di Le Ribelle Salon. Tieni sotto controllo entrate, uscite e margini del tuo salone.',
+  description: 'Accedi al gestionale contabile di Stylistgo. Tieni sotto controllo entrate, uscite e margini del tuo salone.',
   robots: { index: false, follow: true },
 };
 

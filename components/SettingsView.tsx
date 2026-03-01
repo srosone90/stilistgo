@@ -4,9 +4,10 @@ import React, { useRef, useState } from 'react';
 import { useApp } from '@/context/AppContext';
 import { Transaction, CashIn, CashOut } from '@/types';
 import Papa from 'papaparse';
-import { Upload, Download, AlertTriangle, CheckCircle2, RefreshCw, Wifi, WifiOff } from 'lucide-react';
+import { Upload, Download, AlertTriangle, CheckCircle2, RefreshCw, Wifi, WifiOff, FileDown } from 'lucide-react';
 import { generateId } from '@/lib/storage';
 import { resetSupabaseAvailability } from '@/lib/db';
+import { exportTransactionsPDF } from '@/lib/pdf';
 
 const inputStyle: React.CSSProperties = {
   background: '#12121a', border: '1px solid #2e2e40', borderRadius: '10px',
@@ -40,7 +41,7 @@ export default function SettingsView() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `leribelle-export-${Date.now()}.json`;
+    a.download = `stylistgo-export-${Date.now()}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -160,13 +161,20 @@ export default function SettingsView() {
       <div className="rounded-2xl p-5" style={{ background: '#1c1c27', border: '1px solid #2e2e40' }}>
         <h3 className="font-semibold text-white mb-1">📤 Esporta Dati</h3>
         <p className="text-xs mb-4" style={{ color: '#71717a' }}>
-          Esporta tutti i movimenti in formato JSON per backup o migrazione.
+          Esporta tutti i movimenti in formato JSON per backup o migrazione, oppure in PDF per la stampa.
         </p>
         <button onClick={handleExport}
           className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium"
           style={{ background: '#12121a', border: '1px solid #2e2e40', color: '#d4d4d8' }}>
           <Download size={16} />
           Esporta JSON ({transactions.length} voci)
+        </button>
+        <button
+          onClick={() => exportTransactionsPDF(transactions)}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium"
+          style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#f87171' }}>
+          <FileDown size={16} />
+          Esporta PDF completo ({transactions.length} voci)
         </button>
       </div>
 

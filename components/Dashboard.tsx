@@ -11,6 +11,8 @@ import {
 } from '@/lib/calculations';
 import { format } from 'date-fns';
 import { CATEGORY_ICONS, EntryCategory } from '@/types';
+import { FileDown } from 'lucide-react';
+import { exportDashboardPDF } from '@/lib/pdf';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from 'recharts';
@@ -48,11 +50,20 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-white">Dashboard</h1>
-        <p className="text-sm mt-1" style={{ color: '#71717a' }}>
-          Riepilogo economico — {format(new Date(), 'MMMM yyyy')}
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Dashboard</h1>
+          <p className="text-sm mt-1" style={{ color: '#71717a' }}>
+            Riepilogo economico — {format(new Date(), 'MMMM yyyy')}
+          </p>
+        </div>
+        <button
+          onClick={() => exportDashboardPDF(transactions, settings, format(new Date(), 'MMMM yyyy'), monthTx)}
+          className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg mt-1"
+          style={{ background: 'rgba(239,68,68,0.15)', color: '#f87171', border: '1px solid rgba(239,68,68,0.3)' }}
+          title="Esporta report mensile in PDF">
+          <FileDown size={13} /> Esporta PDF
+        </button>
       </div>
 
       {/* KPI Grid */}

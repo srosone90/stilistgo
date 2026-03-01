@@ -117,7 +117,7 @@ export default function AuthForm() {
         >
           <Scissors size={26} className="text-white" />
         </div>
-        <h1 className="text-xl font-bold text-white">Le Ribelle Salon</h1>
+        <h1 className="text-xl font-bold text-white">Stylistgo</h1>
         <p className="text-sm mt-1" style={{ color: '#71717a' }}>
           {mode === 'login' ? 'Accedi al gestionale' : 'Crea il tuo account'}
         </p>

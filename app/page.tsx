@@ -86,7 +86,7 @@ export default function Home() {
               <div className="w-5 h-0.5 rounded" style={{ background: '#d4d4d8' }} />
             </div>
           </button>
-          <p className="font-bold text-white text-sm">Le Ribelle Salon</p>
+          <p className="font-bold text-white text-sm">Stylistgo</p>
           <div className="w-9" />
         </div>
 

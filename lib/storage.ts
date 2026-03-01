@@ -1,7 +1,7 @@
 import { Transaction, CashIn, CashOut, AppSettings } from '@/types';
 
-const TRANSACTIONS_KEY = 'leribelle_transactions';
-const SETTINGS_KEY = 'leribelle_settings';
+const TRANSACTIONS_KEY = 'stylistgo_transactions';
+const SETTINGS_KEY = 'stylistgo_settings';
 
 export const defaultSettings: AppSettings = {
   taxRate: 25,

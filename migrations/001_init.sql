@@ -1,4 +1,4 @@
--- Le Ribelle Salon — Database migration
+-- Stylistgo — Database migration
 -- Run this in the Supabase Dashboard → SQL Editor
 
 -- Transactions table

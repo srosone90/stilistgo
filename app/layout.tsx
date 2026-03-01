@@ -3,8 +3,8 @@ import "./globals.css";
 import { AppProvider } from "@/context/AppContext";
 
 export const metadata: Metadata = {
-  title: "Le Ribelle Salon — Gestionale",
-  description: "Gestione economica e contabilità per Le Ribelle Salon",
+  title: "Stylistgo — Gestionale",
+  description: "Gestione economica e contabilità per Stylistgo",
 };
 
 export default function RootLayout({

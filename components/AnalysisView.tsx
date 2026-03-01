@@ -13,6 +13,8 @@ import {
   PieChart, Pie, Cell, Legend,
 } from 'recharts';
 import { format } from 'date-fns';
+import { FileDown } from 'lucide-react';
+import { exportAnalysisPDF } from '@/lib/pdf';
 
 const COLORS = ['#6366f1', '#a855f7', '#22c55e', '#f59e0b', '#ef4444', '#06b6d4', '#ec4899'];
 
@@ -100,6 +102,16 @@ export default function AnalysisView() {
               {years.map(y => <option key={y} value={y}>{y}</option>)}
             </select>
           )}
+          <button
+            onClick={() => {
+              const label = period === 'month' ? selectedMonth : selectedYear;
+              exportAnalysisPDF(filtered, label, settings, transactions);
+            }}
+            className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg"
+            style={{ background: 'rgba(239,68,68,0.15)', color: '#f87171', border: '1px solid rgba(239,68,68,0.3)' }}
+            title="Esporta report analitico in PDF">
+            <FileDown size={13} /> Esporta PDF
+          </button>
         </div>
       </div>
 

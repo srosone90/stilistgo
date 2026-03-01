@@ -5,7 +5,8 @@ import { useApp } from '@/context/AppContext';
 import { isCashIn, isCashOut, formatCurrency, getTotalIncome, getTotalExpense } from '@/lib/calculations';
 import { Transaction, CATEGORY_ICONS, EntryCategory, EXPENSE_TYPE_ICONS, ExpenseType } from '@/types';
 import { format, parseISO } from 'date-fns';
-import { Trash2, ChevronUp, ChevronDown } from 'lucide-react';
+import { Trash2, ChevronUp, ChevronDown, FileDown } from 'lucide-react';
+import { exportTransactionsPDF } from '@/lib/pdf';
 
 function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, React.CSSProperties> = {
@@ -101,6 +102,13 @@ export default function TabularView() {
         <button onClick={() => { setFilterType('all'); setFilterMonth(''); setFilterYear(''); setFilterCategory(''); }}
           className="text-xs px-3 py-1.5 rounded-lg" style={{ background: 'rgba(99,102,241,0.15)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.3)' }}>
           Reset filtri
+        </button>
+        <button
+          onClick={() => exportTransactionsPDF(filtered, { type: filterType, month: filterMonth, year: filterYear })}
+          className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg ml-auto"
+          style={{ background: 'rgba(239,68,68,0.15)', color: '#f87171', border: '1px solid rgba(239,68,68,0.3)' }}
+          title="Esporta la lista attuale in PDF">
+          <FileDown size={13} /> Esporta PDF
         </button>
       </div>
 

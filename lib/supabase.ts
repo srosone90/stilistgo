@@ -25,7 +25,7 @@ export const supabase = new Proxy({} as SupabaseClient, {
 });
 
 // ─── Fallback local auth (when Supabase is unreachable) ───────────────────────
-const LOCAL_USER_KEY = 'leribelle_local_user';
+const LOCAL_USER_KEY = 'stylistgo_local_user';
 
 interface LocalUser {
   id: string;
@@ -78,7 +78,7 @@ export function resetSupabaseReachable() {
 // ─── Auth helpers ─────────────────────────────────────────────────────────────
 
 function localSignUp(email: string, password: string, fullName: string) {
-  const existingUsers = JSON.parse(localStorage.getItem('leribelle_users') || '[]') as (LocalUser & { password: string })[];
+  const existingUsers = JSON.parse(localStorage.getItem('stylistgo_users') || '[]') as (LocalUser & { password: string })[];
   if (existingUsers.find(u => u.email === email)) {
     return { data: null, error: { message: 'Email già registrata in locale.' } };
   }
@@ -88,7 +88,7 @@ function localSignUp(email: string, password: string, fullName: string) {
     full_name: fullName,
     user_metadata: { full_name: fullName },
   };
-  localStorage.setItem('leribelle_users', JSON.stringify([...existingUsers, { ...newUser, password }]));
+  localStorage.setItem('stylistgo_users', JSON.stringify([...existingUsers, { ...newUser, password }]));
   setLocalUser(newUser);
   return { data: { session: { user: newUser }, user: newUser }, error: null };
 }
@@ -149,7 +149,7 @@ export async function signIn(email: string, password: string) {
   }
 
   // Supabase offline → fallback utenti locali
-  const users = JSON.parse(localStorage.getItem('leribelle_users') || '[]') as (LocalUser & { password: string })[];
+  const users = JSON.parse(localStorage.getItem('stylistgo_users') || '[]') as (LocalUser & { password: string })[];
   const user = users.find(u => u.email === email && u.password === password);
   if (user) {
     const { password: _pw, ...safeUser } = user;

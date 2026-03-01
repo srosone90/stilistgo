@@ -1,5 +1,5 @@
 {
-  "name": "gestionale-le-ribelle-salon",
+  "name": "stylistgo",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -13,6 +13,8 @@
     "@supabase/supabase-js": "^2.98.0",
     "@types/papaparse": "^5.5.2",
     "date-fns": "^4.1.0",
+    "jspdf": "^4.2.0",
+    "jspdf-autotable": "^5.0.7",
     "lucide-react": "^0.575.0",
     "next": "16.1.6",
     "papaparse": "^5.5.3",

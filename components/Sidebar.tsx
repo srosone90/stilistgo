@@ -50,7 +50,7 @@ export default function Sidebar({ activeView, onNavigate }: SidebarProps) {
           <Scissors size={18} className="text-white" />
         </div>
         <div>
-          <p className="font-bold text-sm text-white leading-tight">Le Ribelle</p>
+          <p className="font-bold text-sm text-white leading-tight">Stylistgo</p>
           <p className="text-xs" style={{ color: '#71717a' }}>Salon Gestionale</p>
         </div>
       </div>
