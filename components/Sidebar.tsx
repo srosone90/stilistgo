@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { LayoutDashboard, Table2, BarChart3, Settings, Scissors, Wifi, WifiOff, LogOut } from 'lucide-react';
+import { LayoutDashboard, Table2, BarChart3, Settings, Scissors, Wifi, WifiOff, LogOut, CalendarDays, Users, Sparkles, UserCog, Package } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { getCurrentUser, signOut } from '@/lib/supabase';
 
@@ -12,11 +12,26 @@ interface NavItem {
   icon: React.ReactNode;
 }
 
-const navItems: NavItem[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
-  { id: 'tabella', label: 'Tabella', icon: <Table2 size={20} /> },
-  { id: 'analisi', label: 'Analisi', icon: <BarChart3 size={20} /> },
-  { id: 'impostazioni', label: 'Impostazioni', icon: <Settings size={20} /> },
+const navGroups: { label: string; items: NavItem[] }[] = [
+  {
+    label: 'Contabilità',
+    items: [
+      { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
+      { id: 'tabella', label: 'Tabella', icon: <Table2 size={18} /> },
+      { id: 'analisi', label: 'Analisi', icon: <BarChart3 size={18} /> },
+      { id: 'impostazioni', label: 'Impostazioni', icon: <Settings size={18} /> },
+    ],
+  },
+  {
+    label: 'Gestionale Salone',
+    items: [
+      { id: 'calendar', label: 'Agenda', icon: <CalendarDays size={18} /> },
+      { id: 'clients', label: 'Clienti', icon: <Users size={18} /> },
+      { id: 'services', label: 'Servizi', icon: <Sparkles size={18} /> },
+      { id: 'staff', label: 'Personale', icon: <UserCog size={18} /> },
+      { id: 'inventory', label: 'Magazzino', icon: <Package size={18} /> },
+    ],
+  },
 ];
 
 interface SidebarProps {
@@ -56,25 +71,32 @@ export default function Sidebar({ activeView, onNavigate }: SidebarProps) {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-3 py-4 space-y-1">
-        {navItems.map((item) => {
-          const active = activeView === item.id;
-          return (
-            <button
-              key={item.id}
-              onClick={() => onNavigate(item.id)}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all"
-              style={{
-                background: active ? 'rgba(99,102,241,0.15)' : 'transparent',
-                color: active ? '#818cf8' : '#71717a',
-                border: active ? '1px solid rgba(99,102,241,0.3)' : '1px solid transparent',
-              }}
-            >
-              {item.icon}
-              {item.label}
-            </button>
-          );
-        })}
+      <nav className="flex-1 px-3 py-4 overflow-y-auto space-y-4">
+        {navGroups.map(group => (
+          <div key={group.label}>
+            <p className="px-3 mb-1 text-xs font-semibold uppercase tracking-wider" style={{ color: '#3f3f5a' }}>{group.label}</p>
+            <div className="space-y-0.5">
+              {group.items.map((item) => {
+                const active = activeView === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => onNavigate(item.id)}
+                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all"
+                    style={{
+                      background: active ? 'rgba(99,102,241,0.15)' : 'transparent',
+                      color: active ? '#818cf8' : '#71717a',
+                      border: active ? '1px solid rgba(99,102,241,0.3)' : '1px solid transparent',
+                    }}
+                  >
+                    {item.icon}
+                    {item.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
 
       {/* Footer */}

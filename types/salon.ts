@@ -1,0 +1,245 @@
+// ─── Client / CRM ─────────────────────────────────────────────────────────────
+
+export interface Client {
+  id: string;
+  firstName: string;
+  lastName: string;
+  phone: string;
+  email: string;
+  birthDate: string; // YYYY-MM-DD
+  notes: string;
+  allergies: string;
+  tags: string[];
+  gdprConsent: boolean;
+  gdprDate: string;
+  loyaltyPoints: number;
+  createdAt: string;
+}
+
+export interface TechnicalCard {
+  id: string;
+  clientId: string;
+  operatorId: string;
+  date: string; // YYYY-MM-DD
+  serviceDescription: string;
+  brand: string;
+  formula: string;
+  oxidant: string;
+  oxidantPct: string;
+  posaDuration: number; // minutes
+  result: string;
+  notes: string;
+  createdAt: string;
+}
+
+// ─── Services ─────────────────────────────────────────────────────────────────
+
+export type ServiceCategory =
+  | 'Taglio'
+  | 'Colore'
+  | 'Trattamento'
+  | 'Piega'
+  | 'Estetica'
+  | 'Nail'
+  | 'Sposa'
+  | 'Altro';
+
+export const SERVICE_CATEGORIES: ServiceCategory[] = [
+  'Taglio', 'Colore', 'Trattamento', 'Piega', 'Estetica', 'Nail', 'Sposa', 'Altro',
+];
+
+export interface Service {
+  id: string;
+  name: string;
+  category: ServiceCategory;
+  duration: number; // minutes
+  price: number;
+  description: string;
+  operatorIds: string[]; // empty = all operators
+  active: boolean;
+  createdAt: string;
+}
+
+// ─── Operators / Staff ────────────────────────────────────────────────────────
+
+export type OperatorRole = 'owner' | 'operator' | 'reception';
+
+export type DayOfWeek = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+
+export const DAY_NAMES = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
+export const DAY_NAMES_FULL = ['Domenica', 'Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato'];
+
+export interface WorkShift {
+  dayOfWeek: DayOfWeek;
+  isWorking: boolean;
+  startTime: string; // "HH:mm"
+  endTime: string;   // "HH:mm"
+}
+
+export interface Operator {
+  id: string;
+  name: string;
+  email: string;
+  role: OperatorRole;
+  serviceIds: string[]; // empty = all services
+  color: string; // hex
+  commissionRate: number; // 0-100%
+  schedule: WorkShift[];
+  active: boolean;
+  createdAt: string;
+}
+
+export interface Absence {
+  id: string;
+  operatorId: string;
+  startDate: string; // YYYY-MM-DD
+  endDate: string;   // YYYY-MM-DD
+  reason: string;
+  createdAt: string;
+}
+
+// ─── Appointments ─────────────────────────────────────────────────────────────
+
+export type AppointmentStatus =
+  | 'scheduled'
+  | 'confirmed'
+  | 'completed'
+  | 'cancelled'
+  | 'no-show';
+
+export const STATUS_LABELS: Record<AppointmentStatus, string> = {
+  scheduled: 'Prenotato',
+  confirmed: 'Confermato',
+  completed: 'Completato',
+  cancelled: 'Cancellato',
+  'no-show': 'No-show',
+};
+
+export const STATUS_COLORS: Record<AppointmentStatus, string> = {
+  scheduled: '#6366f1',
+  confirmed: '#22c55e',
+  completed: '#a855f7',
+  cancelled: '#71717a',
+  'no-show': '#ef4444',
+};
+
+export interface AppointmentHistoryEntry {
+  timestamp: string;
+  action: string;
+}
+
+export interface Appointment {
+  id: string;
+  clientId: string;   // empty string if block slot
+  operatorId: string;
+  serviceIds: string[];
+  date: string;       // YYYY-MM-DD
+  startTime: string;  // "HH:mm"
+  endTime: string;    // "HH:mm"
+  status: AppointmentStatus;
+  notes: string;
+  isBlock: boolean;
+  blockReason: string;
+  recurringGroupId: string;
+  feedbackScore: number; // 0 = not given, 1-5
+  history: AppointmentHistoryEntry[];
+  createdAt: string;
+}
+
+export interface WaitingListEntry {
+  id: string;
+  clientId: string;
+  serviceId: string;
+  preferredOperatorId: string;
+  preferredDateFrom: string;
+  notes: string;
+  createdAt: string;
+}
+
+// ─── Inventory ────────────────────────────────────────────────────────────────
+
+export type StockMovementType = 'load' | 'internal_use' | 'sale' | 'adjustment';
+
+export const STOCK_MOVEMENT_LABELS: Record<StockMovementType, string> = {
+  load: 'Carico fornitore',
+  internal_use: 'Uso interno',
+  sale: 'Vendita cliente',
+  adjustment: 'Rettifica',
+};
+
+export interface Product {
+  id: string;
+  name: string;
+  brand: string;
+  category: string;
+  unit: string; // "ml", "g", "pz"
+  purchasePrice: number;
+  salePrice: number;
+  stock: number;
+  minStock: number;
+  isForSale: boolean;
+  active: boolean;
+  createdAt: string;
+}
+
+export interface StockMovement {
+  id: string;
+  productId: string;
+  type: StockMovementType;
+  quantity: number; // positive = in, negative = out
+  date: string;
+  notes: string;
+  operatorId: string;
+  createdAt: string;
+}
+
+// ─── Gift Cards ───────────────────────────────────────────────────────────────
+
+export interface GiftCard {
+  id: string;
+  code: string;
+  clientId: string;
+  clientName: string;
+  initialValue: number;
+  remainingValue: number;
+  expiryDate: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+// ─── Salon Configuration ─────────────────────────────────────────────────────
+
+export interface SalonConfig {
+  salonName: string;
+  openTime: string;   // "HH:mm"
+  closeTime: string;  // "HH:mm"
+  workDays: DayOfWeek[];
+  slotMinutes: number; // 15 | 30
+  loyaltyPointsPerEuro: number;
+  dormientiDays: number; // days before marking client dormant
+}
+
+export const DEFAULT_SALON_CONFIG: SalonConfig = {
+  salonName: 'Stylistgo',
+  openTime: '09:00',
+  closeTime: '19:00',
+  workDays: [1, 2, 3, 4, 5, 6],
+  slotMinutes: 30,
+  loyaltyPointsPerEuro: 1,
+  dormientiDays: 60,
+};
+
+export const OPERATOR_COLORS = [
+  '#6366f1', '#a855f7', '#22c55e', '#f59e0b',
+  '#ef4444', '#06b6d4', '#ec4899', '#84cc16',
+];
+
+// Default schedule helper
+export function defaultSchedule(): WorkShift[] {
+  return Array.from({ length: 7 }, (_, i) => ({
+    dayOfWeek: i as DayOfWeek,
+    isWorking: i >= 1 && i <= 6, // Mon-Sat
+    startTime: '09:00',
+    endTime: '19:00',
+  }));
+}

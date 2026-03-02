@@ -8,11 +8,16 @@ import TabularView from '@/components/TabularView';
 import AnalysisView from '@/components/AnalysisView';
 import SettingsView from '@/components/SettingsView';
 import EntryForm from '@/components/EntryForm';
+import CalendarView from '@/components/CalendarView';
+import ClientsView from '@/components/ClientsView';
+import ServicesView from '@/components/ServicesView';
+import StaffView from '@/components/StaffView';
+import InventoryView from '@/components/InventoryView';
 import { useApp } from '@/context/AppContext';
 import { getCurrentUser } from '@/lib/supabase';
 import { Plus, Loader2 } from 'lucide-react';
 
-type View = 'dashboard' | 'tabella' | 'analisi' | 'impostazioni';
+type View = 'dashboard' | 'tabella' | 'analisi' | 'impostazioni' | 'calendar' | 'clients' | 'services' | 'staff' | 'inventory';
 
 export default function Home() {
   const router = useRouter();
@@ -39,6 +44,11 @@ export default function Home() {
       case 'tabella': return <TabularView />;
       case 'analisi': return <AnalysisView />;
       case 'impostazioni': return <SettingsView />;
+      case 'calendar': return <CalendarView />;
+      case 'clients': return <ClientsView />;
+      case 'services': return <ServicesView />;
+      case 'staff': return <StaffView />;
+      case 'inventory': return <InventoryView />;
     }
   };
 

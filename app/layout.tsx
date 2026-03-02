@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { AppProvider } from "@/context/AppContext";
+import { SalonProvider } from "@/context/SalonContext";
 
 export const metadata: Metadata = {
   title: "Stylistgo — Gestionale",
@@ -15,7 +16,9 @@ export default function RootLayout({
   return (
     <html lang="it">
       <body className="antialiased">
-        <AppProvider>{children}</AppProvider>
+        <AppProvider>
+          <SalonProvider>{children}</SalonProvider>
+        </AppProvider>
       </body>
     </html>
   );
