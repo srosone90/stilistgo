@@ -7,7 +7,8 @@ import { Product, StockMovement, StockMovementType, STOCK_MOVEMENT_LABELS } from
 import { CashOut } from '@/types';
 import { format, parseISO } from 'date-fns';
 import { formatCurrency } from '@/lib/calculations';
-import { Plus, X, Pencil, Trash2, AlertTriangle, Package } from 'lucide-react';
+import { Plus, X, Pencil, Trash2, AlertTriangle, Package, FileText } from 'lucide-react';
+import InvoiceImportModal from './InvoiceImportModal';
 
 const card: React.CSSProperties = { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '16px', padding: '20px' };
 const inputStyle: React.CSSProperties = { background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '10px', padding: '9px 13px', color: 'var(--text)', fontSize: '13px', outline: 'none', width: '100%' };
@@ -40,6 +41,7 @@ export default function InventoryView({ newTrigger }: { newTrigger?: number }) {
   const [search, setSearch] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
   const [showOnlyLow, setShowOnlyLow] = useState(false);
+  const [showInvoiceImport, setShowInvoiceImport] = useState(false);
 
   const categories = useMemo(() => Array.from(new Set(products.map(p => p.category).filter(Boolean))).sort(), [products]);
 
@@ -139,7 +141,12 @@ export default function InventoryView({ newTrigger }: { newTrigger?: number }) {
             <h1 className="text-2xl font-bold text-white">Magazzino</h1>
             <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>{products.filter(p => p.active).length} prodotti</p>
           </div>
-          <button onClick={openNew} style={btnPrimary}><Plus size={14} /></button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button onClick={() => setShowInvoiceImport(true)} style={{ ...btnPrimary, fontSize: '12px', padding: '8px 12px' }} title="Importa fattura con AI">
+              <FileText size={14} /> <span className="hidden sm:inline">Fattura AI</span>
+            </button>
+            <button onClick={openNew} style={btnPrimary}><Plus size={14} /></button>
+          </div>
         </div>
 
         {lowStockCount > 0 && (
@@ -354,6 +361,17 @@ export default function InventoryView({ newTrigger }: { newTrigger?: number }) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Invoice import modal */}
+      {showInvoiceImport && (
+        <InvoiceImportModal
+          onClose={() => setShowInvoiceImport(false)}
+          onImported={(count) => {
+            setShowInvoiceImport(false);
+            // optional toast could go here
+          }}
+        />
       )}
     </div>
   );
