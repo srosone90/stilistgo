@@ -445,9 +445,24 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
             <div className="flex gap-2">
               <button onClick={() => setConfirmDeleteId(null)} style={{ flex: 1, background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--muted)', borderRadius: '8px', padding: '8px', fontSize: '13px', cursor: 'pointer' }}>Annulla</button>
               <button onClick={() => {
-                  // Restore appointment to calendar if payment was linked
                   const pay = payments.find(p => p.id === confirmDeleteId);
-                  if (pay?.appointmentId) changeAppointmentStatus(pay.appointmentId, 'confirmed');
+                  if (pay) {
+                    // Restore appointment to calendar if payment was linked
+                    if (pay.appointmentId) changeAppointmentStatus(pay.appointmentId, 'confirmed');
+                    // Restore stock for every product in the sale
+                    pay.items?.forEach(item => {
+                      if (item.isProduct && item.productId) {
+                        addStockMovement({
+                          productId: item.productId,
+                          type: 'load',
+                          quantity: 1,
+                          date: format(new Date(), 'yyyy-MM-dd'),
+                          notes: `Ripristino da cancellazione vendita ${pay.id.slice(-6)}`,
+                          operatorId: '',
+                        });
+                      }
+                    });
+                  }
                   deletePayment(confirmDeleteId!);
                   setConfirmDeleteId(null);
                 }}

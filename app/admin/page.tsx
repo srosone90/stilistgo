@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Users, Ticket, Megaphone, Flag, ScrollText, LogOut,
   ShieldCheck, TrendingUp, AlertTriangle, CheckCircle2, XCircle, Clock,
   ChevronRight, Plus, Search, X, Save, RefreshCw, ToggleLeft, ToggleRight,
-  Building2, Phone, Mail, MapPin, UserCog, Calendar as CalendarIcon,
+  Building2, Phone, Mail, MapPin, UserCog, Calendar as CalendarIcon, Trash2,
 } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -72,6 +72,7 @@ const TK_STATUS: Record<string, { bg: string; text: string; label: string }> = {
 const ACTION_LABELS: Record<string, string> = {
   tenant_updated: 'Tenant aggiornato', ticket_created: 'Ticket creato',
   broadcast_sent: 'Broadcast inviato', flag_toggled: 'Flag modificato',
+  tenant_deleted: 'Tenant eliminato',
 };
 
 // ─── Styled helpers ───────────────────────────────────────────────────────────
@@ -128,6 +129,9 @@ export default function AdminPage() {
   const [selTenant, setSelTenant] = useState<Tenant | null>(null);
   const [editTenant, setEditTenant] = useState<Partial<Tenant>>({});
   const [savingTenant, setSavingTenant] = useState(false);
+  const [confirmDeleteTenant, setConfirmDeleteTenant] = useState(false);
+  const [deleteDataToo, setDeleteDataToo] = useState(false);
+  const [deletingTenant, setDeletingTenant] = useState(false);
 
   // Ticket modal
   const [selTicket, setSelTicket] = useState<Ticket | null>(null);
@@ -217,6 +221,18 @@ export default function AdminPage() {
     setSavingTenant(true);
     await af('/api/admin/tenants', { method: 'PATCH', body: JSON.stringify({ user_id: selTenant.user_id, ...editTenant }) });
     setSavingTenant(false);
+    setSelTenant(null);
+    loadSection('tenants');
+  };
+
+  // ─── Tenant delete ────────────────────────────────────────────────────────
+  const deleteTenant = async () => {
+    if (!selTenant) return;
+    setDeletingTenant(true);
+    await af('/api/admin/tenants', { method: 'DELETE', body: JSON.stringify({ user_id: selTenant.user_id, delete_data: deleteDataToo }) });
+    setDeletingTenant(false);
+    setConfirmDeleteTenant(false);
+    setDeleteDataToo(false);
     setSelTenant(null);
     loadSection('tenants');
   };
@@ -337,7 +353,7 @@ export default function AdminPage() {
                 <p style={{ color: '#f4f4f5', fontSize: '13px', fontWeight: 600, margin: 0 }}>{t.salon_name}</p>
                 <p style={{ color: '#71717a', fontSize: '11px', margin: 0 }}>Ultimo accesso: {fmtDate(t.last_seen_at)}</p>
               </div>
-              <button onClick={() => { changeSection('tenants'); setTimeout(() => { setSelTenant(t); setEditTenant({ ...t }); }, 100); }}
+              <button onClick={() => { changeSection('tenants'); setTimeout(() => { setSelTenant(t); setEditTenant({ ...t }); setConfirmDeleteTenant(false); setDeleteDataToo(false); }, 100); }}
                 style={{ background: 'none', border: 'none', color: '#818cf8', cursor: 'pointer', fontSize: '12px' }}>
                 Dettaglio <ChevronRight size={12} style={{ display: 'inline' }} />
               </button>
@@ -372,7 +388,7 @@ export default function AdminPage() {
     const set = (k: keyof Tenant, v: unknown) => setEditTenant(prev => ({ ...prev, [k]: v }));
 
     return (
-      <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }} onClick={() => setSelTenant(null)}>
+      <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }} onClick={() => { setSelTenant(null); setConfirmDeleteTenant(false); setDeleteDataToo(false); }}>
         <div style={{ width: '520px', height: '100vh', overflowY: 'auto', background: '#1c1c27', borderLeft: '1px solid #2e2e40', padding: '28px', display: 'flex', flexDirection: 'column', gap: '20px' }} onClick={ev => ev.stopPropagation()}>
           {/* Header */}
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
@@ -384,7 +400,7 @@ export default function AdminPage() {
                 <Badge s={t.plan} map={PLAN} />
               </div>
             </div>
-            <button onClick={() => setSelTenant(null)} style={{ background: 'none', border: 'none', color: '#71717a', cursor: 'pointer', padding: '4px' }}><X size={18} /></button>
+            <button onClick={() => { setSelTenant(null); setConfirmDeleteTenant(false); setDeleteDataToo(false); }} style={{ background: 'none', border: 'none', color: '#71717a', cursor: 'pointer', padding: '4px' }}><X size={18} /></button>
           </div>
 
           {/* Metrics row */}
@@ -477,6 +493,35 @@ export default function AdminPage() {
             style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px', borderRadius: '12px', border: 'none', background: savingTenant ? '#2e2e40' : 'linear-gradient(135deg,#f59e0b,#ef4444)', color: 'white', fontWeight: 600, cursor: savingTenant ? 'not-allowed' : 'pointer' }}>
             <Save size={15} /> {savingTenant ? 'Salvataggio…' : 'Salva modifiche'}
           </button>
+
+          {/* Delete */}
+          {!confirmDeleteTenant ? (
+            <button onClick={() => setConfirmDeleteTenant(true)}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '10px', borderRadius: '12px', border: '1px solid rgba(239,68,68,0.4)', background: 'rgba(239,68,68,0.08)', color: '#f87171', fontWeight: 500, cursor: 'pointer', fontSize: '13px' }}>
+              <Trash2 size={14} /> Elimina tenant
+            </button>
+          ) : (
+            <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.4)', borderRadius: '12px', padding: '14px' }}>
+              <p style={{ color: '#f87171', fontWeight: 600, fontSize: '13px', margin: '0 0 6px' }}>⚠️ Conferma eliminazione</p>
+              <p style={{ color: '#a1a1aa', fontSize: '12px', margin: '0 0 10px' }}>
+                Questa operazione elimina i metadati del tenant da admin_tenants.
+              </p>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', cursor: 'pointer' }}>
+                <input type="checkbox" checked={deleteDataToo} onChange={e => setDeleteDataToo(e.target.checked)} />
+                <span style={{ color: '#f87171', fontSize: '12px', fontWeight: 600 }}>Elimina anche i dati del salone (salon_data) — non reversibile</span>
+              </label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button onClick={() => { setConfirmDeleteTenant(false); setDeleteDataToo(false); }}
+                  style={{ flex: 1, padding: '8px', borderRadius: '8px', border: '1px solid #2e2e40', background: '#12121a', color: '#a1a1aa', cursor: 'pointer', fontSize: '12px' }}>
+                  Annulla
+                </button>
+                <button onClick={deleteTenant} disabled={deletingTenant}
+                  style={{ flex: 1, padding: '8px', borderRadius: '8px', border: 'none', background: deletingTenant ? '#2e2e40' : '#ef4444', color: 'white', cursor: deletingTenant ? 'not-allowed' : 'pointer', fontSize: '12px', fontWeight: 600 }}>
+                  {deletingTenant ? 'Eliminazione…' : 'Elimina definitivamente'}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -518,7 +563,7 @@ export default function AdminPage() {
                 <tr key={t.user_id} style={{ borderBottom: '1px solid #1e1e2a', cursor: 'pointer', transition: 'background 0.15s' }}
                   onMouseEnter={e => (e.currentTarget.style.background = '#202030')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                  onClick={() => { setSelTenant(t); setEditTenant({ ...t }); }}>
+                  onClick={() => { setSelTenant(t); setEditTenant({ ...t }); setConfirmDeleteTenant(false); setDeleteDataToo(false); }}>
                   <td style={{ padding: '12px 14px', color: '#f4f4f5', fontWeight: 600 }}>{t.salon_name}</td>
                   <td style={{ padding: '12px 14px', color: '#a1a1aa' }}>{t.full_name || '—'}</td>
                   <td style={{ padding: '12px 14px' }}><Badge s={t.plan} map={PLAN} /></td>
@@ -527,7 +572,7 @@ export default function AdminPage() {
                   <td style={{ padding: '12px 14px', color: '#a1a1aa', textAlign: 'center' }}>{t.appointments_count}</td>
                   <td style={{ padding: '12px 14px', color: '#71717a', whiteSpace: 'nowrap' }}>{fmtDate(t.registered_at)}</td>
                   <td style={{ padding: '12px 14px' }}>
-                    <button onClick={ev => { ev.stopPropagation(); setSelTenant(t); setEditTenant({ ...t }); }}
+                    <button onClick={ev => { ev.stopPropagation(); setSelTenant(t); setEditTenant({ ...t }); setConfirmDeleteTenant(false); setDeleteDataToo(false); }}
                       style={{ background: 'none', border: '1px solid #2e2e40', borderRadius: '6px', padding: '4px 10px', color: '#818cf8', fontSize: '11px', cursor: 'pointer' }}>
                       Apri
                     </button>

@@ -1,6 +1,7 @@
 ﻿'use client';
 
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { LayoutDashboard, Table2, BarChart3, Settings, Scissors, Wifi, WifiOff, LogOut, CalendarDays, Users, Sparkles, UserCog, Package, Banknote, UserCircle, X, Lock, LogIn, Trophy, Star, Globe, Moon, Sun } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { getCurrentUser, signOut } from '@/lib/supabase';
@@ -97,6 +98,7 @@ export default function Sidebar({ activeView, onNavigate, onLock, permissions, p
     window.location.href = '/login';
   };
   return (
+    <>
     <aside className="w-60 shrink-0 h-screen sticky top-0 flex flex-col"
       style={{ background: 'var(--bg-sidebar)', borderRight: '1px solid var(--border)' }}>
       {/* Logo */}
@@ -230,26 +232,32 @@ export default function Sidebar({ activeView, onNavigate, onLock, permissions, p
         <p className="text-xs px-1" style={{ color: 'var(--border-light)' }}>v1.0.0 · 2026</p>
       </div>
 
-      {/* PIN modal */}
-      {showPinModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
-          <div className="w-full max-w-xs rounded-2xl p-5" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+    </aside>
+
+      {/* PIN modal - rendered as portal to avoid sticky stacking context issues */}
+      {showPinModal && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.75)', zIndex: 9999 }}
+          onClick={() => setShowPinModal(false)}>
+          <div className="w-full max-w-xs rounded-2xl p-5" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
+            onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4">
-              <h3 className="font-semibold text-white text-sm">{pinStep === 'select' ? 'Chi sta lavorando?' : 'Inserisci PIN'}</h3>
+              <h3 className="font-semibold text-sm" style={{ color: 'var(--text)' }}>{pinStep === 'select' ? 'Chi sta lavorando?' : 'Inserisci PIN'}</h3>
               <button onClick={() => setShowPinModal(false)} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}><X size={16} /></button>
             </div>
             {pinStep === 'select' ? (
               <div className="space-y-2">
-                {operators.filter(o => o.active).map(op => (
+                {operators.filter(o => o.active).length === 0 ? (
+                  <p style={{ color: 'var(--muted)', fontSize: '13px', textAlign: 'center', padding: '12px 0' }}>Nessun operatore attivo.<br />Configurali nella sezione Personale.</p>
+                ) : operators.filter(o => o.active).map(op => (
                   <button key={op.id} onClick={() => handleOpSelect(op.id)}
                     className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-left"
-                    style={{ background: 'var(--bg-input)', border: `1px solid ${op.color}40`, cursor: 'pointer' }}>
+                    style={{ background: 'var(--bg-input)', border: `1px solid ${(op.color || '#6366f1') + '40'}`, cursor: 'pointer' }}>
                     <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
-                      style={{ background: op.color + '30', color: op.color }}>
-                      {op.name.charAt(0).toUpperCase()}
+                      style={{ background: (op.color || '#6366f1') + '30', color: op.color || '#6366f1' }}>
+                      {(op.name || '?').charAt(0).toUpperCase()}
                     </div>
                     <div>
-                      <p className="font-medium" style={{ color: 'var(--text-2)' }}>{op.name}</p>
+                      <p className="font-medium" style={{ color: 'var(--text)' }}>{op.name || 'Operatore'}</p>
                       <p style={{ fontSize: 11, color: 'var(--muted)' }}>{op.pin ? <><Lock size={9} style={{ display: 'inline' }} /> PIN richiesto</> : 'Nessun PIN'}</p>
                     </div>
                   </button>
@@ -257,8 +265,8 @@ export default function Sidebar({ activeView, onNavigate, onLock, permissions, p
               </div>
             ) : (
               <div>
-                <p className="text-sm mb-3" style={{ color: 'var(--text-3)' }}>
-                  Operatore: <strong style={{ color: 'var(--text-2)' }}>{operators.find(o => o.id === selectedOpId)?.name}</strong>
+                <p className="text-sm mb-3" style={{ color: 'var(--muted)' }}>
+                  Operatore: <strong style={{ color: 'var(--text)' }}>{operators.find(o => o.id === selectedOpId)?.name}</strong>
                 </p>
                 <input
                   type="password" maxLength={8} placeholder="PIN" value={pinInput}
@@ -277,8 +285,9 @@ export default function Sidebar({ activeView, onNavigate, onLock, permissions, p
               </div>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
-    </aside>
+    </>
   );
 }

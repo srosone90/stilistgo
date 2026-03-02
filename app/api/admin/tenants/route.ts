@@ -119,3 +119,29 @@ export async function PATCH(req: NextRequest) {
 
   return NextResponse.json({ success: true });
 }
+
+/** DELETE /api/admin/tenants — delete tenant metadata (+ optional salon_data) */
+export async function DELETE(req: NextRequest) {
+  if (!auth(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const { user_id, delete_data } = await req.json();
+  if (!user_id) return NextResponse.json({ error: 'user_id required' }, { status: 400 });
+
+  const db = getAdminDb();
+  // Always delete admin_tenants record
+  await db.from('admin_tenants').delete().eq('user_id', user_id);
+
+  // Optionally delete salon_data (full wipe)
+  if (delete_data) {
+    await db.from('salon_data').delete().eq('user_id', user_id);
+  }
+
+  // Audit
+  await db.from('admin_audit_log').insert({
+    id: `al-${Date.now()}`,
+    action: 'tenant_deleted',
+    target_tenant: user_id,
+    details: { delete_data: !!delete_data },
+  });
+
+  return NextResponse.json({ success: true });
+}
