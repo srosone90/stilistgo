@@ -238,7 +238,9 @@ export interface GiftCard {
 
 export interface WhatsAppConfig {
   enabled: boolean;
-  // Automation toggles (credentials are platform-level env vars, not per-salon)
+  phoneNumberId: string;  // from Meta Business Manager
+  accessToken: string;    // from Meta Business Manager (system user token)
+  // Automation toggles
   reminderEnabled: boolean;
   birthdayEnabled: boolean;
   postVisitEnabled: boolean;
@@ -249,6 +251,8 @@ export interface WhatsAppConfig {
 
 export const DEFAULT_WHATSAPP_CONFIG: WhatsAppConfig = {
   enabled: false,
+  phoneNumberId: '',
+  accessToken: '',
   reminderEnabled: true,
   birthdayEnabled: true,
   postVisitEnabled: true,

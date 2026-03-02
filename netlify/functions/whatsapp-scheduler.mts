@@ -14,6 +14,8 @@ import { createClient } from '@supabase/supabase-js';
 // ─── Types (inline to avoid import issues in Netlify functions) ───────────────
 interface WhatsAppConfig {
   enabled: boolean;
+  phoneNumberId: string;
+  accessToken: string;
   reminderEnabled: boolean;
   birthdayEnabled: boolean;
   postVisitEnabled: boolean;
@@ -91,15 +93,6 @@ export default async function handler() {
 
   const supabase = createClient(supabaseUrl, serviceKey);
 
-  // Platform-level WhatsApp credentials (single account for all salons)
-  const platformPhoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-  const platformAccessToken   = process.env.WHATSAPP_ACCESS_TOKEN;
-
-  if (!platformPhoneNumberId || !platformAccessToken) {
-    console.error('Missing WHATSAPP_PHONE_NUMBER_ID or WHATSAPP_ACCESS_TOKEN env vars');
-    return new Response('Missing WhatsApp credentials', { status: 500 });
-  }
-
   // Fetch ALL salon_data rows (service key bypasses RLS)
   const { data: rows, error } = await supabase.from('salon_data').select('user_id, state');
   if (error) { console.error('Supabase fetch error:', error); return new Response('DB error', { status: 500 }); }
@@ -114,10 +107,10 @@ export default async function handler() {
   for (const row of rows ?? []) {
     const state = row.state as SalonState;
     const wa = state?.salonConfig?.whatsapp;
-    if (!wa?.enabled) continue;
+    if (!wa?.enabled || !wa.phoneNumberId || !wa.accessToken) continue;
 
-    const phoneNumberId = platformPhoneNumberId;
-    const accessToken   = platformAccessToken;
+    const phoneNumberId = wa.phoneNumberId;
+    const accessToken   = wa.accessToken;
 
     const clients = state.clients ?? [];
     const appointments = state.appointments ?? [];
