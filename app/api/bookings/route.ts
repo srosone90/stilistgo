@@ -5,12 +5,6 @@ function genId(prefix: string) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
-function addMinutes(time: string, mins: number): string {
-  const [h, m] = time.split(':').map(Number);
-  const total = h * 60 + m + mins;
-  return `${String(Math.floor(total / 60) % 24).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
-}
-
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -59,69 +53,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Errore durante il salvataggio. Riprova.' }, { status: 500 });
     }
 
-    // ── 2. Write appointment into salon_data.state so it appears in calendar ─
-    if (salonId) {
-      try {
-        const { data: salonRow } = await supabase
-          .from('salon_data')
-          .select('state')
-          .eq('user_id', salonId)
-          .maybeSingle();
-
-        const state = (salonRow?.state as Record<string, unknown>) ?? {};
-        const clients = (state.clients as {
-          id: string; name: string; phone: string; email: string; active: boolean; createdAt: string;
-        }[]) ?? [];
-        const appointments = (state.appointments as Record<string, unknown>[]) ?? [];
-
-        // Find or create client by phone
-        let client = clients.find(c => c.phone === clientPhone);
-        if (!client) {
-          client = {
-            id: genId('cl'),
-            name: clientName,
-            phone: clientPhone,
-            email: clientEmail || '',
-            active: true,
-            createdAt: new Date().toISOString(),
-          };
-          clients.push(client);
-        }
-
-        // Build appointment
-        const apptDuration = typeof duration === 'number' && duration > 0 ? duration : 45;
-        const endTime = addMinutes(preferredTime, apptDuration);
-
-        const appointment: Record<string, unknown> = {
-          id: bookingId,
-          clientId: client.id,
-          clientName: clientName,
-          operatorId: operatorId || '',
-          services: Array.isArray(serviceIds) ? serviceIds : [],
-          serviceNames: service || '',
-          date: preferredDate,
-          startTime: preferredTime,
-          endTime,
-          duration: apptDuration,
-          status: 'confirmed',
-          notes: notes || '',
-          price: 0,
-          source: 'online',
-          createdAt: new Date().toISOString(),
-        };
-
-        appointments.push(appointment);
-
-        const updatedState = { ...state, clients, appointments };
-
-        await supabase
-          .from('salon_data')
-          .upsert({ user_id: salonId, state: updatedState }, { onConflict: 'user_id' });
-      } catch (calErr) {
-        // Non-fatal: booking is already saved in online_bookings
-        console.error('Failed to write appointment to salon_data:', calErr);
-      }
-    }
+    // Step 2 (direct salon_data write) removed: the SalonContext auto-import
+    // handles importing pending bookings with the correct Client format
+    // (firstName / lastName) on the next app load.
 
     return NextResponse.json({ success: true, id: bookingId });
   } catch (e) {
