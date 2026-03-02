@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { LayoutDashboard, Table2, BarChart3, Settings, Scissors, Wifi, WifiOff, LogOut, CalendarDays, Users, Sparkles, UserCog, Package, Banknote, UserCircle, X, Lock, LogIn, Trophy } from 'lucide-react';
+import { LayoutDashboard, Table2, BarChart3, Settings, Scissors, Wifi, WifiOff, LogOut, CalendarDays, Users, Sparkles, UserCog, Package, Banknote, UserCircle, X, Lock, LogIn, Trophy, Star, Globe } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { getCurrentUser, signOut } from '@/lib/supabase';
 import { useSalon } from '@/context/SalonContext';
@@ -39,6 +39,13 @@ const navGroups: { label: string; items: NavItem[] }[] = [
     label: 'Team',
     items: [
       { id: 'gamification', label: 'Gamification', icon: <Trophy size={18} /> },
+      { id: 'loyalty',      label: 'Fidelizzazione', icon: <Star size={18} /> },
+    ],
+  },
+  {
+    label: 'Online',
+    items: [
+      { id: 'bookings', label: 'Prenotazioni Online', icon: <Globe size={18} /> },
     ],
   },
 ];

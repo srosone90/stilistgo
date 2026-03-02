@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
 import {
   Client, TechnicalCard, Service, Operator, Absence,
   Appointment, AppointmentStatus, WaitingListEntry,
@@ -25,6 +25,8 @@ import {
   storageGetGamificationConfig, storageSaveGamificationConfig,
   salonGenerateId,
 } from '@/lib/salonStorage';
+import { getCurrentUser } from '@/lib/supabase';
+import { dbGetSalonState, dbSaveSalonState } from '@/lib/salonDb';
 
 interface SalonContextValue {
   // State
@@ -129,6 +131,8 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
   const [cashSessions, setCashSessions] = useState<CashSession[]>([]);
   const [activeOperatorId, setActiveOperatorIdState] = useState<string | null>(null);
   const [salonLoading, setSalonLoading] = useState(true);
+  const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cloudLoadAttempted = useRef(false);
 
   useEffect(() => {
     setClients(storageGetClients());
@@ -148,6 +152,58 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
     setActiveOperatorIdState(storageGetActiveOperatorId());
     setSalonLoading(false);
   }, []);
+
+  // ─── Cloud sync: load from Supabase once after local load ─────────────────
+  useEffect(() => {
+    if (salonLoading) return;
+    const loadCloud = async () => {
+      try {
+        const user = await getCurrentUser();
+        if (!user) return;
+        const cloudState = await dbGetSalonState(user.id as string);
+        if (!cloudState) return;
+        if (cloudState.clients)            { setClients(cloudState.clients as Client[]); storageSaveClients(cloudState.clients as Client[]); }
+        if (cloudState.technicalCards)     { setTechnicalCards(cloudState.technicalCards as TechnicalCard[]); storageSaveTechnicalCards(cloudState.technicalCards as TechnicalCard[]); }
+        if (cloudState.services)           { setServices(cloudState.services as Service[]); storageSaveServices(cloudState.services as Service[]); }
+        if (cloudState.operators)          { setOperators(cloudState.operators as Operator[]); storageSaveOperators(cloudState.operators as Operator[]); }
+        if (cloudState.absences)           { setAbsences(cloudState.absences as Absence[]); storageSaveAbsences(cloudState.absences as Absence[]); }
+        if (cloudState.appointments)       { setAppointments(cloudState.appointments as Appointment[]); storageSaveAppointments(cloudState.appointments as Appointment[]); }
+        if (cloudState.waitingList)        { setWaitingList(cloudState.waitingList as WaitingListEntry[]); storageSaveWaitingList(cloudState.waitingList as WaitingListEntry[]); }
+        if (cloudState.products)           { setProducts(cloudState.products as Product[]); storageSaveProducts(cloudState.products as Product[]); }
+        if (cloudState.stockMovements)     { setStockMovements(cloudState.stockMovements as StockMovement[]); storageSaveStockMovements(cloudState.stockMovements as StockMovement[]); }
+        if (cloudState.giftCards)          { setGiftCards(cloudState.giftCards as GiftCard[]); storageSaveGiftCards(cloudState.giftCards as GiftCard[]); }
+        if (cloudState.payments)           { setPayments(cloudState.payments as Payment[]); storageSavePayments(cloudState.payments as Payment[]); }
+        if (cloudState.cashSessions)       { setCashSessions(cloudState.cashSessions as CashSession[]); storageSaveCashSessions(cloudState.cashSessions as CashSession[]); }
+        if (cloudState.salonConfig)        { setSalonConfig(cloudState.salonConfig as SalonConfig); storageSaveSalonConfig(cloudState.salonConfig as SalonConfig); }
+        if (cloudState.gamificationConfig) { setGamificationConfig(cloudState.gamificationConfig as GamificationConfig); storageSaveGamificationConfig(cloudState.gamificationConfig as GamificationConfig); }
+      } catch { /* ignore */ } finally {
+        cloudLoadAttempted.current = true;
+      }
+    };
+    loadCloud();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [salonLoading]);
+
+  // ─── Cloud sync: debounced save on every state change ─────────────────────
+  useEffect(() => {
+    if (!cloudLoadAttempted.current) return;
+    if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
+    syncTimerRef.current = setTimeout(async () => {
+      try {
+        const user = await getCurrentUser();
+        if (!user) return;
+        await dbSaveSalonState(user.id as string, {
+          clients, technicalCards, services, operators, absences, appointments,
+          waitingList, products, stockMovements, giftCards, payments,
+          cashSessions, salonConfig, gamificationConfig,
+        });
+      } catch { /* ignore */ }
+    }, 3000);
+    return () => { if (syncTimerRef.current) clearTimeout(syncTimerRef.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clients, technicalCards, services, operators, absences, appointments,
+      waitingList, products, stockMovements, giftCards, payments,
+      cashSessions, salonConfig, gamificationConfig]);
 
   // ─── Clients ──────────────────────────────────────────────────────────────
 

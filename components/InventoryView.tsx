@@ -2,7 +2,9 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useSalon } from '@/context/SalonContext';
+import { useApp } from '@/context/AppContext';
 import { Product, StockMovement, StockMovementType, STOCK_MOVEMENT_LABELS } from '@/types/salon';
+import { CashOut } from '@/types';
 import { format, parseISO } from 'date-fns';
 import { formatCurrency } from '@/lib/calculations';
 import { Plus, X, Pencil, Trash2, AlertTriangle, Package } from 'lucide-react';
@@ -24,6 +26,7 @@ const EMPTY_MOVEMENT: Omit<StockMovement, 'id' | 'createdAt'> = {
 
 export default function InventoryView({ newTrigger }: { newTrigger?: number }) {
   const { products, addProduct, updateProduct, deleteProduct, stockMovements, addStockMovement, operators } = useSalon();
+  const { addEntry } = useApp();
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showProdForm, setShowProdForm] = useState(false);
@@ -74,6 +77,26 @@ export default function InventoryView({ newTrigger }: { newTrigger?: number }) {
     if (!moveForm.productId) return;
     const qty = moveForm.type === 'load' ? Math.abs(moveForm.quantity) : -Math.abs(moveForm.quantity);
     addStockMovement({ ...moveForm, quantity: qty });
+
+    // Se è un carico (acquisto), registra automaticamente come spesa in contabilità
+    if (moveForm.type === 'load') {
+      const prod = products.find(p => p.id === moveForm.productId);
+      if (prod && prod.purchasePrice > 0) {
+        const totalCost = prod.purchasePrice * Math.abs(moveForm.quantity);
+        const expenseEntry: Omit<CashOut, 'id' | 'createdAt'> = {
+          type: 'expense',
+          date: moveForm.date,
+          amount: totalCost,
+          supplier: prod.brand || 'Fornitore',
+          expenseType: 'Acquisto Prodotti',
+          dueDate: '',
+          status: 'Pagato',
+          notes: `Carico magazzino: ${prod.name} ×${Math.abs(moveForm.quantity)} ${prod.unit}`,
+        };
+        addEntry(expenseEntry);
+      }
+    }
+
     setShowMoveForm(false);
   }
 

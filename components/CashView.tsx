@@ -95,7 +95,6 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
   const [closingBalance, setClosingBalance] = useState('');
   const [expandedPaymentId, setExpandedPaymentId] = useState<string | null>(null);
   const [newItemServiceId, setNewItemServiceId] = useState('');
-  const [productSearch, setProductSearch] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   // Today's session
@@ -156,7 +155,6 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
 
   function addProductItem(prod: typeof products[number]) {
     setForm(p => ({ ...p, items: [...p.items, { productId: prod.id, serviceName: prod.name, price: prod.salePrice, isProduct: true }] }));
-    setProductSearch('');
   }
 
   // --- Generazione PDF report cassa ---
@@ -556,34 +554,27 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
                   <button onClick={addManualItem} style={{ ...btnPrimary, flexShrink: 0 }}><Plus size={14} /></button>
                 </div>
 
-                {/* Product autocomplete */}
-                <label style={{ ...labelStyle, marginTop: 8 }}>Aggiungi prodotto</label>
-                <div className="mb-2">
-                  <input
-                    type="text"
-                    placeholder="Cerca prodotto per nome o marca..."
-                    value={productSearch}
-                    onChange={e => setProductSearch(e.target.value)}
-                    style={inputStyle}
-                  />
-                  {productSearch.length > 0 && (() => {
-                    const matches = products.filter(p => p.active && p.isForSale && (
-                      p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
-                      p.brand.toLowerCase().includes(productSearch.toLowerCase())
-                    ));
-                    return matches.length > 0 ? (
-                      <div className="mt-1 rounded-xl" style={{ background: '#12121a', border: '1px solid #2e2e40', maxHeight: 180, overflowY: 'auto' }}>
-                        {matches.map(p => (
-                          <button key={p.id} onMouseDown={e => { e.preventDefault(); addProductItem(p); }}
-                            className="w-full text-left px-3 py-2 text-sm"
-                            style={{ background: 'transparent', border: 'none', borderBottom: '1px solid #1c1c27', color: '#d4d4d8', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span><span style={{ color: '#a855f7' }}>📦</span> {p.name} <span style={{ color: '#71717a', fontSize: 11 }}>{p.brand}</span></span>
-                            <span style={{ color: '#22c55e', fontWeight: 600 }}>{formatCurrency(p.salePrice)}</span>
-                          </button>
-                        ))}
-                      </div>
-                    ) : <p className="text-xs mt-1" style={{ color: '#52525b' }}>Nessun prodotto trovato.</p>;
-                  })()}
+                {/* Product dropdown */}
+                <label style={{ ...labelStyle, marginTop: 8 }}>Aggiungi prodotto dal magazzino</label>
+                <div className="flex gap-2 mb-2">
+                  <select
+                    value=""
+                    onChange={e => {
+                      const prod = products.find(p => p.id === e.target.value);
+                      if (prod) addProductItem(prod);
+                    }}
+                    style={{ ...inputStyle, flex: 1 }}
+                  >
+                    <option value="">— Seleziona prodotto —</option>
+                    {products.filter(p => p.active && p.isForSale).length === 0
+                      ? <option disabled>Nessun prodotto in vendita nel magazzino</option>
+                      : products.filter(p => p.active && p.isForSale).map(p => (
+                        <option key={p.id} value={p.id} disabled={p.stock <= 0}>
+                          {p.name}{p.brand ? ` (${p.brand})` : ''} — {formatCurrency(p.salePrice)}{p.stock <= 0 ? ' ⚠ esaurito' : ''}
+                        </option>
+                      ))
+                    }
+                  </select>
                 </div>
 
                 {form.items.map((item, i) => (

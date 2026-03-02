@@ -104,28 +104,7 @@ export default function OperatorLockScreen({ onUnlock }: { onUnlock: () => void 
             ))
           )}
 
-          {/* Link titolare */}
-          <p className="text-center text-xs pt-4" style={{ color: '#3f3f5a' }}>
-            Sei il/la titolare?{' '}
-            <button
-              onClick={() => {
-                // Imposta nessun operatore e sblocca (il
-                // titolare usa il login Supabase già effettuato)
-                setActiveOperatorId('');
-                onUnlock();
-              }}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: '#6366f1',
-                cursor: 'pointer',
-                fontSize: 'inherit',
-                textDecoration: 'underline',
-              }}
-            >
-              Entra come admin
-            </button>
-          </p>
+
         </div>
       ) : (
         <div className="w-full max-w-xs">

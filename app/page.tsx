@@ -15,14 +15,16 @@ import StaffView from '@/components/StaffView';
 import InventoryView from '@/components/InventoryView';
 import CashView from '@/components/CashView';
 import GamificationView from '@/components/GamificationView';
+import LoyaltyView from '@/components/LoyaltyView';
+import OnlineBookingsView from '@/components/OnlineBookingsView';
 import OperatorLockScreen from '@/components/OperatorLockScreen';
 import { useApp } from '@/context/AppContext';
 import { useSalon } from '@/context/SalonContext';
-import { getCurrentUser } from '@/lib/supabase';
+import { getCurrentUser, signOut } from '@/lib/supabase';
 import { DEFAULT_OPERATOR_PERMISSIONS, OperatorPermissions } from '@/types/salon';
-import { Plus, Loader2, CalendarDays, Users, Sparkles, UserCog, Package, Banknote, Trophy } from 'lucide-react';
+import { Plus, Loader2, CalendarDays, Users, Sparkles, UserCog, Package, Banknote, Trophy, Star, Globe, LogOut } from 'lucide-react';
 
-type View = 'dashboard' | 'tabella' | 'analisi' | 'impostazioni' | 'calendar' | 'clients' | 'services' | 'staff' | 'inventory' | 'cash' | 'gamification';
+type View = 'dashboard' | 'tabella' | 'analisi' | 'impostazioni' | 'calendar' | 'clients' | 'services' | 'staff' | 'inventory' | 'cash' | 'gamification' | 'loyalty' | 'bookings';
 
 export default function Home() {
   const router = useRouter();
@@ -54,7 +56,7 @@ export default function Home() {
       calendar: effectivePerms.calendar, clients: effectivePerms.clients,
       services: effectivePerms.services, staff: effectivePerms.staff,
       inventory: effectivePerms.inventory, cash: effectivePerms.cash,
-      gamification: true,
+      gamification: true, loyalty: true, bookings: effectivePerms.accounting,
     };
     if (!viewPermsMap[view]) {
       const fallback = (Object.keys(viewPermsMap) as View[]).find(v => viewPermsMap[v]);
@@ -99,6 +101,8 @@ export default function Home() {
     inventory:    { label: 'Nuovo Prodotto',   icon: <Package size={20} />,   action: () => setFabTrigger(t => t + 1) },
     cash:         { label: 'Incassa',          icon: <Banknote size={20} />,  action: () => setFabTrigger(t => t + 1) },
     gamification: { label: 'Gamification',     icon: <Trophy size={20} />,    action: () => {} },
+    loyalty:      { label: 'Fidelizzazione',    icon: <Star size={20} />,      action: () => {} },
+    bookings:     { label: 'Prenotazioni',      icon: <Globe size={20} />,     action: () => {} },
   };
 
   const renderView = () => {
@@ -114,6 +118,8 @@ export default function Home() {
       case 'inventory':return effectivePerms.inventory ? <InventoryView newTrigger={fabTrigger} /> : AccessDenied;
       case 'cash':     return effectivePerms.cash      ? <CashView newTrigger={fabTrigger} cashPreset={cashPreset} onPresetConsumed={() => setCashPreset(null)} /> : AccessDenied;
       case 'gamification': return <GamificationView />;
+      case 'loyalty':      return <LoyaltyView />;
+      case 'bookings':     return effectivePerms.accounting ? <OnlineBookingsView /> : AccessDenied;
     }
   };
 
@@ -162,7 +168,14 @@ export default function Home() {
             </div>
           </button>
           <p className="font-bold text-white text-sm">Stylistgo</p>
-          <div className="w-9" />
+          <button
+            onClick={async () => { await signOut(); router.push('/login'); }}
+            className="p-2 rounded-lg"
+            style={{ background: '#1c1c27' }}
+            title="Esci"
+          >
+            <LogOut size={18} style={{ color: '#71717a' }} />
+          </button>
         </div>
 
         {/* Page content */}
