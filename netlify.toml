@@ -2,9 +2,5 @@
   command = "npm run build"
   publish = ".next"
 
-[functions]
-  # Increase timeout for AI API calls (Gemini invoice parsing can take 10-20s)
-  timeout = 26
-
 [[plugins]]
   package = "@netlify/plugin-nextjs"
