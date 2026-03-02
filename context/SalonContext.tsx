@@ -228,6 +228,11 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
                 continue;
               }
 
+              // Extract operatorId encoded as [op:xxx] prefix in notes
+              const opMatch = (b.notes || '').match(/^\[op:([^\]]+)\]/);
+              const bookingOperatorId = opMatch?.[1] || '';
+              const cleanNotes = (b.notes || '').replace(/^\[op:[^\]]+\]\s*/, '');
+
               let clientId = mergedClients.find(c =>
                 c.phone === b.client_phone || (b.client_email && c.email === b.client_email)
               )?.id;
@@ -252,11 +257,11 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
               const endMin = (hh || 10) * 60 + (mm || 0) + dur;
               const endTime = `${String(Math.floor(endMin / 60) % 24).padStart(2, '0')}:${String(endMin % 60).padStart(2, '0')}`;
               mergedApts.push({
-                id: salonGenerateId(), clientId, operatorId: '',
+                id: salonGenerateId(), clientId, operatorId: bookingOperatorId,
                 serviceIds: matchedService ? [matchedService.id] : [],
                 date: b.preferred_date, startTime: b.preferred_time, endTime,
                 status: 'scheduled',
-                notes: `📱 Prenotazione online [${b.id}]: ${b.service}${b.notes ? ` — ${b.notes}` : ''}`,
+                notes: `📱 Prenotazione online [${b.id}]: ${b.service}${cleanNotes ? ` — ${cleanNotes}` : ''}`,
                 isBlock: false, blockReason: '', recurringGroupId: '', feedbackScore: 0,
                 createdAt: new Date().toISOString(),
                 history: [{ timestamp: new Date().toISOString(), action: 'Importato da prenotazione online' }],

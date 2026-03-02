@@ -35,6 +35,11 @@ export async function POST(req: NextRequest) {
     const bookingId = genId('bk');
 
     // ── 1. Insert to online_bookings table ───────────────────────────────────
+    // Encode operatorId into notes with a special prefix (avoids needing an extra DB column)
+    const notesWithOp = operatorId
+      ? `[op:${operatorId}]${notes ? ' ' + notes : ''}`
+      : (notes || '');
+
     const { error: onlineErr } = await supabase.from('online_bookings').insert({
       id: bookingId,
       salon_id: salonId || '',
@@ -44,7 +49,7 @@ export async function POST(req: NextRequest) {
       service: service || (Array.isArray(serviceIds) ? serviceIds.join(', ') : ''),
       preferred_date: preferredDate,
       preferred_time: preferredTime,
-      notes: notes || '',
+      notes: notesWithOp,
       status: 'pending',
     });
 
