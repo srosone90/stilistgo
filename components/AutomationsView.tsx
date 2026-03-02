@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSalon } from '@/context/SalonContext';
 import { DEFAULT_WHATSAPP_CONFIG } from '@/types/salon';
 import type { WhatsAppConfig } from '@/types/salon';
+import { getCurrentUser } from '@/lib/supabase';
 import {
   MessageSquare, CheckCircle, XCircle, ChevronDown, ChevronUp,
   Wifi, WifiOff, RefreshCw,
@@ -55,11 +56,43 @@ export default function AutomationsView() {
   const [saved, setSaved] = useState(false);
   const [instanceStatus, setInstanceStatus] = useState<'idle' | 'loading' | 'connected' | 'disconnected'>('idle');
   const [qrCode, setQrCode] = useState<string | null>(null);
+  const credLoadedRef = useRef(false);
 
-  // Sync cfg when salonConfig changes (e.g. credentials arrive from cloud after login)
+  // On mount: fetch credentials directly from the API so we never depend on
+  // the cloud-sync timing in SalonContext. Once loaded, trigger status check.
   useEffect(() => {
-    if (salonConfig.whatsapp) setCfg(salonConfig.whatsapp);
-  }, [salonConfig.whatsapp]);
+    if (credLoadedRef.current) return;
+    credLoadedRef.current = true;
+    (async () => {
+      try {
+        const user = await getCurrentUser();
+        if (!user) return;
+        const res = await fetch(`/api/admin/whatsapp?user_id=${user.id}`);
+        if (!res.ok) return;
+        const d = await res.json();
+        const instanceId = d.ultraMsgInstanceId ?? '';
+        const token = d.ultraMsgToken ?? '';
+        if (instanceId && token) {
+          setCfg(prev => ({ ...prev, ultraMsgInstanceId: instanceId, ultraMsgToken: token }));
+        }
+      } catch { /* offline — fall back to cached salonConfig */ }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Re-sync non-credential fields when salonConfig updates from cloud
+  useEffect(() => {
+    if (salonConfig.whatsapp) {
+      setCfg(prev => ({
+        ...salonConfig.whatsapp!,
+        // Preserve credentials loaded directly from API (more reliable)
+        ultraMsgInstanceId: prev.ultraMsgInstanceId || salonConfig.whatsapp!.ultraMsgInstanceId,
+        ultraMsgToken: prev.ultraMsgToken || salonConfig.whatsapp!.ultraMsgToken,
+      }));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [salonConfig.whatsapp?.ultraMsgInstanceId, salonConfig.whatsapp?.enabled,
+      salonConfig.whatsapp?.reminderEnabled, salonConfig.whatsapp?.birthdayEnabled]);
 
   const isConfigured = Boolean(cfg.ultraMsgInstanceId && cfg.ultraMsgToken);
 
