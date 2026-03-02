@@ -234,6 +234,58 @@ export interface GiftCard {
   createdAt: string;
 }
 
+// ─── WhatsApp Automations ──────────────────────────────────────────────────
+
+export interface WhatsAppConfig {
+  enabled: boolean;
+  phoneNumberId: string;   // Meta: Phone Number ID dashboard.developers.facebook.com
+  accessToken: string;     // Meta: System User Access Token (permanent)
+  // Templates (must be pre-approved in Meta Business Manager > Message Templates)
+  reminderTemplate: string;    // default: 'appointment_reminder'
+  birthdayTemplate: string;    // default: 'birthday_wishes'
+  postVisitTemplate: string;   // default: 'post_visit'
+  loyaltyTemplate: string;     // default: 'loyalty_reward'
+  bookingTemplate: string;     // default: 'booking_confirmed'
+  // Automation toggles
+  reminderEnabled: boolean;
+  birthdayEnabled: boolean;
+  postVisitEnabled: boolean;
+  loyaltyEnabled: boolean;
+  bookingConfirmEnabled: boolean;
+  loyaltyMilestone: number;    // notify when reaching this points count (es. 100)
+}
+
+export const DEFAULT_WHATSAPP_CONFIG: WhatsAppConfig = {
+  enabled: false,
+  phoneNumberId: '',
+  accessToken: '',
+  reminderTemplate: 'appointment_reminder',
+  birthdayTemplate: 'birthday_wishes',
+  postVisitTemplate: 'post_visit',
+  loyaltyTemplate: 'loyalty_reward',
+  bookingTemplate: 'booking_confirmed',
+  reminderEnabled: true,
+  birthdayEnabled: true,
+  postVisitEnabled: true,
+  loyaltyEnabled: false,
+  bookingConfirmEnabled: true,
+  loyaltyMilestone: 100,
+};
+
+export type WhatsAppMessageType = 'reminder' | 'birthday' | 'post_visit' | 'loyalty' | 'booking_confirm' | 'manual';
+
+export interface WhatsAppMessage {
+  id: string;
+  type: WhatsAppMessageType;
+  clientId: string;
+  clientName: string;
+  phone: string;
+  templateName: string;
+  status: 'sent' | 'failed';
+  errorMsg?: string;
+  sentAt: string; // ISO
+}
+
 // ─── Salon Configuration ─────────────────────────────────────────────────────
 
 export interface SalonConfig {
@@ -251,6 +303,7 @@ export interface SalonConfig {
   vatNumber: string;   // P.IVA
   invoiceNote: string; // note standard in stampe/fatture
   currency: string;    // default '€'
+  whatsapp?: WhatsAppConfig;
 }
 
 export const DEFAULT_SALON_CONFIG: SalonConfig = {

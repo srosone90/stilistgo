@@ -6,6 +6,7 @@ import {
   Appointment, AppointmentStatus, WaitingListEntry,
   Product, StockMovement, GiftCard, SalonConfig, AppointmentHistoryEntry,
   Payment, CashSession, GamificationConfig, DEFAULT_GAMIFICATION_CONFIG, DEFAULT_SALON_CONFIG,
+  WhatsAppMessage,
 } from '@/types/salon';
 import {
   storageGetClients, storageSaveClients,
@@ -111,6 +112,10 @@ interface SalonContextValue {
   // Gamification
   gamificationConfig: GamificationConfig;
   updateGamificationConfig: (c: Partial<GamificationConfig>) => void;
+
+  // WhatsApp message log
+  whatsappMessages: WhatsAppMessage[];
+  addWhatsAppMessage: (m: WhatsAppMessage) => void;
 }
 
 const SalonContext = createContext<SalonContextValue | null>(null);
@@ -130,6 +135,7 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
   const [salonConfig, setSalonConfig] = useState<SalonConfig>(DEFAULT_SALON_CONFIG);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [cashSessions, setCashSessions] = useState<CashSession[]>([]);
+  const [whatsappMessages, setWhatsappMessages] = useState<WhatsAppMessage[]>([]);
   const [activeOperatorId, setActiveOperatorIdState] = useState<string | null>(null);
   const [salonLoading, setSalonLoading] = useState(true);
   const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -194,6 +200,7 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
         if (arr<GiftCard>(cloudState.giftCards))               { setGiftCards(cloudState.giftCards as GiftCard[]); storageSaveGiftCards(cloudState.giftCards as GiftCard[]); }
         if (arr<Payment>(cloudState.payments))                 { setPayments(cloudState.payments as Payment[]); storageSavePayments(cloudState.payments as Payment[]); }
         if (arr<CashSession>(cloudState.cashSessions))         { setCashSessions(cloudState.cashSessions as CashSession[]); storageSaveCashSessions(cloudState.cashSessions as CashSession[]); }
+        if (arr<WhatsAppMessage>((cloudState as Record<string, unknown>).whatsappMessages)) { setWhatsappMessages((cloudState as Record<string, unknown>).whatsappMessages as WhatsAppMessage[]); }
         // For object fields (salonConfig, gamificationConfig) compare timestamps:
         // only apply cloud data if cloud saved it MORE RECENTLY than our last local save.
         const cloudSavedAt = (cloudState._savedAt as number) ?? 0;
@@ -318,7 +325,7 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
         await dbSaveSalonState(user.id as string, {
           clients, technicalCards, services, operators, absences, appointments,
           waitingList, products, stockMovements, giftCards, payments,
-          cashSessions, salonConfig, gamificationConfig,
+          cashSessions, salonConfig, gamificationConfig, whatsappMessages,
           _savedAt: savedAt,
         });
       } catch { /* ignore */ }
@@ -330,19 +337,19 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clients, technicalCards, services, operators, absences, appointments,
       waitingList, products, stockMovements, giftCards, payments,
-      cashSessions, salonConfig, gamificationConfig]);
+      cashSessions, salonConfig, gamificationConfig, whatsappMessages]);
 
   // Keep latestStateRef in sync so the flush-on-hide effect has fresh data
   useEffect(() => {
     latestStateRef.current = {
       clients, technicalCards, services, operators, absences, appointments,
       waitingList, products, stockMovements, giftCards, payments,
-      cashSessions, salonConfig, gamificationConfig,
+      cashSessions, salonConfig, gamificationConfig, whatsappMessages,
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clients, technicalCards, services, operators, absences, appointments,
       waitingList, products, stockMovements, giftCards, payments,
-      cashSessions, salonConfig, gamificationConfig]);
+      cashSessions, salonConfig, gamificationConfig, whatsappMessages]);
 
   // ─── Flush to cloud immediately when tab is hidden or page is unloading ───
   // This fires BEFORE window.location.href navigations complete, ensuring
@@ -615,6 +622,10 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
     setGamificationConfig(prev => { const n = { ...prev, ...c }; storageSaveGamificationConfig(n); return n; });
   }, []);
 
+  const addWhatsAppMessage = useCallback((m: WhatsAppMessage) => {
+    setWhatsappMessages(prev => [...prev, m].slice(-200)); // keep last 200
+  }, []);
+
   return (
     <SalonContext.Provider value={{
       clients, technicalCards, services, operators, absences,
@@ -634,6 +645,7 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
       payments, cashSessions, addPayment, deletePayment, addCashSession, closeCashSession,
       activeOperatorId, setActiveOperatorId, verifyOperatorPin,
       gamificationConfig, updateGamificationConfig,
+      whatsappMessages, addWhatsAppMessage,
     }}>
       {children}
     </SalonContext.Provider>
