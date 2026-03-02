@@ -558,7 +558,7 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
 
                 {/* Product autocomplete */}
                 <label style={{ ...labelStyle, marginTop: 8 }}>Aggiungi prodotto</label>
-                <div className="relative mb-2">
+                <div className="mb-2">
                   <input
                     type="text"
                     placeholder="Cerca prodotto per nome o marca..."
@@ -567,19 +567,22 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
                     style={inputStyle}
                   />
                   {productSearch.length > 0 && (() => {
-                    const matches = products.filter(p => p.active && p.isForSale && (p.name.toLowerCase().includes(productSearch.toLowerCase()) || p.brand.toLowerCase().includes(productSearch.toLowerCase())));
+                    const matches = products.filter(p => p.active && p.isForSale && (
+                      p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
+                      p.brand.toLowerCase().includes(productSearch.toLowerCase())
+                    ));
                     return matches.length > 0 ? (
-                      <div className="absolute z-10 w-full mt-1 rounded-xl overflow-hidden" style={{ background: '#18181f', border: '1px solid #2e2e40', maxHeight: 200, overflowY: 'auto' }}>
+                      <div className="mt-1 rounded-xl" style={{ background: '#12121a', border: '1px solid #2e2e40', maxHeight: 180, overflowY: 'auto' }}>
                         {matches.map(p => (
-                          <button key={p.id} onMouseDown={() => addProductItem(p)}
-                            className="w-full text-left px-3 py-2 text-sm hover:bg-[#2e2e40] transition-colors"
-                            style={{ background: 'transparent', border: 'none', color: '#d4d4d8', cursor: 'pointer', display: 'flex', justifyContent: 'space-between' }}>
+                          <button key={p.id} onMouseDown={e => { e.preventDefault(); addProductItem(p); }}
+                            className="w-full text-left px-3 py-2 text-sm"
+                            style={{ background: 'transparent', border: 'none', borderBottom: '1px solid #1c1c27', color: '#d4d4d8', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <span><span style={{ color: '#a855f7' }}>📦</span> {p.name} <span style={{ color: '#71717a', fontSize: 11 }}>{p.brand}</span></span>
                             <span style={{ color: '#22c55e', fontWeight: 600 }}>{formatCurrency(p.salePrice)}</span>
                           </button>
                         ))}
                       </div>
-                    ) : null;
+                    ) : <p className="text-xs mt-1" style={{ color: '#52525b' }}>Nessun prodotto trovato.</p>;
                   })()}
                 </div>
 

@@ -13,6 +13,7 @@ import { format } from 'date-fns';
 import { CATEGORY_ICONS, EntryCategory } from '@/types';
 import { FileDown } from 'lucide-react';
 import { exportDashboardPDF } from '@/lib/pdf';
+import { useCombinedTransactions } from '@/lib/useCombinedTransactions';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from 'recharts';
@@ -32,7 +33,8 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export default function Dashboard() {
-  const { transactions, settings } = useApp();
+  const { settings } = useApp();
+  const transactions = useCombinedTransactions();
   const thisMonth = format(new Date(), 'yyyy-MM');
   const monthTx = useMemo(() => filterByMonth(transactions, thisMonth), [transactions, thisMonth]);
 

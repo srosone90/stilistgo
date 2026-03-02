@@ -15,6 +15,7 @@ import {
 import { format } from 'date-fns';
 import { FileDown } from 'lucide-react';
 import { exportAnalysisPDF } from '@/lib/pdf';
+import { useCombinedTransactions } from '@/lib/useCombinedTransactions';
 
 const COLORS = ['#6366f1', '#a855f7', '#22c55e', '#f59e0b', '#ef4444', '#06b6d4', '#ec4899'];
 
@@ -46,7 +47,8 @@ const CustomPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }:
 };
 
 export default function AnalysisView() {
-  const { transactions, settings } = useApp();
+  const { settings } = useApp();
+  const transactions = useCombinedTransactions();
   const [period, setPeriod] = useState<'month' | 'year'>('month');
   const [selectedYear, setSelectedYear] = useState(format(new Date(), 'yyyy'));
   const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));

@@ -244,6 +244,13 @@ export interface SalonConfig {
   slotMinutes: number; // 15 | 30
   loyaltyPointsPerEuro: number;
   dormientiDays: number; // days before marking client dormant
+  // Contact & identity
+  address: string;
+  phone: string;
+  email: string;
+  vatNumber: string;   // P.IVA
+  invoiceNote: string; // note standard in stampe/fatture
+  currency: string;    // default '€'
 }
 
 export const DEFAULT_SALON_CONFIG: SalonConfig = {
@@ -254,6 +261,12 @@ export const DEFAULT_SALON_CONFIG: SalonConfig = {
   slotMinutes: 30,
   loyaltyPointsPerEuro: 1,
   dormientiDays: 60,
+  address: '',
+  phone: '',
+  email: '',
+  vatNumber: '',
+  invoiceNote: '',
+  currency: '€',
 };
 
 export const OPERATOR_COLORS = [

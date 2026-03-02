@@ -7,6 +7,7 @@ import { Transaction, CATEGORY_ICONS, EntryCategory, EXPENSE_TYPE_ICONS, Expense
 import { format, parseISO } from 'date-fns';
 import { Trash2, ChevronUp, ChevronDown, FileDown } from 'lucide-react';
 import { exportTransactionsPDF } from '@/lib/pdf';
+import { useCombinedTransactions } from '@/lib/useCombinedTransactions';
 
 function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, React.CSSProperties> = {
@@ -22,7 +23,8 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export default function TabularView() {
-  const { transactions, deleteEntry } = useApp();
+  const { deleteEntry } = useApp();
+  const transactions = useCombinedTransactions();
 
   const [filterType, setFilterType] = useState<'all' | 'income' | 'expense'>('all');
   const [filterMonth, setFilterMonth] = useState('');
@@ -173,12 +175,15 @@ export default function TabularView() {
                       ? <span className="text-xs" style={{ color: '#71717a' }}>{t.method} · {t.source}</span>
                       : <StatusBadge status={(t as any).status} />
                     }
-                  </td>
-                  <td className="px-4 py-3 text-right font-semibold" style={{ color: isCashIn(t) ? '#22c55e' : '#ef4444' }}>
+                    {t.id.startsWith('salon-pay-') && (
+                      <span className="ml-2 text-xs px-1.5 py-0.5 rounded" style={{ background: 'rgba(99,102,241,0.15)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.2)' }}>Cassa</span>
+                    )}
                     {isCashIn(t) ? '+' : '-'}{formatCurrency(t.amount)}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    {confirmDelete === t.id ? (
+                    {t.id.startsWith('salon-pay-') ? (
+                      <span className="text-xs" style={{ color: '#3f3f5a' }} title="Voce automatica da Cassa">🔒</span>
+                    ) : confirmDelete === t.id ? (
                       <div className="flex items-center gap-2 justify-end">
                         <button onClick={async () => { await deleteEntry(t.id); setConfirmDelete(null); }}
                           className="text-xs px-2 py-1 rounded" style={{ background: 'rgba(239,68,68,0.8)', color: 'white' }}>
