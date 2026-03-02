@@ -234,13 +234,14 @@ export interface GiftCard {
   createdAt: string;
 }
 
-// ─── WhatsApp Automations ──────────────────────────────────────────────────
+// ─── WhatsApp Automations (UltraMsg) ─────────────────────────────────────────
 
 export interface WhatsAppConfig {
   enabled: boolean;
-  phoneNumberId: string;  // from Meta Business Manager
-  accessToken: string;    // from Meta Business Manager (system user token)
-  // Automation toggles
+  // UltraMsg credentials — set by admin, NOT by the salon user
+  ultraMsgInstanceId: string;
+  ultraMsgToken: string;
+  // Automation toggles — set by salon user
   reminderEnabled: boolean;
   birthdayEnabled: boolean;
   postVisitEnabled: boolean;
@@ -251,8 +252,8 @@ export interface WhatsAppConfig {
 
 export const DEFAULT_WHATSAPP_CONFIG: WhatsAppConfig = {
   enabled: false,
-  phoneNumberId: '',
-  accessToken: '',
+  ultraMsgInstanceId: '',
+  ultraMsgToken: '',
   reminderEnabled: true,
   birthdayEnabled: true,
   postVisitEnabled: true,

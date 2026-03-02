@@ -7,11 +7,12 @@ import {
   ShieldCheck, TrendingUp, AlertTriangle, CheckCircle2, XCircle, Clock,
   ChevronRight, Plus, Search, X, Save, RefreshCw, ToggleLeft, ToggleRight,
   Building2, Phone, Mail, MapPin, UserCog, Calendar as CalendarIcon, Trash2,
+  MessageSquare, Wifi, WifiOff,
 } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type Section = 'overview' | 'tenants' | 'tickets' | 'broadcasts' | 'flags' | 'audit';
+type Section = 'overview' | 'tenants' | 'tickets' | 'broadcasts' | 'flags' | 'audit' | 'whatsapp';
 
 interface Metrics {
   total: number; active: number; trial: number; suspended: number; cancelled: number;
@@ -152,6 +153,14 @@ export default function AdminPage() {
   const [tenantStatusFilter, setTenantStatusFilter] = useState('');
   const [ticketStatusFilter, setTicketStatusFilter] = useState('');
 
+  // WhatsApp istanze
+  const [waSearch, setWaSearch] = useState('');
+  const [waModal, setWaModal] = useState<Tenant | null>(null);
+  const [waForm, setWaForm] = useState({ ultraMsgInstanceId: '', ultraMsgToken: '' });
+  const [waSaving, setWaSaving] = useState(false);
+  const [waSaved, setWaSaved] = useState(false);
+  const [waStatuses, setWaStatuses] = useState<Record<string, 'connected' | 'disconnected' | 'none'>>({});
+
   function getToken() { return sessionStorage.getItem('stylistgo_admin_token') ?? ''; }
 
   const af = useCallback(async (url: string, opts?: RequestInit) => {
@@ -286,6 +295,7 @@ export default function AdminPage() {
     { id: 'broadcasts', icon: <Megaphone size={18} />, label: 'Broadcast' },
     { id: 'flags', icon: <Flag size={18} />, label: 'Feature Flag' },
     { id: 'audit', icon: <ScrollText size={18} />, label: 'Audit Log' },
+    { id: 'whatsapp', icon: <MessageSquare size={18} />, label: 'WhatsApp' },
   ];
 
   // ─── OVERVIEW ────────────────────────────────────────────────────────────
@@ -867,6 +877,178 @@ export default function AdminPage() {
     </div>
   );
 
+  // ─── WHATSAPP ────────────────────────────────────────────────────────────
+  const openWaModal = async (tenant: Tenant) => {
+    setWaModal(tenant);
+    setWaSaved(false);
+    setWaForm({ ultraMsgInstanceId: '', ultraMsgToken: '' });
+    try {
+      const res = await af(`/api/admin/whatsapp?user_id=${tenant.user_id}`);
+      if (res.ok) {
+        const d = await res.json();
+        setWaForm({ ultraMsgInstanceId: d.ultraMsgInstanceId ?? '', ultraMsgToken: d.ultraMsgToken ?? '' });
+      }
+    } catch { /* ignore */ }
+  };
+
+  const checkWaStatus = async (tenant: Tenant, instanceId: string, token: string) => {
+    if (!instanceId || !token) { setWaStatuses(p => ({ ...p, [tenant.user_id]: 'none' })); return; }
+    try {
+      const res = await fetch(`/api/ultramsg/status?instanceId=${instanceId}&token=${token}`);
+      const d = await res.json();
+      setWaStatuses(p => ({ ...p, [tenant.user_id]: d.connected ? 'connected' : 'disconnected' }));
+    } catch {
+      setWaStatuses(p => ({ ...p, [tenant.user_id]: 'disconnected' }));
+    }
+  };
+
+  const saveWaCredentials = async () => {
+    if (!waModal) return;
+    setWaSaving(true);
+    await af('/api/admin/whatsapp', {
+      method: 'PATCH',
+      body: JSON.stringify({ user_id: waModal.user_id, ...waForm }),
+    });
+    setWaSaving(false);
+    setWaSaved(true);
+    await checkWaStatus(waModal, waForm.ultraMsgInstanceId, waForm.ultraMsgToken);
+    setTimeout(() => setWaSaved(false), 2000);
+  };
+
+  const removeWaCredentials = async () => {
+    if (!waModal) return;
+    setWaSaving(true);
+    await af('/api/admin/whatsapp', {
+      method: 'PATCH',
+      body: JSON.stringify({ user_id: waModal.user_id, ultraMsgInstanceId: '', ultraMsgToken: '' }),
+    });
+    setWaForm({ ultraMsgInstanceId: '', ultraMsgToken: '' });
+    setWaStatuses(p => ({ ...p, [waModal.user_id]: 'none' }));
+    setWaSaving(false);
+  };
+
+  const WhatsAppSection = () => {
+    const filtered = tenants.filter(t =>
+      !waSearch || t.salon_name.toLowerCase().includes(waSearch.toLowerCase()) || t.email.toLowerCase().includes(waSearch.toLowerCase())
+    );
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+          <div>
+            <h2 style={{ color: '#f4f4f5', fontWeight: 700, fontSize: '20px', margin: 0 }}>Istanze WhatsApp (UltraMsg)</h2>
+            <p style={{ color: '#71717a', fontSize: '12px', margin: '4px 0 0' }}>Assegna un&apos;istanza UltraMsg a ogni salone. Il salone vede solo i toggle — le credenziali le gestisci solo tu.</p>
+          </div>
+          <div style={{ position: 'relative' }}>
+            <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#71717a' }} />
+            <input value={waSearch} onChange={e => setWaSearch(e.target.value)} placeholder="Cerca salone…" style={{ ...inp({ paddingLeft: '30px', width: '220px' }) }} />
+          </div>
+        </div>
+
+        <div style={card({ padding: 0, overflow: 'hidden' })}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid #2e2e40' }}>
+                {['Salone', 'Email', 'Piano', 'Istanza', 'Stato', 'Azioni'].map(h => (
+                  <th key={h} style={{ padding: '12px 14px', textAlign: 'left', color: '#71717a', fontWeight: 500, fontSize: '11px' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(t => {
+                const status = waStatuses[t.user_id] ?? 'none';
+                return (
+                  <tr key={t.user_id} style={{ borderBottom: '1px solid #1e1e2a' }}>
+                    <td style={{ padding: '12px 14px', color: '#f4f4f5', fontWeight: 600 }}>{t.salon_name || '—'}</td>
+                    <td style={{ padding: '12px 14px', color: '#71717a', fontSize: '11px' }}>{t.email}</td>
+                    <td style={{ padding: '12px 14px' }}><Badge s={t.plan} map={PLAN} /></td>
+                    <td style={{ padding: '12px 14px', color: '#a1a1aa', fontSize: '11px', fontFamily: 'monospace' }}>
+                      {t.user_id in waStatuses && waForm.ultraMsgInstanceId ? waForm.ultraMsgInstanceId : '—'}
+                    </td>
+                    <td style={{ padding: '12px 14px' }}>
+                      {status === 'connected'    && <span style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#4ade80', fontSize: '12px' }}><Wifi size={13} /> Connesso</span>}
+                      {status === 'disconnected' && <span style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#f87171', fontSize: '12px' }}><WifiOff size={13} /> Disconnesso</span>}
+                      {status === 'none'         && <span style={{ color: '#3f3f5a', fontSize: '12px' }}>—</span>}
+                    </td>
+                    <td style={{ padding: '12px 14px' }}>
+                      <button
+                        onClick={() => openWaModal(t)}
+                        style={{ background: 'none', border: '1px solid #2e2e40', borderRadius: '6px', padding: '4px 10px', color: '#818cf8', fontSize: '11px', cursor: 'pointer' }}
+                      >
+                        Configura
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+              {filtered.length === 0 && (
+                <tr><td colSpan={6} style={{ padding: '24px', textAlign: 'center', color: '#3f3f5a' }}>Nessun salone trovato.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Modal assegnazione istanza */}
+        {waModal && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            onClick={() => setWaModal(null)}>
+            <div style={{ width: '460px', background: '#1c1c27', border: '1px solid #2e2e40', borderRadius: '20px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}
+              onClick={ev => ev.stopPropagation()}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <h3 style={{ color: '#f4f4f5', fontWeight: 700, margin: 0 }}>Configura WhatsApp</h3>
+                  <p style={{ color: '#71717a', fontSize: '12px', margin: '4px 0 0' }}>{waModal.salon_name}</p>
+                </div>
+                <button onClick={() => setWaModal(null)} style={{ background: 'none', border: 'none', color: '#71717a', cursor: 'pointer' }}><X size={18} /></button>
+              </div>
+
+              <div style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '10px', padding: '12px', fontSize: '12px', color: '#a1a1aa' }}>
+                💡 Crea l&apos;istanza su <a href="https://ultramsg.com" target="_blank" rel="noreferrer" style={{ color: '#818cf8' }}>ultramsg.com</a>, connetti il numero WhatsApp del salone tramite QR, poi incolla qui Instance ID e Token.
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', color: '#71717a', marginBottom: '4px' }}>Instance ID</label>
+                <input
+                  value={waForm.ultraMsgInstanceId}
+                  onChange={e => setWaForm(p => ({ ...p, ultraMsgInstanceId: e.target.value }))}
+                  placeholder="instance123456"
+                  style={inp()}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', color: '#71717a', marginBottom: '4px' }}>Token</label>
+                <input
+                  value={waForm.ultraMsgToken}
+                  onChange={e => setWaForm(p => ({ ...p, ultraMsgToken: e.target.value }))}
+                  placeholder="xxxxxxxxxxxxxxxx"
+                  style={inp()}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  onClick={saveWaCredentials}
+                  disabled={waSaving || !waForm.ultraMsgInstanceId || !waForm.ultraMsgToken}
+                  style={{ flex: 1, padding: '11px', borderRadius: '12px', border: 'none', background: (!waForm.ultraMsgInstanceId || !waForm.ultraMsgToken) ? '#2e2e40' : 'linear-gradient(135deg,#6366f1,#818cf8)', color: 'white', fontWeight: 600, cursor: (!waForm.ultraMsgInstanceId || !waForm.ultraMsgToken) ? 'not-allowed' : 'pointer' }}
+                >
+                  {waSaving ? 'Salvataggio…' : waSaved ? '✓ Salvato' : 'Salva istanza'}
+                </button>
+                {(waForm.ultraMsgInstanceId || waForm.ultraMsgToken) && (
+                  <button
+                    onClick={removeWaCredentials}
+                    disabled={waSaving}
+                    style={{ padding: '11px 16px', borderRadius: '12px', border: '1px solid #ef4444', background: 'transparent', color: '#f87171', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}
+                  >
+                    Rimuovi
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   // ─── LAYOUT ───────────────────────────────────────────────────────────────
   return (
     <div style={{ display: 'flex', height: '100vh', background: '#0f0f13', overflow: 'hidden' }}>
@@ -924,6 +1106,7 @@ export default function AdminPage() {
             {section === 'broadcasts'  && BroadcastsSection()}
             {section === 'flags'       && FlagsSection()}
             {section === 'audit'       && AuditSection()}
+            {section === 'whatsapp'    && WhatsAppSection()}
           </>
         )}
       </div>
