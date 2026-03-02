@@ -114,7 +114,8 @@ export default function AutomationsView() {
           </div>
           <p className="text-sm text-amber-700">
             Il numero WhatsApp per il tuo salone non è ancora stato configurato.
-            Contatta il supporto StylistGo per attivare il servizio.
+            Contatta il supporto StylistGo per attivare il servizio. Puoi già configurare
+            quali messaggi vuoi ricevere — partiranno appena attivato.
           </p>
           <a
             href="mailto:support@stylistgo.it?subject=Attivazione WhatsApp"
@@ -135,10 +136,10 @@ export default function AutomationsView() {
                 </div></>
               )}
               {instanceStatus === 'disconnected' && (
-                <><WifiOff size={18} className="text-red-500" />
+                <><WifiOff size={18} className="text-orange-500" />
                 <div>
-                  <p className="font-semibold text-sm text-red-600">WhatsApp disconnesso</p>
-                  <p className="text-xs text-gray-400 mt-0.5">Contatta il supporto per riconfigurare</p>
+                  <p className="font-semibold text-sm text-orange-600">In attesa di connessione</p>
+                  <p className="text-xs text-gray-400 mt-0.5">L&apos;istanza è configurata — apri UltraMsg e scansiona il QR con WhatsApp per attivarla.</p>
                 </div></>
               )}
               {(instanceStatus === 'idle' || instanceStatus === 'loading') && (
@@ -157,8 +158,7 @@ export default function AutomationsView() {
       )}
 
       {/* master toggle */}
-      {isConfigured && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-6 py-4 flex items-center justify-between">
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-6 py-4 flex items-center justify-between">
           <div>
             <p className="font-semibold text-gray-800">Automazioni attive</p>
             <p className="text-xs text-gray-400 mt-0.5">
@@ -174,11 +174,10 @@ export default function AutomationsView() {
             <span className={`absolute top-1 left-1 w-5 h-5 bg-white rounded-full shadow transition-transform ${cfg.enabled ? 'translate-x-7' : 'translate-x-0'}`} />
           </button>
         </div>
-      )}
+      
 
       {/* messaggi automatici */}
-      {isConfigured && (
-        <Section title="Messaggi automatici">
+      <Section title="Messaggi automatici">
           <div className="divide-y divide-gray-50">
             <Toggle
               checked={cfg.reminderEnabled}
@@ -232,7 +231,6 @@ export default function AutomationsView() {
             </div>
           </div>
         </Section>
-      )}
 
       {/* log messaggi */}
       <Section title={`Log messaggi (${whatsappMessages?.length ?? 0})`} defaultOpen={false}>

@@ -6,7 +6,7 @@ import {
   Appointment, AppointmentStatus, WaitingListEntry,
   Product, StockMovement, GiftCard, SalonConfig, AppointmentHistoryEntry,
   Payment, CashSession, GamificationConfig, DEFAULT_GAMIFICATION_CONFIG, DEFAULT_SALON_CONFIG,
-  WhatsAppMessage,
+  WhatsAppMessage, WhatsAppConfig, DEFAULT_WHATSAPP_CONFIG,
 } from '@/types/salon';
 import {
   storageGetClients, storageSaveClients,
@@ -209,6 +209,26 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
         if (cloudIsNewer) {
           if (cloudState.salonConfig)        { setSalonConfig(cloudState.salonConfig as SalonConfig); storageSaveSalonConfig(cloudState.salonConfig as SalonConfig); }
           if (cloudState.gamificationConfig) { setGamificationConfig(cloudState.gamificationConfig as GamificationConfig); storageSaveGamificationConfig(cloudState.gamificationConfig as GamificationConfig); }
+        } else if (cloudState.salonConfig) {
+          // Even if local is newer, always apply admin-set WhatsApp credentials from cloud.
+          // Admins write directly to the DB without updating _savedAt, so we must always
+          // pick up ultraMsgInstanceId/ultraMsgToken regardless of the timestamp comparison.
+          const cloudWa = (cloudState.salonConfig as SalonConfig).whatsapp;
+          if (cloudWa?.ultraMsgInstanceId || cloudWa?.ultraMsgToken) {
+            setSalonConfig(prev => {
+              const merged: SalonConfig = {
+                ...prev,
+                whatsapp: {
+                  ...DEFAULT_WHATSAPP_CONFIG,
+                  ...(prev.whatsapp ?? {}),
+                  ultraMsgInstanceId: cloudWa.ultraMsgInstanceId,
+                  ultraMsgToken: cloudWa.ultraMsgToken,
+                },
+              };
+              storageSaveSalonConfig(merged);
+              return merged;
+            });
+          }
         }
 
         // ── Auto-import pending online bookings into the calendar ────────────

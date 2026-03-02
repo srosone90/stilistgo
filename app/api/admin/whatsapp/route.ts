@@ -14,10 +14,10 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'user_id obbligatorio' }, { status: 400 });
   }
 
-  // Fetch current salon_data
+  // Fetch current salon_data — use `state` column (same column used by the salon app)
   const { data: row, error: fetchErr } = await supabase
     .from('salon_data')
-    .select('data')
+    .select('state')
     .eq('user_id', user_id)
     .single();
 
@@ -25,8 +25,9 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Tenant non trovato' }, { status: 404 });
   }
 
-  const current = (row.data as Record<string, unknown>) ?? {};
-  const currentWhatsapp = (current.salonConfig as Record<string, unknown>)?.whatsapp as Record<string, unknown> ?? {};
+  const current = (row.state as Record<string, unknown>) ?? {};
+  const currentSalonConfig = (current.salonConfig as Record<string, unknown>) ?? {};
+  const currentWhatsapp = (currentSalonConfig.whatsapp as Record<string, unknown>) ?? {};
 
   // Merge UltraMsg credentials into existing whatsapp config
   const updatedWhatsapp = {
@@ -37,17 +38,17 @@ export async function PATCH(req: NextRequest) {
     enabled: (ultraMsgInstanceId && ultraMsgToken) ? (currentWhatsapp.enabled ?? false) : false,
   };
 
-  const updatedData = {
+  const updatedState = {
     ...current,
     salonConfig: {
-      ...((current.salonConfig as Record<string, unknown>) ?? {}),
+      ...currentSalonConfig,
       whatsapp: updatedWhatsapp,
     },
   };
 
   const { error: updateErr } = await supabase
     .from('salon_data')
-    .update({ data: updatedData })
+    .update({ state: updatedState })
     .eq('user_id', user_id);
 
   if (updateErr) {
@@ -68,7 +69,7 @@ export async function GET(req: NextRequest) {
 
   const { data: row, error } = await supabase
     .from('salon_data')
-    .select('data')
+    .select('state')
     .eq('user_id', user_id)
     .single();
 
@@ -76,8 +77,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Tenant non trovato' }, { status: 404 });
   }
 
-  const whatsapp = (row.data as Record<string, unknown>)?.salonConfig as Record<string, unknown>;
-  const wa = (whatsapp?.whatsapp as Record<string, unknown>) ?? {};
+  const salonCfg = (row.state as Record<string, unknown>)?.salonConfig as Record<string, unknown> ?? {};
+  const wa = (salonCfg?.whatsapp as Record<string, unknown>) ?? {};
 
   return NextResponse.json({
     ultraMsgInstanceId: wa.ultraMsgInstanceId ?? '',
