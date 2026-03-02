@@ -50,11 +50,12 @@ export interface OnlineBooking {
   status: 'pending' | 'confirmed' | 'cancelled';
 }
 
-export async function dbGetOnlineBookings(): Promise<OnlineBooking[]> {
+export async function dbGetOnlineBookings(userId: string): Promise<OnlineBooking[]> {
   try {
     const { data, error } = await supabase
       .from('online_bookings')
       .select('*')
+      .eq('salon_id', userId)
       .order('created_at', { ascending: false });
     if (error || !data) return [];
     return data as OnlineBooking[];

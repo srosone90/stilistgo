@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { clientName, clientPhone, clientEmail, service, preferredDate, preferredTime, notes } = body;
+    const { clientName, clientPhone, clientEmail, service, preferredDate, preferredTime, notes, salonId } = body;
 
     if (!clientName || !clientPhone || !service || !preferredDate || !preferredTime) {
       return NextResponse.json({ error: 'Campi obbligatori mancanti.' }, { status: 400 });
@@ -25,6 +25,7 @@ export async function POST(req: NextRequest) {
 
     const { error } = await supabase.from('online_bookings').insert({
       id,
+      salon_id: salonId || '',
       client_name: clientName,
       client_phone: clientPhone,
       client_email: clientEmail || '',

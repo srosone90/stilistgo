@@ -6,6 +6,7 @@ import { OnlineBooking, dbGetOnlineBookings, dbUpdateBookingStatus, dbDeleteBook
 import { format, parseISO } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { RefreshCw, CheckCircle2, XCircle, Trash2, ExternalLink, Clock, Phone, Mail, Scissors, CalendarPlus } from 'lucide-react';
+import { getCurrentUser } from '@/lib/supabase';
 
 const card: React.CSSProperties = { background: '#1c1c27', border: '1px solid #2e2e40', borderRadius: '16px', padding: '20px' };
 
@@ -24,14 +25,19 @@ export default function OnlineBookingsView() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'pending' | 'confirmed' | 'cancelled'>('all');
   const [converting, setConverting] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string>('');
 
-  const bookingUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/booking`
-    : '/booking';
+  useEffect(() => {
+    getCurrentUser().then(u => { if (u) setUserId(u.id as string); });
+  }, []);
+
+  const bookingUrl = typeof window !== 'undefined' && userId
+    ? `${window.location.origin}/booking/${userId}`
+    : '';
 
   const load = useCallback(async () => {
     setLoading(true);
-    const data = await dbGetOnlineBookings();
+    const data = await dbGetOnlineBookings(userId);
     setBookings(data);
     setLoading(false);
     // Auto-convert every pending booking to a calendar appointment
@@ -78,7 +84,7 @@ export default function OnlineBookingsView() {
       await dbUpdateBookingStatus(b.id, 'confirmed');
       setBookings(prev => prev.map(x => x.id === b.id ? { ...x, status: 'confirmed' } : x));
     }
-  }, [clients, services, addClient, addAppointment]);
+  }, [clients, services, addClient, addAppointment, userId]);
 
   useEffect(() => { load(); }, [load]);
 

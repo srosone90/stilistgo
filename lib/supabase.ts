@@ -164,12 +164,8 @@ export async function signIn(email: string, password: string) {
 }
 
 export async function signOut() {
-  // Clear all user-specific salon data so the next user starts fresh
-  if (typeof window !== 'undefined') {
-    Object.keys(localStorage)
-      .filter(k => k.startsWith('stylistgo_') && k !== 'stylistgo_users')
-      .forEach(k => localStorage.removeItem(k));
-  }
+  // Only clear local-session token — per-user localStorage keys stay intact
+  // so data reloads instantly when the same user logs back in.
   clearLocalUser();
   try {
     return await supabase.auth.signOut();
