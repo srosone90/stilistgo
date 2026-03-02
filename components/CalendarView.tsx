@@ -91,7 +91,8 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
   const filteredAppts = useMemo(() =>
     appointments.filter(a => {
       const inRange = days.some(d => isSameDay(parseISO(a.date), d));
-      const opOk = !filterOperator || a.operatorId === filterOperator;
+      // Always include unassigned appointments regardless of operator filter
+      const opOk = !filterOperator || a.operatorId === filterOperator || !a.operatorId;
       return inRange && opOk && a.status !== 'completed';
     }), [appointments, days, filterOperator]);
 
@@ -399,6 +400,20 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
               </div>
             </div>
           ))}
+          {/* Unassigned column header — shown only when there are unassigned appointments today */}
+          {(() => {
+            const dayStr = format(currentDate, 'yyyy-MM-dd');
+            const activeOpIds = new Set(activeOperators.map(o => o.id));
+            const hasUnassigned = filteredAppts.some(a => a.date === dayStr && !activeOpIds.has(a.operatorId));
+            return hasUnassigned ? (
+              <div className="flex-1 py-2 px-2" style={{ borderLeft: '1px solid var(--border)', minWidth: 0 }}>
+                <div className="flex items-center justify-center gap-1.5">
+                  <span className="inline-block w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: '#71717a' }} />
+                  <span className="text-xs font-semibold truncate" style={{ color: '#71717a' }}>Non assegnato</span>
+                </div>
+              </div>
+            ) : null;
+          })()}
         </div>
         {/* Time grid */}
         <div ref={gridRef} className="flex" style={{ minHeight: hours.length * HOUR_PX }}>
@@ -459,6 +474,53 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
               </div>
             );
           })}
+          {/* Unassigned column — appointments with no matching active operator */}
+          {(() => {
+            const dayStr = format(currentDate, 'yyyy-MM-dd');
+            const activeOpIds = new Set(activeOperators.map(o => o.id));
+            const unassigned = filteredAppts.filter(a => a.date === dayStr && !activeOpIds.has(a.operatorId));
+            if (unassigned.length === 0) return null;
+            return (
+              <div className="flex-1 relative" style={{ borderLeft: '1px solid var(--border)', minWidth: 0 }}>
+                {hours.map(h => (
+                  <div key={h} style={{ height: HOUR_PX, borderBottom: '1px solid #1e1e2e' }}
+                    onClick={() => openNew(dayStr, '', resolveStartTime(dayStr, '', h))}
+                    className="cursor-pointer hover:bg-white/[0.02] transition-colors" />
+                ))}
+                {unassigned.map(a => {
+                  const isDragging = draggingId === a.id;
+                  const effectiveStart = isDragging && draggingPos ? draggingPos.startTime : a.startTime;
+                  const effectiveEndDrag = isDragging && draggingPos ? draggingPos.endTime : a.endTime;
+                  const startMin = timeToMinutes(effectiveStart) - START_MIN;
+                  const effectiveEnd = resizingId === a.id ? resizingEndTime : effectiveEndDrag;
+                  const endMin = timeToMinutes(effectiveEnd) - START_MIN;
+                  const top = (startMin / 60) * HOUR_PX;
+                  const height = Math.max(((endMin - startMin) / 60) * HOUR_PX, 28);
+                  const color = '#71717a';
+                  const client = clients.find(c => c.id === a.clientId);
+                  const svcNames = a.serviceIds.map(sid => services.find(s => s.id === sid)?.name).filter(Boolean).join(', ');
+                  return (
+                    <div key={a.id}
+                      onMouseDown={e => handleDragStart(e, a)}
+                      onClick={e => { if (wasDraggedRef.current || draggingId || resizingId) { e.stopPropagation(); return; } e.stopPropagation(); openEdit(a); }}
+                      className="absolute left-1 right-1 rounded-lg px-2 py-1 hover:brightness-110 transition-all overflow-hidden"
+                      style={{ top, height, background: 'rgba(113,113,122,0.15)', border: '1px solid rgba(113,113,122,0.4)', zIndex: isDragging ? 10 : 2, opacity: isDragging ? 0.7 : 1, cursor: isDragging ? 'grabbing' : 'grab', userSelect: 'none' }}>
+                      <p className="text-xs font-semibold truncate" style={{ color }}>
+                        {a.isBlock ? '🔒 ' + (a.blockReason || 'Blocco') : (client ? `${client.firstName} ${client.lastName}` : '—')}
+                      </p>
+                      <p className="text-xs" style={{ color: 'var(--text-3)', fontSize: 10 }}>{effectiveStart}–{effectiveEnd}</p>
+                      {svcNames && <p className="truncate" style={{ color: 'var(--muted)', fontSize: 10 }}>{svcNames}</p>}
+                      <div onMouseDown={e => handleResizeStart(e, a)}
+                        className="absolute bottom-0 left-0 right-0 flex items-center justify-center"
+                        style={{ height: 10, cursor: 'ns-resize', background: 'rgba(113,113,122,0.2)' }}>
+                        <div style={{ width: 20, height: 2, borderRadius: 2, background: color, opacity: 0.8 }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
       </div>
       )}
