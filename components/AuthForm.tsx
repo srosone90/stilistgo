@@ -223,6 +223,18 @@ export default function AuthForm() {
           )}
         </button>
       </div>
+
+      {/* Discrete admin link — visible only on login mode */}
+      {mode === 'login' && (
+        <div className="mt-8 text-center">
+          <a
+            href="/admin"
+            style={{ fontSize: '10px', color: '#1e1e2a', textDecoration: 'none', letterSpacing: '0.05em' }}
+          >
+            ···
+          </a>
+        </div>
+      )}
     </div>
   );
 }

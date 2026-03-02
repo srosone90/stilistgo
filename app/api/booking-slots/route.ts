@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
 
     // Always return salon name + services for public display
     const salonConfig = state?.salonConfig as Record<string, string> | null;
-    const salonName: string = salonConfig?.name || '';
+    const salonName: string = salonConfig?.salonName || '';
     const rawServices = state?.services as { id: string; name: string; duration: number; category: string; active: boolean }[] | null;
     const services = (rawServices ?? []).filter(s => s.active).map(s => ({
       id: s.id, name: s.name, duration: s.duration, category: s.category,

@@ -12,8 +12,8 @@ export async function POST(req: NextRequest) {
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    // Supabase service_role key is always a JWT starting with "eyJ" — anything else is invalid
-    const isValidServiceKey = serviceKey?.startsWith('eyJ');
+    // Accept both classic JWT (eyJ) and new Supabase sb_secret_ format
+    const isValidServiceKey = serviceKey?.startsWith('eyJ') || serviceKey?.startsWith('sb_secret_');
     const supabaseKey = (isValidServiceKey ? serviceKey : null) ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
     if (!supabaseUrl || !supabaseKey) {

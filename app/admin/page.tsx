@@ -1,0 +1,871 @@
+'use client';
+
+import React, { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import {
+  LayoutDashboard, Users, Ticket, Megaphone, Flag, ScrollText, LogOut,
+  ShieldCheck, TrendingUp, AlertTriangle, CheckCircle2, XCircle, Clock,
+  ChevronRight, Plus, Search, X, Save, RefreshCw, ToggleLeft, ToggleRight,
+  Building2, Phone, Mail, MapPin, UserCog, Calendar as CalendarIcon,
+} from 'lucide-react';
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+type Section = 'overview' | 'tenants' | 'tickets' | 'broadcasts' | 'flags' | 'audit';
+
+interface Metrics {
+  total: number; active: number; trial: number; suspended: number; cancelled: number;
+  mrr: number; arr: number;
+  byPlan: Record<string, number>; regByMonth: Record<string, number>;
+  atRisk: number; openTickets: number; urgentTickets: number; broadcasts: number;
+}
+
+interface Tenant {
+  user_id: string; email: string; full_name: string; salon_name: string;
+  plan: string; monthly_price: number; trial_ends_at: string | null;
+  status: string; region: string; sector: string; notes: string; csm: string;
+  registered_at: string; last_seen_at: string | null;
+  clients_count: number; appointments_count: number; operators_count: number;
+  services_count: number; last_sync: string; phone: string; vat_number: string;
+}
+
+interface Ticket {
+  id: string; tenant_id: string; tenant_name: string; subject: string; body: string;
+  category: string; priority: string; status: string; assigned_to: string;
+  resolution: string; created_at: string; updated_at: string;
+}
+
+interface Broadcast { id: string; title: string; body: string; target: string; created_at: string; }
+interface Flag { id: string; name: string; description: string; enabled_for: string; enabled: boolean; created_at: string; }
+interface AuditEntry { id: string; action: string; target_tenant: string; details: Record<string, unknown>; created_at: string; }
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—';
+const fmtDT = (d: string | null) => d ? new Date(d).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+
+const STATUS: Record<string, { bg: string; text: string; border: string; label: string }> = {
+  trial:     { bg: 'rgba(245,158,11,0.15)', text: '#fbbf24', border: 'rgba(245,158,11,0.4)', label: 'Trial' },
+  active:    { bg: 'rgba(34,197,94,0.15)',  text: '#4ade80', border: 'rgba(34,197,94,0.4)',  label: 'Attivo' },
+  suspended: { bg: 'rgba(239,68,68,0.1)',   text: '#f87171', border: 'rgba(239,68,68,0.3)',  label: 'Sospeso' },
+  cancelled: { bg: 'rgba(113,113,122,0.1)', text: '#71717a', border: 'rgba(113,113,122,0.2)', label: 'Cancellato' },
+};
+const PLAN: Record<string, { bg: string; text: string; label: string }> = {
+  trial:      { bg: 'rgba(245,158,11,0.1)',  text: '#fbbf24', label: 'Trial' },
+  starter:    { bg: 'rgba(99,102,241,0.1)',  text: '#818cf8', label: 'Starter' },
+  pro:        { bg: 'rgba(168,85,247,0.1)',  text: '#c084fc', label: 'Pro' },
+  business:   { bg: 'rgba(34,197,94,0.1)',   text: '#4ade80', label: 'Business' },
+  enterprise: { bg: 'rgba(20,184,166,0.1)',  text: '#2dd4bf', label: 'Enterprise' },
+};
+const PRIO: Record<string, { text: string; label: string }> = {
+  bassa: { text: '#71717a', label: 'Bassa' }, normale: { text: '#818cf8', label: 'Normale' },
+  alta:  { text: '#fbbf24', label: 'Alta' },  urgente: { text: '#f87171', label: 'Urgente' },
+};
+const TK_STATUS: Record<string, { bg: string; text: string; label: string }> = {
+  aperto:        { bg: 'rgba(239,68,68,0.1)',   text: '#f87171', label: 'Aperto' },
+  in_lavorazione:{ bg: 'rgba(245,158,11,0.1)',  text: '#fbbf24', label: 'In lavorazione' },
+  risolto:       { bg: 'rgba(34,197,94,0.1)',   text: '#4ade80', label: 'Risolto' },
+  chiuso:        { bg: 'rgba(113,113,122,0.1)', text: '#71717a', label: 'Chiuso' },
+};
+
+const ACTION_LABELS: Record<string, string> = {
+  tenant_updated: 'Tenant aggiornato', ticket_created: 'Ticket creato',
+  broadcast_sent: 'Broadcast inviato', flag_toggled: 'Flag modificato',
+};
+
+// ─── Styled helpers ───────────────────────────────────────────────────────────
+
+const inp = (extra?: React.CSSProperties): React.CSSProperties => ({
+  width: '100%', background: '#12121a', border: '1px solid #2e2e40', borderRadius: '10px',
+  padding: '9px 12px', color: '#f4f4f5', fontSize: '13px', outline: 'none',
+  boxSizing: 'border-box', ...extra,
+});
+const sel = (extra?: React.CSSProperties): React.CSSProperties => ({
+  ...inp(extra), cursor: 'pointer', appearance: 'none' as const,
+});
+const card = (extra?: React.CSSProperties): React.CSSProperties => ({
+  background: '#1c1c27', border: '1px solid #2e2e40', borderRadius: '16px', padding: '20px', ...extra,
+});
+
+function Badge({ s, map }: { s: string; map: Record<string, { bg: string; text: string; border?: string; label: string }> }) {
+  const c = map[s] ?? { bg: 'rgba(113,113,122,0.1)', text: '#71717a', label: s };
+  return (
+    <span style={{ background: c.bg, color: c.text, border: `1px solid ${c.border ?? 'transparent'}`, borderRadius: '6px', padding: '2px 8px', fontSize: '11px', fontWeight: 600, whiteSpace: 'nowrap' }}>
+      {c.label}
+    </span>
+  );
+}
+
+function KpiCard({ label, value, sub, color }: { label: string; value: string | number; sub?: string; color?: string }) {
+  return (
+    <div style={card({ padding: '18px 20px' })}>
+      <p style={{ color: '#71717a', fontSize: '12px', margin: 0, marginBottom: '6px' }}>{label}</p>
+      <p style={{ color: color ?? '#f4f4f5', fontSize: '26px', fontWeight: 700, margin: 0 }}>{value}</p>
+      {sub && <p style={{ color: '#71717a', fontSize: '11px', margin: 0, marginTop: '4px' }}>{sub}</p>}
+    </div>
+  );
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
+
+export default function AdminPage() {
+  const router = useRouter();
+  const [authed, setAuthed] = useState(false);
+  const [section, setSection] = useState<Section>('overview');
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  // Data
+  const [metrics, setMetrics] = useState<Metrics | null>(null);
+  const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [broadcasts, setBroadcasts] = useState<Broadcast[]>([]);
+  const [flags, setFlags] = useState<Flag[]>([]);
+  const [audit, setAudit] = useState<AuditEntry[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  // Tenant detail modal
+  const [selTenant, setSelTenant] = useState<Tenant | null>(null);
+  const [editTenant, setEditTenant] = useState<Partial<Tenant>>({});
+  const [savingTenant, setSavingTenant] = useState(false);
+
+  // Ticket modal
+  const [selTicket, setSelTicket] = useState<Ticket | null>(null);
+  const [newTicket, setNewTicket] = useState(false);
+  const [ticketForm, setTicketForm] = useState<Partial<Ticket>>({});
+
+  // Broadcast modal
+  const [newBcast, setNewBcast] = useState(false);
+  const [bcastForm, setBcastForm] = useState({ title: '', body: '', target: 'all' });
+
+  // Flag new modal
+  const [newFlag, setNewFlag] = useState(false);
+  const [flagForm, setFlagForm] = useState({ name: '', description: '', enabled_for: 'all' });
+
+  // Search
+  const [tenantSearch, setTenantSearch] = useState('');
+  const [tenantPlanFilter, setTenantPlanFilter] = useState('');
+  const [tenantStatusFilter, setTenantStatusFilter] = useState('');
+  const [ticketStatusFilter, setTicketStatusFilter] = useState('');
+
+  function getToken() { return sessionStorage.getItem('stylistgo_admin_token') ?? ''; }
+
+  const af = useCallback(async (url: string, opts?: RequestInit) => {
+    const token = getToken();
+    return fetch(url, {
+      ...opts,
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...(opts?.headers ?? {}) },
+    });
+  }, []);
+
+  // Auth check
+  useEffect(() => {
+    af('/api/admin/auth').then(r => {
+      if (r.ok) { setAuthed(true); }
+      else { router.replace('/admin/login'); }
+    }).catch(() => router.replace('/admin/login'));
+  }, [af, router]);
+
+  // Load data for current section
+  const loadSection = useCallback(async (s: Section) => {
+    setLoading(true);
+    try {
+      if (s === 'overview') {
+        const [m, t] = await Promise.all([af('/api/admin/metrics'), af('/api/admin/tenants')]);
+        const [md, td] = await Promise.all([m.json(), t.json()]);
+        setMetrics(md);
+        setTenants(td.tenants ?? []);
+      } else if (s === 'tenants') {
+        const res = await af('/api/admin/tenants');
+        const d = await res.json();
+        setTenants(d.tenants ?? []);
+      } else if (s === 'tickets') {
+        const res = await af('/api/admin/tickets');
+        const d = await res.json();
+        setTickets(d.tickets ?? []);
+        // Also load tenants for select
+        const tr = await af('/api/admin/tenants');
+        const td = await tr.json();
+        setTenants(td.tenants ?? []);
+      } else if (s === 'broadcasts') {
+        const res = await af('/api/admin/broadcasts');
+        const d = await res.json();
+        setBroadcasts(d.broadcasts ?? []);
+      } else if (s === 'flags') {
+        const res = await af('/api/admin/flags');
+        const d = await res.json();
+        setFlags(d.flags ?? []);
+      } else if (s === 'audit') {
+        const res = await af('/api/admin/audit?limit=100');
+        const d = await res.json();
+        setAudit(d.entries ?? []);
+      }
+    } finally { setLoading(false); }
+  }, [af]);
+
+  useEffect(() => { if (authed) loadSection(section); }, [authed, section, loadSection]);
+
+  const changeSection = (s: Section) => { setSection(s); setSelTenant(null); setSelTicket(null); };
+
+  const logout = () => { sessionStorage.removeItem('stylistgo_admin_token'); router.replace('/admin/login'); };
+
+  if (!authed) return null;
+
+  // ─── Tenant save ──────────────────────────────────────────────────────────
+  const saveTenant = async () => {
+    if (!selTenant) return;
+    setSavingTenant(true);
+    await af('/api/admin/tenants', { method: 'PATCH', body: JSON.stringify({ user_id: selTenant.user_id, ...editTenant }) });
+    setSavingTenant(false);
+    setSelTenant(null);
+    loadSection('tenants');
+  };
+
+  // ─── Ticket save ─────────────────────────────────────────────────────────
+  const saveTicket = async () => {
+    if (selTicket) {
+      await af('/api/admin/tickets', { method: 'PATCH', body: JSON.stringify({ id: selTicket.id, ...ticketForm }) });
+    } else {
+      await af('/api/admin/tickets', { method: 'POST', body: JSON.stringify(ticketForm) });
+    }
+    setSelTicket(null); setNewTicket(false);
+    loadSection('tickets');
+  };
+
+  // ─── Broadcast send ───────────────────────────────────────────────────────
+  const sendBroadcast = async () => {
+    await af('/api/admin/broadcasts', { method: 'POST', body: JSON.stringify(bcastForm) });
+    setNewBcast(false); setBcastForm({ title: '', body: '', target: 'all' });
+    loadSection('broadcasts');
+  };
+
+  // ─── Flag toggle ──────────────────────────────────────────────────────────
+  const toggleFlag = async (flag: Flag) => {
+    await af('/api/admin/flags', { method: 'PATCH', body: JSON.stringify({ id: flag.id, enabled: !flag.enabled }) });
+    setFlags(prev => prev.map(f => f.id === flag.id ? { ...f, enabled: !f.enabled } : f));
+  };
+
+  const createFlag = async () => {
+    await af('/api/admin/flags', { method: 'POST', body: JSON.stringify(flagForm) });
+    setNewFlag(false); setFlagForm({ name: '', description: '', enabled_for: 'all' });
+    loadSection('flags');
+  };
+
+  // ─── Filtered lists ───────────────────────────────────────────────────────
+  const filteredTenants = tenants.filter(t => {
+    const q = tenantSearch.toLowerCase();
+    const matchQ = !q || t.salon_name.toLowerCase().includes(q) || t.email.toLowerCase().includes(q) || t.full_name.toLowerCase().includes(q);
+    const matchPlan = !tenantPlanFilter || t.plan === tenantPlanFilter;
+    const matchStatus = !tenantStatusFilter || t.status === tenantStatusFilter;
+    return matchQ && matchPlan && matchStatus;
+  });
+
+  const filteredTickets = tickets.filter(t => !ticketStatusFilter || t.status === ticketStatusFilter);
+
+  // ─── SIDEBAR ─────────────────────────────────────────────────────────────
+  const navItems: { id: Section; icon: React.ReactNode; label: string; count?: number }[] = [
+    { id: 'overview', icon: <LayoutDashboard size={18} />, label: 'Overview' },
+    { id: 'tenants', icon: <Users size={18} />, label: 'Tenant', count: metrics?.total },
+    { id: 'tickets', icon: <Ticket size={18} />, label: 'Ticket', count: metrics?.openTickets },
+    { id: 'broadcasts', icon: <Megaphone size={18} />, label: 'Broadcast' },
+    { id: 'flags', icon: <Flag size={18} />, label: 'Feature Flag' },
+    { id: 'audit', icon: <ScrollText size={18} />, label: 'Audit Log' },
+  ];
+
+  // ─── OVERVIEW ────────────────────────────────────────────────────────────
+  const OverviewSection = () => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <h2 style={{ color: '#f4f4f5', fontWeight: 700, fontSize: '20px', margin: 0 }}>Panoramica SaaS</h2>
+
+      {/* KPI Row */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(160px,1fr))', gap: '12px' }}>
+        <KpiCard label="Tenant totali" value={metrics?.total ?? '—'} />
+        <KpiCard label="Attivi" value={metrics?.active ?? '—'} color="#4ade80" />
+        <KpiCard label="Trial" value={metrics?.trial ?? '—'} color="#fbbf24" />
+        <KpiCard label="MRR stimato" value={metrics ? `€${metrics.mrr.toLocaleString('it-IT', { minimumFractionDigits: 0 })}` : '—'} color="#818cf8" sub={metrics ? `ARR €${metrics.arr.toLocaleString('it-IT')}` : undefined} />
+        <KpiCard label="Ticket aperti" value={metrics?.openTickets ?? '—'} color={metrics?.urgentTickets ? '#f87171' : undefined} sub={metrics?.urgentTickets ? `${metrics.urgentTickets} urgenti` : undefined} />
+        <KpiCard label="A rischio churn" value={metrics?.atRisk ?? '—'} color={metrics?.atRisk ? '#f59e0b' : undefined} />
+      </div>
+
+      {/* Plans + recent registrations */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+        <div style={card()}>
+          <p style={{ color: '#71717a', fontSize: '12px', margin: '0 0 12px' }}>Tenant per piano</p>
+          {metrics && Object.entries(metrics.byPlan).map(([plan, n]) => (
+            <div key={plan} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <Badge s={plan} map={PLAN} />
+              <span style={{ color: '#f4f4f5', fontWeight: 600, fontSize: '14px' }}>{n}</span>
+            </div>
+          ))}
+        </div>
+        <div style={card()}>
+          <p style={{ color: '#71717a', fontSize: '12px', margin: '0 0 12px' }}>Nuove registrazioni (6 mesi)</p>
+          {metrics && Object.entries(metrics.regByMonth).sort().map(([month, n]) => (
+            <div key={month} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <span style={{ color: '#a1a1aa', fontSize: '12px' }}>{month}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ height: '6px', borderRadius: '3px', background: '#818cf8', width: `${Math.min(100, n * 20)}px` }} />
+                <span style={{ color: '#f4f4f5', fontWeight: 600, fontSize: '13px', minWidth: '20px' }}>{n}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* At-risk tenants */}
+      {tenants.filter(t => {
+        if (t.status === 'cancelled') return false;
+        const now = Date.now();
+        if (t.trial_ends_at && new Date(t.trial_ends_at).getTime() - now < 3 * 86400000 && new Date(t.trial_ends_at).getTime() > now) return true;
+        if (t.last_seen_at && now - new Date(t.last_seen_at).getTime() > 14 * 86400000) return true;
+        return false;
+      }).length > 0 && (
+        <div style={card()}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+            <AlertTriangle size={16} style={{ color: '#f59e0b' }} />
+            <p style={{ color: '#f4f4f5', fontSize: '14px', fontWeight: 600, margin: 0 }}>Tenant a rischio</p>
+          </div>
+          {tenants.filter(t => {
+            if (t.status === 'cancelled') return false;
+            const now = Date.now();
+            if (t.trial_ends_at && new Date(t.trial_ends_at).getTime() - now < 3 * 86400000 && new Date(t.trial_ends_at).getTime() > now) return true;
+            if (t.last_seen_at && now - new Date(t.last_seen_at).getTime() > 14 * 86400000) return true;
+            return false;
+          }).slice(0, 5).map(t => (
+            <div key={t.user_id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #2e2e40' }}>
+              <div>
+                <p style={{ color: '#f4f4f5', fontSize: '13px', fontWeight: 600, margin: 0 }}>{t.salon_name}</p>
+                <p style={{ color: '#71717a', fontSize: '11px', margin: 0 }}>Ultimo accesso: {fmtDate(t.last_seen_at)}</p>
+              </div>
+              <button onClick={() => { changeSection('tenants'); setTimeout(() => { setSelTenant(t); setEditTenant({ ...t }); }, 100); }}
+                style={{ background: 'none', border: 'none', color: '#818cf8', cursor: 'pointer', fontSize: '12px' }}>
+                Dettaglio <ChevronRight size={12} style={{ display: 'inline' }} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Recent audit */}
+      <div style={card()}>
+        <p style={{ color: '#71717a', fontSize: '12px', margin: '0 0 12px' }}>Ultime azioni admin</p>
+        {audit.slice(0, 5).map(e => (
+          <div key={e.id} style={{ display: 'flex', gap: '12px', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #1e1e2a' }}>
+            <ScrollText size={13} style={{ color: '#71717a', flexShrink: 0 }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ color: '#f4f4f5', fontSize: '12px', margin: 0 }}>{ACTION_LABELS[e.action] ?? e.action}</p>
+              {e.target_tenant && <p style={{ color: '#71717a', fontSize: '11px', margin: 0 }}>{e.target_tenant.slice(0, 16)}</p>}
+            </div>
+            <p style={{ color: '#3f3f5a', fontSize: '11px', margin: 0 }}>{fmtDT(e.created_at)}</p>
+          </div>
+        ))}
+        {audit.length === 0 && <p style={{ color: '#3f3f5a', fontSize: '12px' }}>Nessuna azione registrata.</p>}
+      </div>
+    </div>
+  );
+
+  // ─── TENANT DETAIL MODAL ─────────────────────────────────────────────────
+  const TenantModal = () => {
+    if (!selTenant) return null;
+    const t = selTenant;
+    const e = editTenant;
+    const set = (k: keyof Tenant, v: unknown) => setEditTenant(prev => ({ ...prev, [k]: v }));
+
+    return (
+      <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }} onClick={() => setSelTenant(null)}>
+        <div style={{ width: '520px', height: '100vh', overflowY: 'auto', background: '#1c1c27', borderLeft: '1px solid #2e2e40', padding: '28px', display: 'flex', flexDirection: 'column', gap: '20px' }} onClick={ev => ev.stopPropagation()}>
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+            <div>
+              <p style={{ color: '#f4f4f5', fontSize: '18px', fontWeight: 700, margin: 0 }}>{t.salon_name}</p>
+              <p style={{ color: '#71717a', fontSize: '12px', margin: '4px 0 8px' }}>{t.user_id}</p>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <Badge s={t.status} map={STATUS} />
+                <Badge s={t.plan} map={PLAN} />
+              </div>
+            </div>
+            <button onClick={() => setSelTenant(null)} style={{ background: 'none', border: 'none', color: '#71717a', cursor: 'pointer', padding: '4px' }}><X size={18} /></button>
+          </div>
+
+          {/* Metrics row */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '8px' }}>
+            {[['Clienti', t.clients_count], ['Appunt.', t.appointments_count], ['Operat.', t.operators_count], ['Servizi', t.services_count]].map(([l, v]) => (
+              <div key={l as string} style={{ background: '#12121a', borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
+                <p style={{ color: '#818cf8', fontSize: '18px', fontWeight: 700, margin: 0 }}>{v as number}</p>
+                <p style={{ color: '#71717a', fontSize: '10px', margin: 0 }}>{l as string}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Edit fields */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {[
+              ['Nome salone', 'salon_name', 'text'],
+              ['Titolare', 'full_name', 'text'],
+              ['Email', 'email', 'email'],
+              ['Telefono', 'phone', 'tel'],
+              ['Regione', 'region', 'text'],
+              ['CSM assegnato', 'csm', 'text'],
+            ].map(([label, key, type]) => (
+              <div key={key as string}>
+                <label style={{ display: 'block', fontSize: '11px', color: '#71717a', marginBottom: '4px' }}>{label}</label>
+                <input type={type as string} value={(e[key as keyof Tenant] ?? '') as string}
+                  onChange={ev => set(key as keyof Tenant, ev.target.value)} style={inp()} />
+              </div>
+            ))}
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', color: '#71717a', marginBottom: '4px' }}>Piano</label>
+                <select value={(e.plan ?? t.plan) as string} onChange={ev => set('plan', ev.target.value)} style={sel()}>
+                  {['trial','starter','pro','business','enterprise'].map(p => <option key={p} value={p}>{p.charAt(0).toUpperCase()+p.slice(1)}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', color: '#71717a', marginBottom: '4px' }}>Stato</label>
+                <select value={(e.status ?? t.status) as string} onChange={ev => set('status', ev.target.value)} style={sel()}>
+                  {['trial','active','suspended','cancelled'].map(s => <option key={s} value={s}>{STATUS[s]?.label ?? s}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', color: '#71717a', marginBottom: '4px' }}>Prezzo mensile (€)</label>
+                <input type="number" min={0} value={((e.monthly_price ?? t.monthly_price) as number)}
+                  onChange={ev => set('monthly_price', parseFloat(ev.target.value) || 0)} style={inp()} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', color: '#71717a', marginBottom: '4px' }}>Fine trial</label>
+                <input type="date" value={((e.trial_ends_at ?? t.trial_ends_at) as string)?.slice(0, 10) ?? ''}
+                  onChange={ev => set('trial_ends_at', ev.target.value ? new Date(ev.target.value).toISOString() : null)} style={inp()} />
+              </div>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '11px', color: '#71717a', marginBottom: '4px' }}>Note interne</label>
+              <textarea rows={3} value={(e.notes ?? t.notes) as string} onChange={ev => set('notes', ev.target.value)}
+                style={{ ...inp(), resize: 'vertical' }} />
+            </div>
+          </div>
+
+          {/* Info row */}
+          <div style={{ background: '#12121a', borderRadius: '10px', padding: '12px', fontSize: '11px', color: '#71717a' }}>
+            <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+              <span><CalendarIcon size={10} style={{ display: 'inline', marginRight: 3 }} />Registrato: {fmtDate(t.registered_at)}</span>
+              <span><Clock size={10} style={{ display: 'inline', marginRight: 3 }} />Ultimo sync: {fmtDT(t.last_sync)}</span>
+            </div>
+          </div>
+
+          {/* Save */}
+          <button onClick={saveTenant} disabled={savingTenant}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px', borderRadius: '12px', border: 'none', background: savingTenant ? '#2e2e40' : 'linear-gradient(135deg,#f59e0b,#ef4444)', color: 'white', fontWeight: 600, cursor: savingTenant ? 'not-allowed' : 'pointer' }}>
+            <Save size={15} /> {savingTenant ? 'Salvataggio…' : 'Salva modifiche'}
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  // ─── TENANTS ─────────────────────────────────────────────────────────────
+  const TenantsSection = () => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+        <h2 style={{ color: '#f4f4f5', fontWeight: 700, fontSize: '20px', margin: 0 }}>Tenant ({filteredTenants.length})</h2>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative' }}>
+            <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#71717a' }} />
+            <input placeholder="Cerca…" value={tenantSearch} onChange={e => setTenantSearch(e.target.value)} style={{ ...inp(), paddingLeft: '30px', width: '180px' }} />
+          </div>
+          <select value={tenantPlanFilter} onChange={e => setTenantPlanFilter(e.target.value)} style={sel({ width: '120px' })}>
+            <option value="">Tutti i piani</option>
+            {['trial','starter','pro','business','enterprise'].map(p => <option key={p} value={p}>{p.charAt(0).toUpperCase()+p.slice(1)}</option>)}
+          </select>
+          <select value={tenantStatusFilter} onChange={e => setTenantStatusFilter(e.target.value)} style={sel({ width: '130px' })}>
+            <option value="">Tutti gli stati</option>
+            {Object.entries(STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+          </select>
+        </div>
+      </div>
+
+      <div style={card({ padding: 0, overflow: 'hidden' })}>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid #2e2e40' }}>
+                {['Salone','Titolare','Piano','Stato','Clienti','Appunt.','Registrato','Azioni'].map(h => (
+                  <th key={h} style={{ padding: '12px 14px', textAlign: 'left', color: '#71717a', fontWeight: 500, fontSize: '11px', whiteSpace: 'nowrap' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filteredTenants.map(t => (
+                <tr key={t.user_id} style={{ borderBottom: '1px solid #1e1e2a', cursor: 'pointer', transition: 'background 0.15s' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = '#202030')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                  onClick={() => { setSelTenant(t); setEditTenant({ ...t }); }}>
+                  <td style={{ padding: '12px 14px', color: '#f4f4f5', fontWeight: 600 }}>{t.salon_name}</td>
+                  <td style={{ padding: '12px 14px', color: '#a1a1aa' }}>{t.full_name || '—'}</td>
+                  <td style={{ padding: '12px 14px' }}><Badge s={t.plan} map={PLAN} /></td>
+                  <td style={{ padding: '12px 14px' }}><Badge s={t.status} map={STATUS} /></td>
+                  <td style={{ padding: '12px 14px', color: '#a1a1aa', textAlign: 'center' }}>{t.clients_count}</td>
+                  <td style={{ padding: '12px 14px', color: '#a1a1aa', textAlign: 'center' }}>{t.appointments_count}</td>
+                  <td style={{ padding: '12px 14px', color: '#71717a', whiteSpace: 'nowrap' }}>{fmtDate(t.registered_at)}</td>
+                  <td style={{ padding: '12px 14px' }}>
+                    <button onClick={ev => { ev.stopPropagation(); setSelTenant(t); setEditTenant({ ...t }); }}
+                      style={{ background: 'none', border: '1px solid #2e2e40', borderRadius: '6px', padding: '4px 10px', color: '#818cf8', fontSize: '11px', cursor: 'pointer' }}>
+                      Apri
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {filteredTenants.length === 0 && (
+                <tr><td colSpan={8} style={{ padding: '24px', textAlign: 'center', color: '#3f3f5a' }}>Nessun tenant trovato.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+
+  // ─── TICKETS ─────────────────────────────────────────────────────────────
+  const TicketsSection = () => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+        <h2 style={{ color: '#f4f4f5', fontWeight: 700, fontSize: '20px', margin: 0 }}>Ticket di supporto</h2>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <select value={ticketStatusFilter} onChange={e => setTicketStatusFilter(e.target.value)} style={sel({ width: '150px' })}>
+            <option value="">Tutti gli stati</option>
+            {Object.entries(TK_STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+          </select>
+          <button onClick={() => { setTicketForm({ category: 'domanda', priority: 'normale' }); setNewTicket(true); }}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', borderRadius: '10px', border: 'none', background: 'linear-gradient(135deg,#f59e0b,#ef4444)', color: 'white', fontWeight: 600, fontSize: '13px', cursor: 'pointer' }}>
+            <Plus size={14} /> Nuovo ticket
+          </button>
+        </div>
+      </div>
+
+      <div style={card({ padding: 0, overflow: 'hidden' })}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+          <thead>
+            <tr style={{ borderBottom: '1px solid #2e2e40' }}>
+              {['Salone','Oggetto','Categoria','Priorità','Stato','Data','Azioni'].map(h => (
+                <th key={h} style={{ padding: '12px 14px', textAlign: 'left', color: '#71717a', fontWeight: 500, fontSize: '11px' }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filteredTickets.map(t => (
+              <tr key={t.id} style={{ borderBottom: '1px solid #1e1e2a' }}>
+                <td style={{ padding: '12px 14px', color: '#f4f4f5', fontWeight: 600 }}>{t.tenant_name || '—'}</td>
+                <td style={{ padding: '12px 14px', color: '#a1a1aa', maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.subject}</td>
+                <td style={{ padding: '12px 14px', color: '#71717a' }}>{t.category}</td>
+                <td style={{ padding: '12px 14px' }}><span style={{ color: PRIO[t.priority]?.text ?? '#71717a', fontWeight: 600 }}>{PRIO[t.priority]?.label ?? t.priority}</span></td>
+                <td style={{ padding: '12px 14px' }}><Badge s={t.status} map={TK_STATUS} /></td>
+                <td style={{ padding: '12px 14px', color: '#71717a', whiteSpace: 'nowrap' }}>{fmtDate(t.created_at)}</td>
+                <td style={{ padding: '12px 14px' }}>
+                  <button onClick={() => { setSelTicket(t); setTicketForm({ ...t }); setNewTicket(false); }}
+                    style={{ background: 'none', border: '1px solid #2e2e40', borderRadius: '6px', padding: '4px 10px', color: '#818cf8', fontSize: '11px', cursor: 'pointer' }}>
+                    Apri
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {filteredTickets.length === 0 && (
+              <tr><td colSpan={7} style={{ padding: '24px', textAlign: 'center', color: '#3f3f5a' }}>Nessun ticket trovato.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Ticket modal */}
+      {(selTicket || newTicket) && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => { setSelTicket(null); setNewTicket(false); }}>
+          <div style={{ width: '480px', maxHeight: '90vh', overflowY: 'auto', background: '#1c1c27', border: '1px solid #2e2e40', borderRadius: '20px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '14px' }} onClick={ev => ev.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ color: '#f4f4f5', fontWeight: 700, margin: 0 }}>{selTicket ? 'Modifica ticket' : 'Nuovo ticket'}</h3>
+              <button onClick={() => { setSelTicket(null); setNewTicket(false); }} style={{ background: 'none', border: 'none', color: '#71717a', cursor: 'pointer' }}><X size={18} /></button>
+            </div>
+            {[
+              ['Salone', 'tenant_name', 'text'],
+              ['Oggetto', 'subject', 'text'],
+            ].map(([l, k, type]) => (
+              <div key={k as string}>
+                <label style={{ display: 'block', fontSize: '11px', color: '#71717a', marginBottom: '4px' }}>{l}</label>
+                <input type={type as string} value={(ticketForm[k as keyof Ticket] ?? '') as string} onChange={ev => setTicketForm(p => ({ ...p, [k as string]: ev.target.value }))} style={inp()} />
+              </div>
+            ))}
+            <div>
+              <label style={{ display: 'block', fontSize: '11px', color: '#71717a', marginBottom: '4px' }}>Descrizione</label>
+              <textarea rows={3} value={ticketForm.body ?? ''} onChange={ev => setTicketForm(p => ({ ...p, body: ev.target.value }))} style={{ ...inp(), resize: 'vertical' }} />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              {[['Categoria', 'category', ['bug','domanda','feature','altro']], ['Priorità', 'priority', ['bassa','normale','alta','urgente']], ['Stato', 'status', ['aperto','in_lavorazione','risolto','chiuso']]].map(([l, k, opts]) => (
+                <div key={k as string}>
+                  <label style={{ display: 'block', fontSize: '11px', color: '#71717a', marginBottom: '4px' }}>{l as string}</label>
+                  <select value={(ticketForm[k as keyof Ticket] ?? '') as string} onChange={ev => setTicketForm(p => ({ ...p, [k as string]: ev.target.value }))} style={sel()}>
+                    {(opts as string[]).map(o => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                </div>
+              ))}
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', color: '#71717a', marginBottom: '4px' }}>Assegnato a</label>
+                <input value={ticketForm.assigned_to ?? ''} onChange={ev => setTicketForm(p => ({ ...p, assigned_to: ev.target.value }))} style={inp()} />
+              </div>
+            </div>
+            {selTicket && (
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', color: '#71717a', marginBottom: '4px' }}>Note risoluzione</label>
+                <textarea rows={2} value={ticketForm.resolution ?? ''} onChange={ev => setTicketForm(p => ({ ...p, resolution: ev.target.value }))} style={{ ...inp(), resize: 'vertical' }} />
+              </div>
+            )}
+            <button onClick={saveTicket} style={{ padding: '11px', borderRadius: '12px', border: 'none', background: 'linear-gradient(135deg,#f59e0b,#ef4444)', color: 'white', fontWeight: 600, cursor: 'pointer' }}>
+              {selTicket ? 'Salva modifiche' : 'Crea ticket'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  // ─── BROADCASTS ──────────────────────────────────────────────────────────
+  const BroadcastsSection = () => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <h2 style={{ color: '#f4f4f5', fontWeight: 700, fontSize: '20px', margin: 0 }}>Broadcast ({broadcasts.length})</h2>
+        <button onClick={() => setNewBcast(true)}
+          style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', borderRadius: '10px', border: 'none', background: 'linear-gradient(135deg,#f59e0b,#ef4444)', color: 'white', fontWeight: 600, fontSize: '13px', cursor: 'pointer' }}>
+          <Plus size={14} /> Nuovo messaggio
+        </button>
+      </div>
+      <p style={{ color: '#71717a', fontSize: '12px', margin: '-8px 0 0' }}>Messaggi in-app inviati ai tenant (visibili al prossimo accesso al gestionale).</p>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        {broadcasts.map(b => (
+          <div key={b.id} style={card({ padding: '16px' })}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
+              <div style={{ flex: 1 }}>
+                <p style={{ color: '#f4f4f5', fontWeight: 600, fontSize: '14px', margin: 0 }}>{b.title}</p>
+                <p style={{ color: '#a1a1aa', fontSize: '12px', margin: '4px 0 8px' }}>{b.body}</p>
+                <div style={{ display: 'flex', gap: '12px', fontSize: '11px', color: '#71717a' }}>
+                  <span>Target: <span style={{ color: '#818cf8' }}>{b.target}</span></span>
+                  <span>{fmtDT(b.created_at)}</span>
+                </div>
+              </div>
+              <button onClick={async () => { await af('/api/admin/broadcasts', { method: 'DELETE', body: JSON.stringify({ id: b.id }) }); setBroadcasts(prev => prev.filter(x => x.id !== b.id)); }}
+                style={{ background: 'none', border: 'none', color: '#71717a', cursor: 'pointer', padding: '4px' }}><X size={15} /></button>
+            </div>
+          </div>
+        ))}
+        {broadcasts.length === 0 && <div style={card({ color: '#3f3f5a', fontSize: '13px', textAlign: 'center' })}>Nessun broadcast inviato.</div>}
+      </div>
+
+      {/* New broadcast modal */}
+      {newBcast && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setNewBcast(false)}>
+          <div style={{ width: '460px', background: '#1c1c27', border: '1px solid #2e2e40', borderRadius: '20px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '14px' }} onClick={ev => ev.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ color: '#f4f4f5', fontWeight: 700, margin: 0 }}>Invia broadcast</h3>
+              <button onClick={() => setNewBcast(false)} style={{ background: 'none', border: 'none', color: '#71717a', cursor: 'pointer' }}><X size={18} /></button>
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '11px', color: '#71717a', marginBottom: '4px' }}>Titolo</label>
+              <input value={bcastForm.title} onChange={e => setBcastForm(p => ({ ...p, title: e.target.value }))} style={inp()} placeholder="Es. Novità del prodotto" />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '11px', color: '#71717a', marginBottom: '4px' }}>Messaggio</label>
+              <textarea rows={4} value={bcastForm.body} onChange={e => setBcastForm(p => ({ ...p, body: e.target.value }))} style={{ ...inp(), resize: 'vertical' }} placeholder="Testo del messaggio…" />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '11px', color: '#71717a', marginBottom: '4px' }}>Destinatari</label>
+              <select value={bcastForm.target} onChange={e => setBcastForm(p => ({ ...p, target: e.target.value }))} style={sel()}>
+                <option value="all">Tutti i tenant</option>
+                <option value="trial">Solo trial</option>
+                <option value="active">Solo attivi</option>
+                <option value="plan:pro">Solo piano Pro</option>
+                <option value="plan:business">Solo piano Business</option>
+              </select>
+            </div>
+            <button onClick={sendBroadcast} disabled={!bcastForm.title || !bcastForm.body}
+              style={{ padding: '11px', borderRadius: '12px', border: 'none', background: (!bcastForm.title || !bcastForm.body) ? '#2e2e40' : 'linear-gradient(135deg,#f59e0b,#ef4444)', color: 'white', fontWeight: 600, cursor: (!bcastForm.title || !bcastForm.body) ? 'not-allowed' : 'pointer' }}>
+              Invia broadcast
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  // ─── FEATURE FLAGS ────────────────────────────────────────────────────────
+  const FlagsSection = () => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <h2 style={{ color: '#f4f4f5', fontWeight: 700, fontSize: '20px', margin: 0 }}>Feature Flag</h2>
+        <button onClick={() => setNewFlag(true)}
+          style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', borderRadius: '10px', border: 'none', background: 'linear-gradient(135deg,#f59e0b,#ef4444)', color: 'white', fontWeight: 600, fontSize: '13px', cursor: 'pointer' }}>
+          <Plus size={14} /> Nuovo flag
+        </button>
+      </div>
+
+      <div style={card({ padding: 0, overflow: 'hidden' })}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+          <thead>
+            <tr style={{ borderBottom: '1px solid #2e2e40' }}>
+              {['Funzionalità','Descrizione','Attivo per','Stato'].map(h => (
+                <th key={h} style={{ padding: '12px 14px', textAlign: 'left', color: '#71717a', fontWeight: 500, fontSize: '11px' }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {flags.map(f => (
+              <tr key={f.id} style={{ borderBottom: '1px solid #1e1e2a' }}>
+                <td style={{ padding: '12px 14px', color: '#f4f4f5', fontWeight: 600 }}>{f.name}</td>
+                <td style={{ padding: '12px 14px', color: '#71717a' }}>{f.description || '—'}</td>
+                <td style={{ padding: '12px 14px' }}><span style={{ background: 'rgba(99,102,241,0.1)', color: '#818cf8', padding: '2px 8px', borderRadius: '6px', fontSize: '11px' }}>{f.enabled_for}</span></td>
+                <td style={{ padding: '12px 14px' }}>
+                  <button onClick={() => toggleFlag(f)} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', color: f.enabled ? '#4ade80' : '#71717a' }}>
+                    {f.enabled ? <ToggleRight size={22} /> : <ToggleLeft size={22} />}
+                    <span style={{ fontSize: '12px' }}>{f.enabled ? 'Attivo' : 'Disattivo'}</span>
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* New flag modal */}
+      {newFlag && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setNewFlag(false)}>
+          <div style={{ width: '400px', background: '#1c1c27', border: '1px solid #2e2e40', borderRadius: '20px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '14px' }} onClick={ev => ev.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ color: '#f4f4f5', fontWeight: 700, margin: 0 }}>Nuovo feature flag</h3>
+              <button onClick={() => setNewFlag(false)} style={{ background: 'none', border: 'none', color: '#71717a', cursor: 'pointer' }}><X size={18} /></button>
+            </div>
+            {[['Nome', 'name'], ['Descrizione', 'description']].map(([l, k]) => (
+              <div key={k}>
+                <label style={{ display: 'block', fontSize: '11px', color: '#71717a', marginBottom: '4px' }}>{l}</label>
+                <input value={flagForm[k as 'name' | 'description']} onChange={e => setFlagForm(p => ({ ...p, [k]: e.target.value }))} style={inp()} />
+              </div>
+            ))}
+            <div>
+              <label style={{ display: 'block', fontSize: '11px', color: '#71717a', marginBottom: '4px' }}>Attivo per</label>
+              <select value={flagForm.enabled_for} onChange={e => setFlagForm(p => ({ ...p, enabled_for: e.target.value }))} style={sel()}>
+                <option value="all">Tutti</option>
+                <option value="none">Nessuno</option>
+                <option value="starter">Starter+</option>
+                <option value="pro">Pro+</option>
+                <option value="business">Business+</option>
+              </select>
+            </div>
+            <button onClick={createFlag} disabled={!flagForm.name}
+              style={{ padding: '11px', borderRadius: '12px', border: 'none', background: !flagForm.name ? '#2e2e40' : 'linear-gradient(135deg,#f59e0b,#ef4444)', color: 'white', fontWeight: 600, cursor: !flagForm.name ? 'not-allowed' : 'pointer' }}>
+              Crea flag
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  // ─── AUDIT LOG ───────────────────────────────────────────────────────────
+  const AuditSection = () => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <h2 style={{ color: '#f4f4f5', fontWeight: 700, fontSize: '20px', margin: 0 }}>Audit Log</h2>
+        <button onClick={() => loadSection('audit')} style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'none', border: '1px solid #2e2e40', borderRadius: '8px', padding: '6px 12px', color: '#71717a', cursor: 'pointer', fontSize: '12px' }}>
+          <RefreshCw size={12} /> Aggiorna
+        </button>
+      </div>
+      <div style={card({ padding: 0, overflow: 'hidden' })}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+          <thead>
+            <tr style={{ borderBottom: '1px solid #2e2e40' }}>
+              {['Azione','Tenant','Dettagli','Data'].map(h => (
+                <th key={h} style={{ padding: '12px 14px', textAlign: 'left', color: '#71717a', fontWeight: 500, fontSize: '11px' }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {audit.map(e => (
+              <tr key={e.id} style={{ borderBottom: '1px solid #1e1e2a' }}>
+                <td style={{ padding: '10px 14px', color: '#f4f4f5', fontWeight: 500 }}>{ACTION_LABELS[e.action] ?? e.action}</td>
+                <td style={{ padding: '10px 14px', color: '#a1a1aa', fontSize: '11px' }}>{e.target_tenant ? e.target_tenant.slice(0, 16) : '—'}</td>
+                <td style={{ padding: '10px 14px', color: '#71717a', maxWidth: '260px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {Object.entries(e.details ?? {}).map(([k, v]) => `${k}: ${v}`).join(' · ') || '—'}
+                </td>
+                <td style={{ padding: '10px 14px', color: '#3f3f5a', whiteSpace: 'nowrap' }}>{fmtDT(e.created_at)}</td>
+              </tr>
+            ))}
+            {audit.length === 0 && (
+              <tr><td colSpan={4} style={{ padding: '24px', textAlign: 'center', color: '#3f3f5a' }}>Nessuna azione registrata.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+
+  // ─── LAYOUT ───────────────────────────────────────────────────────────────
+  return (
+    <div style={{ display: 'flex', height: '100vh', background: '#0f0f13', overflow: 'hidden' }}>
+      {/* Sidebar */}
+      <div style={{ width: sidebarOpen ? '220px' : '56px', flexShrink: 0, background: '#13131e', borderRight: '1px solid #2e2e40', display: 'flex', flexDirection: 'column', transition: 'width 0.2s', overflow: 'hidden' }}>
+        {/* Logo */}
+        <div style={{ padding: sidebarOpen ? '20px 16px 16px' : '20px 12px 16px', display: 'flex', alignItems: 'center', gap: '10px', borderBottom: '1px solid #2e2e40' }}>
+          <div style={{ width: '32px', height: '32px', borderRadius: '10px', background: 'linear-gradient(135deg,#f59e0b,#ef4444)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <ShieldCheck size={16} color="white" />
+          </div>
+          {sidebarOpen && <span style={{ color: '#f4f4f5', fontWeight: 700, fontSize: '14px', whiteSpace: 'nowrap' }}>Admin Panel</span>}
+        </div>
+
+        {/* Nav */}
+        <nav style={{ flex: 1, padding: '12px 8px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+          {navItems.map(item => {
+            const active = section === item.id;
+            return (
+              <button key={item.id} onClick={() => changeSection(item.id)} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: sidebarOpen ? '9px 10px' : '9px', borderRadius: '10px', border: 'none', background: active ? 'rgba(245,158,11,0.15)' : 'transparent', color: active ? '#fbbf24' : '#71717a', cursor: 'pointer', textAlign: 'left', width: '100%', whiteSpace: 'nowrap', justifyContent: sidebarOpen ? 'flex-start' : 'center' }}>
+                <span style={{ flexShrink: 0 }}>{item.icon}</span>
+                {sidebarOpen && <><span style={{ fontSize: '13px', fontWeight: active ? 600 : 400, flex: 1 }}>{item.label}</span>
+                  {item.count !== undefined && item.count > 0 && (
+                    <span style={{ background: active ? 'rgba(245,158,11,0.3)' : 'rgba(245,158,11,0.15)', color: '#fbbf24', borderRadius: '10px', padding: '1px 7px', fontSize: '10px', fontWeight: 600 }}>{item.count}</span>
+                  )}</>}
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* Bottom */}
+        <div style={{ padding: '12px 8px', borderTop: '1px solid #2e2e40', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <button onClick={() => setSidebarOpen(p => !p)} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px', borderRadius: '10px', border: 'none', background: 'transparent', color: '#71717a', cursor: 'pointer', justifyContent: sidebarOpen ? 'flex-start' : 'center' }}>
+            <ChevronRight size={16} style={{ transform: sidebarOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', flexShrink: 0 }} />
+            {sidebarOpen && <span style={{ fontSize: '12px' }}>Riduci</span>}
+          </button>
+          <button onClick={logout} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px', borderRadius: '10px', border: 'none', background: 'transparent', color: '#71717a', cursor: 'pointer', justifyContent: sidebarOpen ? 'flex-start' : 'center' }}>
+            <LogOut size={16} style={{ flexShrink: 0 }} />
+            {sidebarOpen && <span style={{ fontSize: '12px' }}>Esci</span>}
+          </button>
+          {sidebarOpen && <a href="/login" style={{ fontSize: '10px', color: '#2e2e40', textAlign: 'center', textDecoration: 'none', padding: '4px 0' }}>← Gestionale</a>}
+        </div>
+      </div>
+
+      {/* Main */}
+      <div style={{ flex: 1, overflow: 'auto', padding: '28px' }}>
+        {loading ? (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '200px', color: '#71717a', gap: '10px' }}>
+            <RefreshCw size={18} className="animate-spin" /> Caricamento…
+          </div>
+        ) : (
+          <>
+            {section === 'overview'    && <OverviewSection />}
+            {section === 'tenants'     && <TenantsSection />}
+            {section === 'tickets'     && <TicketsSection />}
+            {section === 'broadcasts'  && <BroadcastsSection />}
+            {section === 'flags'       && <FlagsSection />}
+            {section === 'audit'       && <AuditSection />}
+          </>
+        )}
+      </div>
+
+      {/* Tenant modal */}
+      {selTenant && <TenantModal />}
+    </div>
+  );
+}
