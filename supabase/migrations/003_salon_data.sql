@@ -26,6 +26,9 @@ create policy "salon_data_public_read" on salon_data
   for select using (true);
 
 -- 2) Tabella per le prenotazioni online (richieste dal sito di booking)
+-- Add salon_id column in case the table already existed without it
+alter table if exists online_bookings add column if not exists salon_id text not null default '';
+
 create table if not exists online_bookings (
   id             text        primary key,
   salon_id       text        not null default '',

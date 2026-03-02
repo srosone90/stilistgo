@@ -175,6 +175,14 @@ export async function signOut() {
 }
 
 export async function getCurrentUser() {
+  // 1. Try local session from localStorage first (instant, no network needed)
+  //    This is the most reliable path for a logged-in user on page reload.
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user) return session.user;
+  } catch { /* ignore */ }
+
+  // 2. Try full getUser (validates token with server)
   const online = await isSupabaseReachable();
   if (online) {
     try {
@@ -182,7 +190,8 @@ export async function getCurrentUser() {
       if (user) return user;
     } catch { /* ignora */ }
   }
-  // Fallback sessione locale
+
+  // 3. Fallback sessione locale (offline / local accounts)
   const local = getLocalUser();
   return local as unknown as ReturnType<typeof supabase.auth.getUser> extends Promise<{ data: { user: infer U } }> ? U : null;
 }
