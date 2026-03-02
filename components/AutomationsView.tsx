@@ -78,20 +78,22 @@ export default function AutomationsView() {
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [debugInfo, setDebugInfo] = useState<string>('');
 
   // Fetch credentials directly from DB on mount — never depends on SalonContext timing
   useEffect(() => {
     (async () => {
       try {
         const user = await getCurrentUser();
-        if (!user) { setConnStatus('not-configured'); return; }
+        if (!user) { setConnStatus('not-configured'); setDebugInfo('no user session'); return; }
 
         const r = await fetch(`/api/admin/whatsapp?user_id=${user.id}`);
-        if (!r.ok) { setConnStatus('not-configured'); return; }
+        if (!r.ok) { setConnStatus('not-configured'); setDebugInfo(`api error ${r.status}`); return; }
 
         const d = await r.json();
         const instanceId: string = d.ultraMsgInstanceId ?? '';
         const token: string = d.ultraMsgToken ?? '';
+        setDebugInfo(`db:${d.debug ?? '?'} id:${instanceId ? instanceId.slice(0,12)+'…' : 'empty'}`);
 
         if (!instanceId || !token) { setConnStatus('not-configured'); return; }
 
@@ -102,8 +104,9 @@ export default function AutomationsView() {
         const sd = await sr.json();
         setConnStatus(sd.connected ? 'connected' : 'disconnected');
         setQrCode(sd.qrCode ?? null);
-      } catch {
+      } catch (e) {
         setConnStatus('not-configured');
+        setDebugInfo(String(e));
       }
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -155,6 +158,13 @@ export default function AutomationsView() {
           </span>
         )}
       </div>
+
+      {/* ── Debug pill (rimuovere dopo fix) ── */}
+      {debugInfo && (
+        <div style={{ fontSize: 11, color: 'var(--muted)', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 6, padding: '3px 10px', alignSelf: 'flex-start', fontFamily: 'monospace' }}>
+          debug: {debugInfo}
+        </div>
+      )}
 
       {/* ── Stato connessione ── */}
       {connStatus === 'loading' && (
