@@ -83,16 +83,16 @@ export async function GET(req: NextRequest) {
       (!operatorId || a.operatorId === operatorId)
     );
 
-    // Also block slots from pending online bookings (not yet imported into salon_data)
-    // Extract operatorId encoded as [op:xxx] prefix in notes
-    const { data: pendingRows } = await supabase
+    // Also block slots from online_bookings (pending OR confirmed) to handle
+    // both: not-yet-imported bookings AND bookings imported but salon_data not synced yet.
+    const { data: onlineRows } = await supabase
       .from('online_bookings')
-      .select('preferred_time, notes')
+      .select('preferred_time, notes, status')
       .eq('salon_id', salonId)
       .eq('preferred_date', date)
-      .eq('status', 'pending');
+      .neq('status', 'cancelled');
 
-    const pendingAppts: { startTime: string }[] = (pendingRows ?? []).filter(r => {
+    const pendingAppts: { startTime: string }[] = (onlineRows ?? []).filter(r => {
       if (!operatorId) return true;
       const m = (r.notes || '').match(/^\[op:([^\]]+)\]/);
       const pendingOp = m?.[1] || '';
