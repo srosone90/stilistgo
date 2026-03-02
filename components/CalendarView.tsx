@@ -510,6 +510,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                   const height = Math.max(((endMin - startMin) / 60) * HOUR_PX, 28);
                   const color = operators.find(o => o.id === a.operatorId)?.color || '#6366f1';
                   const client = clients.find(c => c.id === a.clientId);
+                  const svcNames = a.serviceIds.map(sid => services.find(s => s.id === sid)?.name).filter(Boolean).join(', ');
                   return (
                     <div key={a.id}
                       onMouseDown={e => handleDragStart(e, a)}
@@ -519,7 +520,8 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                       <p className="text-xs font-semibold truncate" style={{ color }}>
                         {a.isBlock ? 'Blocco: ' + a.blockReason : (client ? `${client.firstName} ${client.lastName}` : '—')}
                       </p>
-                      <p className="text-xs truncate" style={{ color: 'var(--text-3)' }}>{a.startTime}–{effectiveEnd}</p>
+                      <p className="text-xs truncate" style={{ color: 'var(--text-3)', fontSize: 10 }}>{a.startTime}–{effectiveEnd}</p>
+                      {svcNames && height > 38 && <p className="truncate" style={{ color: 'var(--muted)', fontSize: 10 }}>{svcNames}</p>}
                       <div onMouseDown={e => handleResizeStart(e, a)}
                         className="absolute bottom-0 left-0 right-0 flex items-center justify-center"
                         style={{ height: 10, cursor: 'ns-resize', background: `${color}30` }}>
