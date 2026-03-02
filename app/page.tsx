@@ -17,16 +17,15 @@ import CashView from '@/components/CashView';
 import GamificationView from '@/components/GamificationView';
 import LoyaltyView from '@/components/LoyaltyView';
 import OnlineBookingsView from '@/components/OnlineBookingsView';
-import AutomationsView from '@/components/AutomationsView';
 import OperatorLockScreen from '@/components/OperatorLockScreen';
 import { useApp } from '@/context/AppContext';
 import { useSalon } from '@/context/SalonContext';
 import { getCurrentUser, signOut } from '@/lib/supabase';
 import { DEFAULT_OPERATOR_PERMISSIONS, OperatorPermissions } from '@/types/salon';
 import { PLAN_FEATURES, PlanFeatures, VIEW_TO_FEATURE, UPGRADE_TEXT } from '@/lib/planGate';
-import { Plus, Loader2, CalendarDays, Users, Sparkles, UserCog, Package, Banknote, Trophy, Star, Globe, LogOut, Lock, MessageSquare } from 'lucide-react';
+import { Plus, Loader2, CalendarDays, Users, Sparkles, UserCog, Package, Banknote, Trophy, Star, Globe, LogOut, Lock } from 'lucide-react';
 
-type View = 'dashboard' | 'tabella' | 'analisi' | 'impostazioni' | 'calendar' | 'clients' | 'services' | 'staff' | 'inventory' | 'cash' | 'gamification' | 'loyalty' | 'bookings' | 'automazioni';
+type View = 'dashboard' | 'tabella' | 'analisi' | 'impostazioni' | 'calendar' | 'clients' | 'services' | 'staff' | 'inventory' | 'cash' | 'gamification' | 'loyalty' | 'bookings';
 
 export default function Home() {
   const router = useRouter();
@@ -60,7 +59,7 @@ export default function Home() {
       calendar: effectivePerms.calendar, clients: effectivePerms.clients,
       services: effectivePerms.services, staff: effectivePerms.staff,
       inventory: effectivePerms.inventory, cash: effectivePerms.cash,
-      gamification: true, loyalty: true, bookings: effectivePerms.accounting, automazioni: true,
+      gamification: true, loyalty: true, bookings: effectivePerms.accounting,
     };
     if (!viewPermsMap[view]) {
       const fallback = (Object.keys(viewPermsMap) as View[]).find(v => viewPermsMap[v]);
@@ -136,7 +135,6 @@ export default function Home() {
     gamification: { label: 'Gamification',     icon: <Trophy size={20} />,    action: () => {} },
     loyalty:      { label: 'Fidelizzazione',    icon: <Star size={20} />,      action: () => {} },
     bookings:     { label: 'Prenotazioni',      icon: <Globe size={20} />,         action: () => {} },
-    automazioni:  { label: 'Automazioni',       icon: <MessageSquare size={20} />, action: () => {} },
   };
 
   const renderView = () => {
@@ -159,7 +157,6 @@ export default function Home() {
       case 'gamification': return <GamificationView />;
       case 'loyalty':      return <LoyaltyView />;
       case 'bookings':     return effectivePerms.accounting ? <OnlineBookingsView /> : AccessDenied;
-      case 'automazioni':   return <AutomationsView />;
     }
   };
 
