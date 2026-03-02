@@ -56,7 +56,7 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
     payments, addPayment, deletePayment,
     cashSessions, addCashSession, closeCashSession,
     clients, operators, services, appointments,
-    redeemGiftCard, salonConfig,
+    redeemGiftCard, salonConfig, changeAppointmentStatus,
   } = useSalon();
 
   const [showForm, setShowForm] = useState(false);
@@ -94,6 +94,7 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
   const [closingBalance, setClosingBalance] = useState('');
   const [expandedPaymentId, setExpandedPaymentId] = useState<string | null>(null);
   const [newItemServiceId, setNewItemServiceId] = useState('');
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   // Today's session
   const todaySession = useMemo(() =>
@@ -289,10 +290,7 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
     });
     // Mark appointment completed
     if (form.appointmentId) {
-      const appt = appointments.find(a => a.id === form.appointmentId);
-      if (appt) {
-        // changeAppointmentStatus called indirectly - handled by context
-      }
+      changeAppointmentStatus(form.appointmentId, 'completed');
     }
     setShowForm(false);
     setForm(EMPTY_FORM);
@@ -372,7 +370,7 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="font-bold" style={{ color: '#22c55e' }}>{formatCurrency(p.total)}</span>
-                  <button onClick={e => { e.stopPropagation(); deletePayment(p.id); }}
+                  <button onClick={e => { e.stopPropagation(); setConfirmDeleteId(p.id); }}
                     style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: '#f87171', borderRadius: '8px', padding: '5px 8px', cursor: 'pointer' }}>
                     <Trash2 size={13} />
                   </button>
@@ -418,6 +416,21 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
           </div>
         )}
       </div>
+
+      {/* Confirm delete modal */}
+      {confirmDeleteId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
+          <div className="w-full max-w-sm rounded-2xl p-6" style={{ background: '#18181f', border: '1px solid #2e2e40' }}>
+            <h3 className="font-semibold text-white mb-2">Eliminare incasso?</h3>
+            <p className="text-sm mb-4" style={{ color: '#71717a' }}>Questa azione non è reversibile.</p>
+            <div className="flex gap-2">
+              <button onClick={() => setConfirmDeleteId(null)} style={{ flex: 1, background: '#12121a', border: '1px solid #2e2e40', color: '#71717a', borderRadius: '8px', padding: '8px', fontSize: '13px', cursor: 'pointer' }}>Annulla</button>
+              <button onClick={() => { deletePayment(confirmDeleteId); setConfirmDeleteId(null); }}
+                style={{ flex: 1, background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: '#f87171', borderRadius: '8px', padding: '8px', fontSize: '13px', cursor: 'pointer', fontWeight: 600 }}>Elimina</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Open session modal */}
       {showOpenSession && (

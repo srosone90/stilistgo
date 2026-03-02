@@ -6,6 +6,7 @@ import { LayoutDashboard, Table2, BarChart3, Settings, Scissors, Wifi, WifiOff, 
 import { useApp } from '@/context/AppContext';
 import { getCurrentUser, signOut } from '@/lib/supabase';
 import { useSalon } from '@/context/SalonContext';
+import { OperatorPermissions } from '@/types/salon';
 
 interface NavItem {
   id: string;
@@ -40,9 +41,10 @@ interface SidebarProps {
   activeView: string;
   onNavigate: (view: string) => void;
   onLock?: () => void;
+  permissions?: OperatorPermissions;
 }
 
-export default function Sidebar({ activeView, onNavigate, onLock }: SidebarProps) {
+export default function Sidebar({ activeView, onNavigate, onLock, permissions }: SidebarProps) {
   const { dataSource } = useApp();
   const { operators, activeOperatorId, setActiveOperatorId, verifyOperatorPin } = useSalon();
   const router = useRouter();
@@ -100,7 +102,17 @@ export default function Sidebar({ activeView, onNavigate, onLock }: SidebarProps
           <div key={group.label}>
             <p className="px-3 mb-1 text-xs font-semibold uppercase tracking-wider" style={{ color: '#3f3f5a' }}>{group.label}</p>
             <div className="space-y-0.5">
-              {group.items.map((item) => {
+              {group.items.filter(item => {
+                if (!permissions) return true;
+                if (item.id === 'dashboard' || item.id === 'tabella' || item.id === 'analisi' || item.id === 'impostazioni') return permissions.accounting;
+                if (item.id === 'calendar') return permissions.calendar;
+                if (item.id === 'clients') return permissions.clients;
+                if (item.id === 'services') return permissions.services;
+                if (item.id === 'staff') return permissions.staff;
+                if (item.id === 'inventory') return permissions.inventory;
+                if (item.id === 'cash') return permissions.cash;
+                return true;
+              }).map((item) => {
                 const active = activeView === item.id;
                 return (
                   <button

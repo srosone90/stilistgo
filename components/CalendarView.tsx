@@ -46,6 +46,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
   const [filterOperator, setFilterOperator] = useState('');
   const [showQuickClient, setShowQuickClient] = useState(false);
   const [quickClient, setQuickClient] = useState(EMPTY_QUICK_CLIENT);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
     if (newTrigger && newTrigger > 0) {
@@ -87,7 +88,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
     appointments.filter(a => {
       const inRange = days.some(d => isSameDay(parseISO(a.date), d));
       const opOk = !filterOperator || a.operatorId === filterOperator;
-      return inRange && opOk;
+      return inRange && opOk && a.status !== 'completed';
     }), [appointments, days, filterOperator]);
 
   function navigate(dir: number) {
@@ -451,7 +452,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
             <div className="flex justify-between mt-4">
               <div className="flex gap-2">
                 {editAppt && (
-                  <button onClick={() => { deleteAppointment(editAppt.id); setShowForm(false); }}
+                  <button onClick={() => setConfirmDeleteId(editAppt.id)}
                     style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: '#f87171', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', cursor: 'pointer' }}>
                     Elimina
                   </button>
@@ -480,6 +481,21 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Confirm delete appointment */}
+      {confirmDeleteId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
+          <div className="w-full max-w-sm rounded-2xl p-6" style={{ background: '#18181f', border: '1px solid #2e2e40' }}>
+            <h3 className="font-semibold text-white mb-2">Eliminare appuntamento?</h3>
+            <p className="text-sm mb-4" style={{ color: '#71717a' }}>Questa azione non è reversibile.</p>
+            <div className="flex gap-2">
+              <button onClick={() => setConfirmDeleteId(null)} style={{ flex: 1, background: '#12121a', border: '1px solid #2e2e40', color: '#71717a', borderRadius: '8px', padding: '8px', fontSize: '13px', cursor: 'pointer' }}>Annulla</button>
+              <button onClick={() => { deleteAppointment(confirmDeleteId); setConfirmDeleteId(null); setShowForm(false); }}
+                style={{ flex: 1, background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: '#f87171', borderRadius: '8px', padding: '8px', fontSize: '13px', cursor: 'pointer', fontWeight: 600 }}>Elimina</button>
+            </div>
           </div>
         </div>
       )}

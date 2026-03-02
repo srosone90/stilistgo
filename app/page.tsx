@@ -18,6 +18,7 @@ import OperatorLockScreen from '@/components/OperatorLockScreen';
 import { useApp } from '@/context/AppContext';
 import { useSalon } from '@/context/SalonContext';
 import { getCurrentUser } from '@/lib/supabase';
+import { DEFAULT_OPERATOR_PERMISSIONS, OperatorPermissions } from '@/types/salon';
 import { Plus, Loader2, CalendarDays, Users, Sparkles, UserCog, Package, Banknote } from 'lucide-react';
 
 type View = 'dashboard' | 'tabella' | 'analisi' | 'impostazioni' | 'calendar' | 'clients' | 'services' | 'staff' | 'inventory' | 'cash';
@@ -32,24 +33,54 @@ export default function Home() {
   const [showLockScreen, setShowLockScreen] = useState(false);
   const [cashPreset, setCashPreset] = useState<{ clientId: string; appointmentId: string } | null>(null);
   const { loading } = useApp();
-  const { activeOperatorId } = useSalon();
+  const { activeOperatorId, operators } = useSalon();
 
-  // Reset FAB trigger ogni volta che si cambia sezione
-  useEffect(() => { setFabTrigger(0); }, [view]);
+  // Calcola permessi effettivi dell'operatore attivo (undefined = admin = tutto)
+  const activeOp = operators.find(o => o.id === activeOperatorId);
+  const effectivePerms: OperatorPermissions = activeOperatorId && activeOp
+    ? (activeOp.permissions ?? DEFAULT_OPERATOR_PERMISSIONS)
+    : { calendar: true, clients: true, services: true, staff: true, inventory: true, cash: true, accounting: true };
 
-  // Auth guard
+  // Se la vista attuale non è accessibile dopo cambio permessi, torna a calendar o dashboard
+  useEffect(() => {
+    if (showLockScreen) return;
+    const viewPermsMap: Record<View, boolean> = {
+      dashboard: effectivePerms.accounting, tabella: effectivePerms.accounting,
+      analisi: effectivePerms.accounting, impostazioni: effectivePerms.accounting,
+      calendar: effectivePerms.calendar, clients: effectivePerms.clients,
+      services: effectivePerms.services, staff: effectivePerms.staff,
+      inventory: effectivePerms.inventory, cash: effectivePerms.cash,
+    };
+    if (!viewPermsMap[view]) {
+      const fallback = (Object.keys(viewPermsMap) as View[]).find(v => viewPermsMap[v]);
+      setView(fallback ?? 'calendar');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeOperatorId, showLockScreen]);
+
+  // Auth guard — mostra SEMPRE il lock screen al caricamento
   useEffect(() => {
     getCurrentUser().then((user) => {
       if (!user) {
         router.push('/login');
       } else {
         setAuthChecked(true);
-        // Mostra lock screen solo se non c'è operatore attivo in memoria
-        if (!activeOperatorId) setShowLockScreen(true);
+        setShowLockScreen(true); // sempre, ad ogni accesso
       }
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
+
+  // Reset FAB trigger ogni volta che si cambia sezione
+  useEffect(() => { setFabTrigger(0); }, [view]);
+
+  // Nodo "accesso negato" da usare nelle view bloccate
+  const AccessDenied = (
+    <div className="flex flex-col items-center justify-center h-full gap-3 py-20">
+      <div className="text-5xl">🔒</div>
+      <p className="text-white font-semibold text-lg">Accesso non consentito</p>
+      <p className="text-sm" style={{ color: '#71717a' }}>Contatta il titolare per richiedere l&apos;accesso a questa sezione.</p>
+    </div>
+  );
 
   const FAB_CONFIG: Record<View, { label: string; icon: React.ReactNode; action: () => void }> = {
     dashboard:    { label: 'Nuova Voce',       icon: <Plus size={20} />,      action: () => setShowForm(true) },
@@ -66,16 +97,16 @@ export default function Home() {
 
   const renderView = () => {
     switch (view) {
-      case 'dashboard': return <Dashboard />;
-      case 'tabella': return <TabularView />;
-      case 'analisi': return <AnalysisView />;
-      case 'impostazioni': return <SettingsView />;
-      case 'calendar': return <CalendarView newTrigger={fabTrigger} onGoToCash={(clientId, appointmentId) => { setCashPreset({ clientId, appointmentId }); setView('cash'); }} />;
-      case 'clients': return <ClientsView newTrigger={fabTrigger} />;
-      case 'services': return <ServicesView newTrigger={fabTrigger} />;
-      case 'staff': return <StaffView newTrigger={fabTrigger} />;
-      case 'inventory': return <InventoryView newTrigger={fabTrigger} />;
-      case 'cash': return <CashView newTrigger={fabTrigger} cashPreset={cashPreset} onPresetConsumed={() => setCashPreset(null)} />;
+      case 'dashboard': return effectivePerms.accounting ? <Dashboard /> : AccessDenied;
+      case 'tabella':   return effectivePerms.accounting ? <TabularView /> : AccessDenied;
+      case 'analisi':   return effectivePerms.accounting ? <AnalysisView /> : AccessDenied;
+      case 'impostazioni': return effectivePerms.accounting ? <SettingsView /> : AccessDenied;
+      case 'calendar': return effectivePerms.calendar ? <CalendarView newTrigger={fabTrigger} onGoToCash={(clientId, appointmentId) => { setCashPreset({ clientId, appointmentId }); setView('cash'); }} /> : AccessDenied;
+      case 'clients':  return effectivePerms.clients  ? <ClientsView newTrigger={fabTrigger} /> : AccessDenied;
+      case 'services': return effectivePerms.services  ? <ServicesView newTrigger={fabTrigger} /> : AccessDenied;
+      case 'staff':    return effectivePerms.staff     ? <StaffView newTrigger={fabTrigger} /> : AccessDenied;
+      case 'inventory':return effectivePerms.inventory ? <InventoryView newTrigger={fabTrigger} /> : AccessDenied;
+      case 'cash':     return effectivePerms.cash      ? <CashView newTrigger={fabTrigger} cashPreset={cashPreset} onPresetConsumed={() => setCashPreset(null)} /> : AccessDenied;
     }
   };
 
@@ -99,7 +130,7 @@ export default function Home() {
     <div className="flex h-screen overflow-hidden" style={{ background: '#0f0f13' }}>
       {/* Desktop sidebar */}
       <div className="hidden md:block">
-        <Sidebar activeView={view} onNavigate={(v) => setView(v as View)} onLock={() => setShowLockScreen(true)} />
+        <Sidebar activeView={view} onNavigate={(v) => setView(v as View)} onLock={() => setShowLockScreen(true)} permissions={effectivePerms} />
       </div>
 
       {/* Mobile sidebar overlay */}
@@ -107,7 +138,7 @@ export default function Home() {
         <div className="fixed inset-0 z-40 md:hidden">
           <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.6)' }} onClick={() => setSidebarOpen(false)} />
           <div className="relative z-50">
-            <Sidebar activeView={view} onNavigate={(v) => { setView(v as View); setSidebarOpen(false); }} onLock={() => { setSidebarOpen(false); setShowLockScreen(true); }} />
+            <Sidebar activeView={view} onNavigate={(v) => { setView(v as View); setSidebarOpen(false); }} onLock={() => { setSidebarOpen(false); setShowLockScreen(true); }} permissions={effectivePerms} />
           </div>
         </div>
       )}

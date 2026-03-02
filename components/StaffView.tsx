@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useSalon } from '@/context/SalonContext';
-import { Operator, OperatorRole, WorkShift, DayOfWeek, DAY_NAMES, DAY_NAMES_FULL, OPERATOR_COLORS, defaultSchedule, Absence } from '@/types/salon';
+import { Operator, OperatorRole, WorkShift, DayOfWeek, DAY_NAMES, DAY_NAMES_FULL, OPERATOR_COLORS, defaultSchedule, Absence, OperatorPermissions, DEFAULT_OPERATOR_PERMISSIONS, PERMISSION_LABELS } from '@/types/salon';
 import { format, parseISO } from 'date-fns';
 import { salonGenerateId } from '@/lib/salonStorage';
 import { formatCurrency } from '@/lib/calculations';
@@ -19,6 +19,7 @@ const EMPTY_OPERATOR: Omit<Operator, 'id' | 'createdAt'> = {
   name: '', email: '', role: 'operator', serviceIds: [],
   color: OPERATOR_COLORS[0], commissionRate: 0,
   schedule: defaultSchedule(), active: true, pin: '',
+  permissions: { ...DEFAULT_OPERATOR_PERMISSIONS },
 };
 
 const EMPTY_ABSENCE: Omit<Absence, 'id' | 'createdAt'> = {
@@ -60,7 +61,7 @@ export default function StaffView({ newTrigger }: { newTrigger?: number }) {
 
   function openEdit(o: Operator) {
     setEditOp(o);
-    setForm({ name: o.name, email: o.email, role: o.role, serviceIds: [...o.serviceIds], color: o.color, commissionRate: o.commissionRate, schedule: o.schedule.map(s => ({ ...s })), active: o.active, pin: o.pin || '' });
+    setForm({ name: o.name, email: o.email, role: o.role, serviceIds: [...o.serviceIds], color: o.color, commissionRate: o.commissionRate, schedule: o.schedule.map(s => ({ ...s })), active: o.active, pin: o.pin || '', permissions: o.permissions ? { ...o.permissions } : { ...DEFAULT_OPERATOR_PERMISSIONS } });
     setShowForm(true);
   }
 
@@ -308,6 +309,28 @@ export default function StaffView({ newTrigger }: { newTrigger?: number }) {
                   ))}
                 </div>
               </div>
+
+              {/* Permessi accesso — solo per ruoli non-titolare */}
+              {form.role !== 'owner' && (
+                <div className="col-span-2 pt-2" style={{ borderTop: '1px solid #2e2e40' }}>
+                  <label style={{ ...labelStyle, marginBottom: '8px', fontSize: '13px', color: '#d4d4d8' }}>Accesso alle sezioni</label>
+                  <p style={{ fontSize: '11px', color: '#3f3f5a', marginBottom: 10 }}>Deseleziona le sezioni a cui questo operatore non deve avere accesso.</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(Object.keys(PERMISSION_LABELS) as (keyof OperatorPermissions)[]).map(key => {
+                      const perms = form.permissions ?? { ...DEFAULT_OPERATOR_PERMISSIONS };
+                      const checked = perms[key] ?? true;
+                      return (
+                        <label key={key} className="flex items-center gap-2 text-sm cursor-pointer py-1.5 px-2 rounded-lg"
+                          style={{ background: checked ? 'rgba(99,102,241,0.08)' : '#12121a', border: `1px solid ${checked ? 'rgba(99,102,241,0.25)' : '#2e2e40'}` }}>
+                          <input type="checkbox" checked={checked}
+                            onChange={e => setForm(p => ({ ...p, permissions: { ...(p.permissions ?? DEFAULT_OPERATOR_PERMISSIONS), [key]: e.target.checked } }))} />
+                          <span style={{ color: checked ? '#d4d4d8' : '#71717a' }}>{PERMISSION_LABELS[key]}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
             <div className="flex justify-end gap-2 mt-4">
               <button onClick={() => setShowForm(false)} style={{ background: '#12121a', border: '1px solid #2e2e40', color: '#71717a', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', cursor: 'pointer' }}>Annulla</button>

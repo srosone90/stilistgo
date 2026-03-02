@@ -76,6 +76,31 @@ export interface WorkShift {
   endTime: string;   // "HH:mm"
 }
 
+export type OperatorPermissions = {
+  calendar: boolean;   // Agenda
+  clients: boolean;    // Clienti
+  services: boolean;   // Servizi
+  staff: boolean;      // Personale
+  inventory: boolean;  // Magazzino
+  cash: boolean;       // Cassa
+  accounting: boolean; // Contabilità (dashboard, tabella, analisi, impostazioni)
+};
+
+export const DEFAULT_OPERATOR_PERMISSIONS: OperatorPermissions = {
+  calendar: true, clients: true, services: true,
+  staff: false, inventory: false, cash: true, accounting: false,
+};
+
+export const PERMISSION_LABELS: Record<keyof OperatorPermissions, string> = {
+  calendar: 'Agenda',
+  clients: 'Clienti',
+  services: 'Servizi',
+  staff: 'Personale',
+  inventory: 'Magazzino',
+  cash: 'Cassa',
+  accounting: 'Contabilità',
+};
+
 export interface Operator {
   id: string;
   name: string;
@@ -86,7 +111,8 @@ export interface Operator {
   commissionRate: number; // 0-100%
   schedule: WorkShift[];
   active: boolean;
-  pin?: string; // 4-digit PIN for staff login
+  pin?: string; // PIN per accesso staff
+  permissions?: OperatorPermissions; // undefined = accesso completo (titolare)
   createdAt: string;
 }
 
