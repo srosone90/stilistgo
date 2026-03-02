@@ -13,16 +13,18 @@ import ClientsView from '@/components/ClientsView';
 import ServicesView from '@/components/ServicesView';
 import StaffView from '@/components/StaffView';
 import InventoryView from '@/components/InventoryView';
+import CashView from '@/components/CashView';
 import { useApp } from '@/context/AppContext';
 import { getCurrentUser } from '@/lib/supabase';
-import { Plus, Loader2 } from 'lucide-react';
+import { Plus, Loader2, CalendarDays, Users, Sparkles, UserCog, Package, Banknote } from 'lucide-react';
 
-type View = 'dashboard' | 'tabella' | 'analisi' | 'impostazioni' | 'calendar' | 'clients' | 'services' | 'staff' | 'inventory';
+type View = 'dashboard' | 'tabella' | 'analisi' | 'impostazioni' | 'calendar' | 'clients' | 'services' | 'staff' | 'inventory' | 'cash';
 
 export default function Home() {
   const router = useRouter();
   const [view, setView] = useState<View>('dashboard');
   const [showForm, setShowForm] = useState(false);
+  const [fabTrigger, setFabTrigger] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
   const { loading } = useApp();
@@ -38,17 +40,31 @@ export default function Home() {
     });
   }, [router]);
 
+  const FAB_CONFIG: Record<View, { label: string; icon: React.ReactNode; action: () => void }> = {
+    dashboard:    { label: 'Nuova Voce',       icon: <Plus size={20} />,      action: () => setShowForm(true) },
+    tabella:      { label: 'Nuova Voce',       icon: <Plus size={20} />,      action: () => setShowForm(true) },
+    analisi:      { label: 'Nuova Voce',       icon: <Plus size={20} />,      action: () => setShowForm(true) },
+    impostazioni: { label: 'Nuova Voce',       icon: <Plus size={20} />,      action: () => setShowForm(true) },
+    calendar:     { label: 'Nuovo Appuntamento', icon: <CalendarDays size={20} />, action: () => setFabTrigger(t => t + 1) },
+    clients:      { label: 'Nuovo Cliente',    icon: <Users size={20} />,     action: () => setFabTrigger(t => t + 1) },
+    services:     { label: 'Nuovo Servizio',   icon: <Sparkles size={20} />,  action: () => setFabTrigger(t => t + 1) },
+    staff:        { label: 'Nuovo Operatore',  icon: <UserCog size={20} />,   action: () => setFabTrigger(t => t + 1) },
+    inventory:    { label: 'Nuovo Prodotto',   icon: <Package size={20} />,   action: () => setFabTrigger(t => t + 1) },
+    cash:         { label: 'Incassa',          icon: <Banknote size={20} />,  action: () => setFabTrigger(t => t + 1) },
+  };
+
   const renderView = () => {
     switch (view) {
       case 'dashboard': return <Dashboard />;
       case 'tabella': return <TabularView />;
       case 'analisi': return <AnalysisView />;
       case 'impostazioni': return <SettingsView />;
-      case 'calendar': return <CalendarView />;
-      case 'clients': return <ClientsView />;
-      case 'services': return <ServicesView />;
-      case 'staff': return <StaffView />;
-      case 'inventory': return <InventoryView />;
+      case 'calendar': return <CalendarView newTrigger={fabTrigger} />;
+      case 'clients': return <ClientsView newTrigger={fabTrigger} />;
+      case 'services': return <ServicesView newTrigger={fabTrigger} />;
+      case 'staff': return <StaffView newTrigger={fabTrigger} />;
+      case 'inventory': return <InventoryView newTrigger={fabTrigger} />;
+      case 'cash': return <CashView newTrigger={fabTrigger} />;
     }
   };
 
@@ -106,15 +122,14 @@ export default function Home() {
         </main>
       </div>
 
-      {/* FAB — Quick Entry button */}
+      {/* FAB — Contextual action button */}
       <button
-        onClick={() => setShowForm(true)}
+        onClick={FAB_CONFIG[view].action}
         className="fixed bottom-6 right-6 z-30 flex items-center gap-2 px-5 py-3 rounded-2xl font-semibold text-white shadow-2xl transition-all hover:scale-105 active:scale-95"
         style={{ background: 'linear-gradient(135deg,#6366f1,#a855f7)', boxShadow: '0 0 30px rgba(99,102,241,0.4)' }}
-        title="Inserisci voce (Entrata o Uscita)"
       >
-        <Plus size={20} />
-        <span className="hidden sm:block">Nuova Voce</span>
+        {FAB_CONFIG[view].icon}
+        <span className="hidden sm:block">{FAB_CONFIG[view].label}</span>
       </button>
 
       {/* Entry Form Modal */}

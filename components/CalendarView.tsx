@@ -1,11 +1,11 @@
-'use client';
+﻿'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { useSalon } from '@/context/SalonContext';
-import { Appointment, AppointmentStatus, STATUS_COLORS, STATUS_LABELS } from '@/types/salon';
+import { Appointment, AppointmentStatus, STATUS_LABELS } from '@/types/salon';
 import { format, parseISO, addDays, startOfWeek, isSameDay } from 'date-fns';
 import { it } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Plus, X, Clock, User, Scissors } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, X, UserPlus } from 'lucide-react';
 
 const inputStyle: React.CSSProperties = { background: '#12121a', border: '1px solid #2e2e40', borderRadius: '10px', padding: '9px 13px', color: '#f4f4f5', fontSize: '13px', outline: 'none', width: '100%' };
 const labelStyle: React.CSSProperties = { fontSize: '12px', color: '#71717a', marginBottom: '4px', display: 'block' };
@@ -17,21 +17,26 @@ const EMPTY_APPT: Omit<Appointment, 'id' | 'createdAt' | 'history'> = {
   status: 'scheduled', notes: '', isBlock: false, blockReason: '',
   recurringGroupId: '', feedbackScore: 0,
 };
+const EMPTY_QUICK_CLIENT = { firstName: '', lastName: '', phone: '' };
 
 function timeToMinutes(t: string) {
   const [h, m] = t.split(':').map(Number);
   return h * 60 + m;
 }
-
 function minutesToTime(m: number) {
-  const h = Math.floor(m / 60).toString().padStart(2, '0');
-  const mm = (m % 60).toString().padStart(2, '0');
+  const clamped = Math.max(0, Math.min(m, 23 * 60 + 55));
+  const h = Math.floor(clamped / 60).toString().padStart(2, '0');
+  const mm = (clamped % 60).toString().padStart(2, '0');
   return `${h}:${mm}`;
 }
+const HOUR_PX = 64;
 
-export default function CalendarView() {
-  const { appointments, operators, services, clients, salonConfig,
-    addAppointment, updateAppointment, changeAppointmentStatus, deleteAppointment } = useSalon();
+export default function CalendarView({ newTrigger }: { newTrigger?: number }) {
+  const {
+    appointments, operators, services, clients, salonConfig,
+    addAppointment, updateAppointment, changeAppointmentStatus, deleteAppointment,
+    addClient,
+  } = useSalon();
 
   const [view, setView] = useState<'day' | 'week'>('week');
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -39,15 +44,29 @@ export default function CalendarView() {
   const [editAppt, setEditAppt] = useState<Appointment | null>(null);
   const [form, setForm] = useState<Omit<Appointment, 'id' | 'createdAt' | 'history'>>(EMPTY_APPT);
   const [filterOperator, setFilterOperator] = useState('');
+  const [showQuickClient, setShowQuickClient] = useState(false);
+  const [quickClient, setQuickClient] = useState(EMPTY_QUICK_CLIENT);
+
+  useEffect(() => {
+    if (newTrigger && newTrigger > 0) {
+      setEditAppt(null);
+      setForm({ ...EMPTY_APPT, date: format(new Date(), 'yyyy-MM-dd'), operatorId: operators[0]?.id || '' });
+      setShowForm(true);
+    }
+  }, [newTrigger, operators]);
+
+  // Resize
+  const resizeRef = useRef<{ apptId: string; origEndMin: number; startY: number } | null>(null);
+  const [resizingId, setResizingId] = useState<string | null>(null);
+  const [resizingEndTime, setResizingEndTimeState] = useState('');
 
   const openHour = parseInt(salonConfig.openTime.split(':')[0], 10);
   const closeHour = parseInt(salonConfig.closeTime.split(':')[0], 10);
   const hours = Array.from({ length: closeHour - openHour }, (_, i) => openHour + i);
+  const START_MIN = openHour * 60;
 
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
-  const days = view === 'week'
-    ? Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
-    : [currentDate];
+  const days = view === 'week' ? Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)) : [currentDate];
 
   const activeOperators = useMemo(() =>
     operators.filter(o => o.active && (!filterOperator || o.id === filterOperator)),
@@ -58,20 +77,32 @@ export default function CalendarView() {
       const inRange = days.some(d => isSameDay(parseISO(a.date), d));
       const opOk = !filterOperator || a.operatorId === filterOperator;
       return inRange && opOk;
-    }),
-    [appointments, days, filterOperator]);
+    }), [appointments, days, filterOperator]);
 
   function navigate(dir: number) {
     setCurrentDate(prev => addDays(prev, view === 'week' ? dir * 7 : dir));
   }
 
+  // If clicking under an appointment, start after it
+  function resolveStartTime(dayStr: string, operatorId: string, clickedHour: number): string {
+    const clickedMin = clickedHour * 60;
+    const dayAppts = appointments.filter(a => a.date === dayStr && a.operatorId === operatorId);
+    let lastEnd = clickedMin;
+    for (const a of dayAppts) {
+      const sMin = timeToMinutes(a.startTime);
+      const eMin = timeToMinutes(a.endTime);
+      if (sMin <= clickedMin && eMin > lastEnd) lastEnd = eMin;
+    }
+    return minutesToTime(lastEnd);
+  }
+
   function openNew(date?: string, operatorId?: string, startTime?: string) {
     const d = date || format(currentDate, 'yyyy-MM-dd');
-    const svcDuration = 60;
+    const op = operatorId || operators[0]?.id || '';
     const start = startTime || '09:00';
-    const end = minutesToTime(timeToMinutes(start) + svcDuration);
+    const end = minutesToTime(timeToMinutes(start) + 60);
     setEditAppt(null);
-    setForm({ ...EMPTY_APPT, date: d, operatorId: operatorId || '', startTime: start, endTime: end });
+    setForm({ ...EMPTY_APPT, date: d, operatorId: op, startTime: start, endTime: end });
     setShowForm(true);
   }
 
@@ -82,18 +113,14 @@ export default function CalendarView() {
   }
 
   function handleSave() {
-    if (editAppt) {
-      updateAppointment({ ...editAppt, ...form }, 'Appuntamento modificato');
-    } else {
-      addAppointment(form);
-    }
+    if (editAppt) updateAppointment({ ...editAppt, ...form }, 'Appuntamento modificato');
+    else addAppointment(form);
     setShowForm(false);
   }
 
   function handleServiceToggle(id: string) {
     setForm(p => {
       const ids = p.serviceIds.includes(id) ? p.serviceIds.filter(s => s !== id) : [...p.serviceIds, id];
-      // Auto-calculate end time from total duration
       const totalMin = ids.reduce((sum, sid) => {
         const svc = services.find(s => s.id === sid);
         return sum + (svc?.duration || 0);
@@ -103,17 +130,51 @@ export default function CalendarView() {
     });
   }
 
-  // Slot height constants
-  const HOUR_PX = 64;
-  const START_MIN = openHour * 60;
-
-  function apptStyle(a: Appointment, opIndex: number, colWidth: number) {
-    const startMin = timeToMinutes(a.startTime) - START_MIN;
-    const endMin = timeToMinutes(a.endTime) - START_MIN;
-    const top = (startMin / 60) * HOUR_PX;
-    const height = Math.max(((endMin - startMin) / 60) * HOUR_PX, 24);
-    return { top, height, color: operators.find(o => o.id === a.operatorId)?.color || '#6366f1' };
+  function handleQuickClientSave() {
+    if (!quickClient.firstName.trim()) return;
+    addClient({
+      firstName: quickClient.firstName, lastName: quickClient.lastName,
+      phone: quickClient.phone, email: '', birthDate: '', notes: '',
+      allergies: '', tags: [], gdprConsent: false, gdprDate: '', loyaltyPoints: 0,
+    });
+    setShowQuickClient(false);
+    setQuickClient(EMPTY_QUICK_CLIENT);
   }
+
+  // Resize drag
+  const handleResizeStart = useCallback((e: React.MouseEvent, appt: Appointment) => {
+    e.stopPropagation();
+    e.preventDefault();
+    resizeRef.current = { apptId: appt.id, origEndMin: timeToMinutes(appt.endTime), startY: e.clientY };
+    setResizingId(appt.id);
+    setResizingEndTimeState(appt.endTime);
+  }, []);
+
+  useEffect(() => {
+    function onMove(e: MouseEvent) {
+      if (!resizeRef.current) return;
+      const delta = e.clientY - resizeRef.current.startY;
+      const deltaMin = Math.round((delta / HOUR_PX) * 60 / 15) * 15;
+      const newEnd = Math.max(resizeRef.current.origEndMin + 15, resizeRef.current.origEndMin + deltaMin);
+      setResizingEndTimeState(minutesToTime(newEnd));
+    }
+    function onUp() {
+      if (!resizeRef.current) return;
+      const { apptId } = resizeRef.current;
+      setResizingId(null);
+      resizeRef.current = null;
+      setResizingEndTimeState(prev => {
+        const appt = appointments.find(a => a.id === apptId);
+        if (appt && prev && prev !== appt.endTime) {
+          updateAppointment({ ...appt, endTime: prev }, 'Durata modificata');
+        }
+        return '';
+      });
+    }
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    return () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };
+  }, [appointments, updateAppointment]);
 
   return (
     <div className="flex flex-col gap-4 h-full" style={{ minHeight: 0 }}>
@@ -123,22 +184,20 @@ export default function CalendarView() {
           <h1 className="text-2xl font-bold text-white">Agenda</h1>
           <p className="text-xs mt-0.5" style={{ color: '#71717a' }}>
             {view === 'week'
-              ? `Settimana del ${format(weekStart, 'dd MMM', { locale: it })} – ${format(addDays(weekStart, 6), 'dd MMM yyyy', { locale: it })}`
+              ? `Settimana del ${format(weekStart, 'dd MMM', { locale: it })} ${String.fromCharCode(8211)} ${format(addDays(weekStart, 6), 'dd MMM yyyy', { locale: it })}`
               : format(currentDate, 'EEEE dd MMMM yyyy', { locale: it })}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <div className="flex rounded-lg overflow-hidden" style={{ border: '1px solid #2e2e40' }}>
             {(['day', 'week'] as const).map(v => (
-              <button key={v} onClick={() => setView(v)}
-                className="px-3 py-1.5 text-xs font-medium"
+              <button key={v} onClick={() => setView(v)} className="px-3 py-1.5 text-xs font-medium"
                 style={{ background: view === v ? 'rgba(99,102,241,0.2)' : '#12121a', color: view === v ? '#818cf8' : '#71717a', border: 'none', cursor: 'pointer' }}>
                 {v === 'day' ? 'Giornaliero' : 'Settimanale'}
               </button>
             ))}
           </div>
-          <select value={filterOperator} onChange={e => setFilterOperator(e.target.value)}
-            style={{ ...inputStyle, width: 'auto', padding: '6px 10px' }}>
+          <select value={filterOperator} onChange={e => setFilterOperator(e.target.value)} style={{ ...inputStyle, width: 'auto', padding: '6px 10px' }}>
             <option value="">Tutti gli operatori</option>
             {operators.filter(o => o.active).map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
           </select>
@@ -149,7 +208,6 @@ export default function CalendarView() {
         </div>
       </div>
 
-      {/* Legend */}
       {activeOperators.length > 1 && (
         <div className="flex gap-3 flex-wrap">
           {activeOperators.map(o => (
@@ -163,23 +221,17 @@ export default function CalendarView() {
 
       {/* Calendar Grid */}
       <div className="flex-1 overflow-auto rounded-2xl" style={{ border: '1px solid #2e2e40', background: '#1c1c27' }}>
-        {/* Header */}
         <div className="flex sticky top-0 z-10" style={{ background: '#18181f', borderBottom: '1px solid #2e2e40' }}>
           <div style={{ width: 56, flexShrink: 0 }} />
           {days.map((day, di) => (
             <div key={di} className="flex-1 text-center py-2 text-xs font-medium"
               style={{ color: isSameDay(day, new Date()) ? '#818cf8' : '#71717a', borderLeft: '1px solid #2e2e40' }}>
               <span className="block">{format(day, 'EEE', { locale: it })}</span>
-              <span className="block text-base font-bold" style={{ color: isSameDay(day, new Date()) ? '#818cf8' : '#d4d4d8' }}>
-                {format(day, 'dd')}
-              </span>
+              <span className="block text-base font-bold" style={{ color: isSameDay(day, new Date()) ? '#818cf8' : '#d4d4d8' }}>{format(day, 'dd')}</span>
             </div>
           ))}
         </div>
-
-        {/* Time grid */}
         <div className="flex" style={{ minHeight: hours.length * HOUR_PX }}>
-          {/* Hours column */}
           <div style={{ width: 56, flexShrink: 0 }}>
             {hours.map(h => (
               <div key={h} style={{ height: HOUR_PX, borderBottom: '1px solid #2e2e40', display: 'flex', alignItems: 'flex-start', paddingTop: 4, paddingLeft: 8 }}>
@@ -187,34 +239,41 @@ export default function CalendarView() {
               </div>
             ))}
           </div>
-
-          {/* Day columns */}
           {days.map((day, di) => {
             const dayStr = format(day, 'yyyy-MM-dd');
             const dayAppts = filteredAppts.filter(a => a.date === dayStr);
             return (
               <div key={di} className="flex-1 relative" style={{ borderLeft: '1px solid #2e2e40' }}>
-                {/* Hour lines */}
                 {hours.map(h => (
                   <div key={h} style={{ height: HOUR_PX, borderBottom: '1px solid #1e1e2e' }}
-                    onClick={() => openNew(dayStr, filterOperator || operators[0]?.id, `${String(h).padStart(2, '0')}:00`)}
+                    onClick={() => {
+                      const opId = filterOperator || operators[0]?.id || '';
+                      openNew(dayStr, opId, resolveStartTime(dayStr, opId, h));
+                    }}
                     className="cursor-pointer hover:bg-white/[0.02] transition-colors" />
                 ))}
-                {/* Appointments */}
                 {dayAppts.map(a => {
                   const startMin = timeToMinutes(a.startTime) - START_MIN;
-                  const endMin = timeToMinutes(a.endTime) - START_MIN;
+                  const effectiveEnd = resizingId === a.id ? resizingEndTime : a.endTime;
+                  const endMin = timeToMinutes(effectiveEnd) - START_MIN;
                   const top = (startMin / 60) * HOUR_PX;
                   const height = Math.max(((endMin - startMin) / 60) * HOUR_PX, 28);
-                  const op = operators.find(o => o.id === a.operatorId);
-                  const color = op?.color || '#6366f1';
+                  const color = operators.find(o => o.id === a.operatorId)?.color || '#6366f1';
                   const client = clients.find(c => c.id === a.clientId);
                   return (
-                    <div key={a.id} onClick={e => { e.stopPropagation(); openEdit(a); }}
+                    <div key={a.id}
+                      onClick={e => { if (resizingId) return; e.stopPropagation(); openEdit(a); }}
                       className="absolute left-1 right-1 rounded-lg px-2 py-1 cursor-pointer hover:brightness-110 transition-all overflow-hidden"
-                      style={{ top, height, background: `${color}25`, border: `1px solid ${color}60`, zIndex: 2 }}>
-                      <p className="text-xs font-semibold truncate" style={{ color }}>{a.isBlock ? '🔒 ' + a.blockReason : (client ? `${client.firstName} ${client.lastName}` : '—')}</p>
-                      <p className="text-xs truncate" style={{ color: '#a1a1aa' }}>{a.startTime}–{a.endTime}</p>
+                      style={{ top, height, background: `${color}25`, border: `1px solid ${color}60`, zIndex: 2, userSelect: 'none' }}>
+                      <p className="text-xs font-semibold truncate" style={{ color }}>
+                        {a.isBlock ? 'Blocco: ' + a.blockReason : (client ? `${client.firstName} ${client.lastName}` : '—')}
+                      </p>
+                      <p className="text-xs truncate" style={{ color: '#a1a1aa' }}>{a.startTime}–{effectiveEnd}</p>
+                      <div onMouseDown={e => handleResizeStart(e, a)}
+                        className="absolute bottom-0 left-0 right-0 flex items-center justify-center"
+                        style={{ height: 10, cursor: 'ns-resize', background: `${color}30` }}>
+                        <div style={{ width: 20, height: 2, borderRadius: 2, background: color, opacity: 0.8 }} />
+                      </div>
                     </div>
                   );
                 })}
@@ -224,7 +283,28 @@ export default function CalendarView() {
         </div>
       </div>
 
-      {/* ── Modal: Appointment Form ── */}
+      {/* Quick Client Modal */}
+      {showQuickClient && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)' }}>
+          <div className="w-full max-w-sm rounded-2xl p-5" style={{ background: '#18181f', border: '1px solid #2e2e40' }}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-semibold text-white text-sm">Nuovo cliente rapido</h3>
+              <button onClick={() => setShowQuickClient(false)} style={{ background: 'none', border: 'none', color: '#71717a', cursor: 'pointer' }}><X size={16} /></button>
+            </div>
+            <div className="space-y-2">
+              <div><label style={labelStyle}>Nome *</label><input autoFocus value={quickClient.firstName} onChange={e => setQuickClient(p => ({ ...p, firstName: e.target.value }))} style={inputStyle} /></div>
+              <div><label style={labelStyle}>Cognome</label><input value={quickClient.lastName} onChange={e => setQuickClient(p => ({ ...p, lastName: e.target.value }))} style={inputStyle} /></div>
+              <div><label style={labelStyle}>Telefono</label><input value={quickClient.phone} onChange={e => setQuickClient(p => ({ ...p, phone: e.target.value }))} style={inputStyle} /></div>
+            </div>
+            <div className="flex gap-2 mt-4">
+              <button onClick={() => setShowQuickClient(false)} style={{ flex: 1, background: '#12121a', border: '1px solid #2e2e40', color: '#71717a', borderRadius: '8px', padding: '8px', fontSize: '13px', cursor: 'pointer' }}>Annulla</button>
+              <button onClick={handleQuickClientSave} style={{ ...btnPrimary, flex: 1, justifyContent: 'center' }}>Crea e seleziona</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Appointment Modal */}
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
           <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl p-6" style={{ background: '#18181f', border: '1px solid #2e2e40' }}>
@@ -240,27 +320,29 @@ export default function CalendarView() {
                 <button onClick={() => setShowForm(false)} style={{ background: 'none', border: 'none', color: '#71717a', cursor: 'pointer' }}><X size={18} /></button>
               </div>
             </div>
-
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <input type="checkbox" id="isBlock" checked={form.isBlock} onChange={e => setForm(p => ({ ...p, isBlock: e.target.checked }))} />
                 <label htmlFor="isBlock" style={{ fontSize: '13px', color: '#d4d4d8' }}>Blocca orario (pausa / riunione)</label>
               </div>
-
               {form.isBlock ? (
                 <div><label style={labelStyle}>Motivo blocco</label><input value={form.blockReason} onChange={e => setForm(p => ({ ...p, blockReason: e.target.value }))} style={inputStyle} /></div>
               ) : (
                 <div>
-                  <label style={labelStyle}>Cliente</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label style={{ ...labelStyle, marginBottom: 0 }}>Cliente</label>
+                    <button onClick={() => setShowQuickClient(true)} style={{ background: 'none', border: 'none', color: '#818cf8', cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <UserPlus size={12} /> Nuovo cliente
+                    </button>
+                  </div>
                   <select value={form.clientId} onChange={e => setForm(p => ({ ...p, clientId: e.target.value }))} style={inputStyle}>
                     <option value="">— Seleziona cliente —</option>
-                    {clients.sort((a, b) => `${a.firstName}${a.lastName}`.localeCompare(`${b.firstName}${b.lastName}`)).map(c => (
-                      <option key={c.id} value={c.id}>{c.firstName} {c.lastName}</option>
+                    {[...clients].sort((a, b) => `${a.firstName}${a.lastName}`.localeCompare(`${b.firstName}${b.lastName}`)).map(c => (
+                      <option key={c.id} value={c.id}>{c.firstName} {c.lastName}{c.phone ? ` · ${c.phone}` : ''}</option>
                     ))}
                   </select>
                 </div>
               )}
-
               <div className="grid grid-cols-2 gap-3">
                 <div><label style={labelStyle}>Data</label><input type="date" value={form.date} onChange={e => setForm(p => ({ ...p, date: e.target.value }))} style={inputStyle} /></div>
                 <div>
@@ -273,7 +355,6 @@ export default function CalendarView() {
                 <div><label style={labelStyle}>Ora inizio</label><input type="time" value={form.startTime} onChange={e => setForm(p => ({ ...p, startTime: e.target.value }))} style={inputStyle} /></div>
                 <div><label style={labelStyle}>Ora fine</label><input type="time" value={form.endTime} onChange={e => setForm(p => ({ ...p, endTime: e.target.value }))} style={inputStyle} /></div>
               </div>
-
               {!form.isBlock && (
                 <div>
                   <label style={labelStyle}>Servizi</label>
@@ -288,10 +369,8 @@ export default function CalendarView() {
                   </div>
                 </div>
               )}
-
-              <div><label style={labelStyle}>Note sull'appuntamento</label><textarea rows={2} value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} style={{ ...inputStyle, resize: 'vertical' }} /></div>
+              <div><label style={labelStyle}>Note</label><textarea rows={2} value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} style={{ ...inputStyle, resize: 'vertical' }} /></div>
             </div>
-
             <div className="flex justify-between mt-4">
               <div>
                 {editAppt && (
@@ -306,15 +385,13 @@ export default function CalendarView() {
                 <button onClick={handleSave} style={btnPrimary}>Salva</button>
               </div>
             </div>
-
-            {/* History log */}
             {editAppt?.history && editAppt.history.length > 0 && (
               <div className="mt-4 pt-4" style={{ borderTop: '1px solid #2e2e40' }}>
                 <p className="text-xs font-semibold mb-2" style={{ color: '#71717a' }}>Storico modifiche</p>
                 <div className="space-y-1">
                   {[...editAppt.history].reverse().map((h, i) => (
                     <p key={i} className="text-xs" style={{ color: '#3f3f5a' }}>
-                      {format(parseISO(h.timestamp), 'dd/MM/yyyy HH:mm')} — {h.action}
+                      {format(parseISO(h.timestamp), 'dd/MM/yyyy HH:mm')} {String.fromCharCode(8212)} {h.action}
                     </p>
                   ))}
                 </div>

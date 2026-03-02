@@ -2,7 +2,7 @@ import {
   Client, TechnicalCard, Service, Operator, Absence,
   Appointment, WaitingListEntry, Product, StockMovement,
   GiftCard, SalonConfig, DEFAULT_SALON_CONFIG, defaultSchedule,
-  OPERATOR_COLORS,
+  OPERATOR_COLORS, Payment, CashSession,
 } from '@/types/salon';
 
 // ─── Generic helpers ──────────────────────────────────────────────────────────
@@ -45,6 +45,9 @@ const K = {
   stockMovements: 'stylistgo_stock_movements',
   giftCards: 'stylistgo_gift_cards',
   salonConfig: 'stylistgo_salon_config',
+  payments: 'stylistgo_payments',
+  cashSessions: 'stylistgo_cash_sessions',
+  activeOperatorId: 'stylistgo_active_operator',
 };
 
 // ─── Clients ──────────────────────────────────────────────────────────────────
@@ -138,4 +141,26 @@ export function storageGetSalonConfig(): SalonConfig {
 }
 export function storageSaveSalonConfig(data: SalonConfig): void {
   if (typeof window !== 'undefined') localStorage.setItem(K.salonConfig, JSON.stringify(data));
+}
+
+// ─── Payments ──────────────────────────────────────────────────────────────────
+
+export function storageGetPayments(): Payment[] { return getList<Payment>(K.payments); }
+export function storageSavePayments(data: Payment[]): void { saveList(K.payments, data); }
+
+// ─── Cash Sessions ────────────────────────────────────────────────────────────
+
+export function storageGetCashSessions(): CashSession[] { return getList<CashSession>(K.cashSessions); }
+export function storageSaveCashSessions(data: CashSession[]): void { saveList(K.cashSessions, data); }
+
+// ─── Active Operator ─────────────────────────────────────────────────────────
+
+export function storageGetActiveOperatorId(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem(K.activeOperatorId);
+}
+export function storageSaveActiveOperatorId(id: string | null): void {
+  if (typeof window === 'undefined') return;
+  if (id) localStorage.setItem(K.activeOperatorId, id);
+  else localStorage.removeItem(K.activeOperatorId);
 }

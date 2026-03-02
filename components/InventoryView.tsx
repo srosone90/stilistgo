@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useSalon } from '@/context/SalonContext';
 import { Product, StockMovement, StockMovementType, STOCK_MOVEMENT_LABELS } from '@/types/salon';
 import { format, parseISO } from 'date-fns';
@@ -22,11 +22,13 @@ const EMPTY_MOVEMENT: Omit<StockMovement, 'id' | 'createdAt'> = {
   productId: '', type: 'load', quantity: 1, date: format(new Date(), 'yyyy-MM-dd'), notes: '', operatorId: '',
 };
 
-export default function InventoryView() {
+export default function InventoryView({ newTrigger }: { newTrigger?: number }) {
   const { products, addProduct, updateProduct, deleteProduct, stockMovements, addStockMovement, operators } = useSalon();
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showProdForm, setShowProdForm] = useState(false);
+
+  useEffect(() => { if (newTrigger && newTrigger > 0) { setShowProdForm(true); setEditProd(null); setForm(EMPTY_PRODUCT); } }, [newTrigger]);
   const [editProd, setEditProd] = useState<Product | null>(null);
   const [form, setForm] = useState<Omit<Product, 'id' | 'createdAt'>>(EMPTY_PRODUCT);
   const [showMoveForm, setShowMoveForm] = useState(false);
@@ -206,7 +208,19 @@ export default function InventoryView() {
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2"><label style={labelStyle}>Nome *</label><input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} style={inputStyle} /></div>
               <div><label style={labelStyle}>Brand</label><input value={form.brand} onChange={e => setForm(p => ({ ...p, brand: e.target.value }))} style={inputStyle} /></div>
-              <div><label style={labelStyle}>Categoria</label><input value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))} placeholder="es. Colorante, Shampoo…" style={inputStyle} /></div>
+              <div>
+                <label style={labelStyle}>Categoria</label>
+                <select value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value === '__new__' ? '' : e.target.value }))}
+                  style={inputStyle}>
+                  <option value="">— Seleziona o digita —</option>
+                  {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                  <option value="__new__">+ Nuova categoria...</option>
+                </select>
+                {(form.category === '' || !categories.includes(form.category)) && (
+                  <input value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))}
+                    placeholder="Scrivi nome categoria..." style={{ ...inputStyle, marginTop: 6 }} />
+                )}
+              </div>
               <div><label style={labelStyle}>Unità</label><input value={form.unit} onChange={e => setForm(p => ({ ...p, unit: e.target.value }))} placeholder="pz, ml, g…" style={inputStyle} /></div>
               <div><label style={labelStyle}>Giacenza attuale</label><input type="number" min={0} value={form.stock} onChange={e => setForm(p => ({ ...p, stock: Number(e.target.value) }))} style={inputStyle} /></div>
               <div><label style={labelStyle}>Soglia minima riordino</label><input type="number" min={0} value={form.minStock} onChange={e => setForm(p => ({ ...p, minStock: Number(e.target.value) }))} style={inputStyle} /></div>

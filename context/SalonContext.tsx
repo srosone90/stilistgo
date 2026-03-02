@@ -5,6 +5,7 @@ import {
   Client, TechnicalCard, Service, Operator, Absence,
   Appointment, AppointmentStatus, WaitingListEntry,
   Product, StockMovement, GiftCard, SalonConfig, AppointmentHistoryEntry,
+  Payment, CashSession,
 } from '@/types/salon';
 import {
   storageGetClients, storageSaveClients,
@@ -18,6 +19,9 @@ import {
   storageGetStockMovements, storageSaveStockMovements,
   storageGetGiftCards, storageSaveGiftCards,
   storageGetSalonConfig, storageSaveSalonConfig,
+  storageGetPayments, storageSavePayments,
+  storageGetCashSessions, storageSaveCashSessions,
+  storageGetActiveOperatorId, storageSaveActiveOperatorId,
   salonGenerateId,
 } from '@/lib/salonStorage';
 
@@ -86,6 +90,19 @@ interface SalonContextValue {
 
   // Config
   updateSalonConfig: (c: Partial<SalonConfig>) => void;
+
+  // Payments / Cassa
+  payments: Payment[];
+  cashSessions: CashSession[];
+  addPayment: (p: Omit<Payment, 'id' | 'createdAt'>) => void;
+  deletePayment: (id: string) => void;
+  addCashSession: (openingBalance: number) => void;
+  closeCashSession: (id: string, closingBalance: number) => void;
+
+  // Active operator (PIN-based staff)
+  activeOperatorId: string | null;
+  setActiveOperatorId: (id: string | null) => void;
+  verifyOperatorPin: (operatorId: string, pin: string) => boolean;
 }
 
 const SalonContext = createContext<SalonContextValue | null>(null);
@@ -102,6 +119,9 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
   const [stockMovements, setStockMovements] = useState<StockMovement[]>([]);
   const [giftCards, setGiftCards] = useState<GiftCard[]>([]);
   const [salonConfig, setSalonConfig] = useState<SalonConfig>(storageGetSalonConfig());
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [cashSessions, setCashSessions] = useState<CashSession[]>([]);
+  const [activeOperatorId, setActiveOperatorIdState] = useState<string | null>(null);
   const [salonLoading, setSalonLoading] = useState(true);
 
   useEffect(() => {
@@ -116,6 +136,9 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
     setStockMovements(storageGetStockMovements());
     setGiftCards(storageGetGiftCards());
     setSalonConfig(storageGetSalonConfig());
+    setPayments(storageGetPayments());
+    setCashSessions(storageGetCashSessions());
+    setActiveOperatorIdState(storageGetActiveOperatorId());
     setSalonLoading(false);
   }, []);
 
@@ -305,6 +328,61 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
     setSalonConfig(prev => { const n = { ...prev, ...c }; storageSaveSalonConfig(n); return n; });
   }, []);
 
+  // ─── Payments ───────────────────────────────────────────────────────────────
+
+  const addPayment = useCallback((p: Omit<Payment, 'id' | 'createdAt'>) => {
+    const full: Payment = { ...p, id: salonGenerateId(), createdAt: new Date().toISOString() };
+    setPayments(prev => { const n = [full, ...prev]; storageSavePayments(n); return n; });
+    // Auto loyalty points: 1pt per euro spent
+    if (p.clientId) {
+      setClients(prev => {
+        const n = prev.map(c => c.id === p.clientId ? { ...c, loyaltyPoints: c.loyaltyPoints + Math.floor(p.total) } : c);
+        storageSaveClients(n);
+        return n;
+      });
+    }
+  }, []);
+
+  const deletePayment = useCallback((id: string) => {
+    setPayments(prev => { const n = prev.filter(x => x.id !== id); storageSavePayments(n); return n; });
+  }, []);
+
+  const addCashSession = useCallback((openingBalance: number) => {
+    const full: CashSession = {
+      id: salonGenerateId(),
+      date: new Date().toISOString().slice(0, 10),
+      openingBalance,
+      closingBalance: null,
+      closedAt: null,
+      createdAt: new Date().toISOString(),
+    };
+    setCashSessions(prev => { const n = [full, ...prev]; storageSaveCashSessions(n); return n; });
+  }, []);
+
+  const closeCashSession = useCallback((id: string, closingBalance: number) => {
+    setCashSessions(prev => {
+      const n = prev.map(s => s.id === id
+        ? { ...s, closingBalance, closedAt: new Date().toISOString() }
+        : s);
+      storageSaveCashSessions(n);
+      return n;
+    });
+  }, []);
+
+  // ─── Active Operator (PIN) ──────────────────────────────────────────────────────
+
+  const setActiveOperatorId = useCallback((id: string | null) => {
+    storageSaveActiveOperatorId(id);
+    setActiveOperatorIdState(id);
+  }, []);
+
+  const verifyOperatorPin = useCallback((operatorId: string, pin: string): boolean => {
+    const op = storageGetOperators().find(o => o.id === operatorId);
+    if (!op) return false;
+    if (!op.pin) return true; // no PIN set = always accept
+    return op.pin === pin;
+  }, []);
+
   return (
     <SalonContext.Provider value={{
       clients, technicalCards, services, operators, absences,
@@ -321,6 +399,8 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
       addStockMovement,
       addGiftCard, redeemGiftCard, updateGiftCard,
       updateSalonConfig,
+      payments, cashSessions, addPayment, deletePayment, addCashSession, closeCashSession,
+      activeOperatorId, setActiveOperatorId, verifyOperatorPin,
     }}>
       {children}
     </SalonContext.Provider>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useSalon } from '@/context/SalonContext';
 import { Service, ServiceCategory, SERVICE_CATEGORIES } from '@/types/salon';
 import { formatCurrency } from '@/lib/calculations';
@@ -22,12 +22,14 @@ const CAT_COLORS: Record<ServiceCategory, string> = {
   Sposa: '#ef4444', Altro: '#71717a',
 };
 
-export default function ServicesView() {
+export default function ServicesView({ newTrigger }: { newTrigger?: number }) {
   const { services, addService, updateService, deleteService, operators } = useSalon();
   const [showForm, setShowForm] = useState(false);
   const [editSvc, setEditSvc] = useState<Service | null>(null);
   const [form, setForm] = useState<Omit<Service, 'id' | 'createdAt'>>(EMPTY_SERVICE);
   const [filterCat, setFilterCat] = useState<ServiceCategory | 'all'>('all');
+
+  useEffect(() => { if (newTrigger && newTrigger > 0) { setShowForm(true); setEditSvc(null); setForm(EMPTY_SERVICE); } }, [newTrigger]);
 
   const grouped = useMemo(() => {
     const cats = filterCat === 'all' ? SERVICE_CATEGORIES : [filterCat];

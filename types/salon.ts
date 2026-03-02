@@ -86,6 +86,7 @@ export interface Operator {
   commissionRate: number; // 0-100%
   schedule: WorkShift[];
   active: boolean;
+  pin?: string; // 4-digit PIN for staff login
   createdAt: string;
 }
 
@@ -233,6 +234,53 @@ export const OPERATOR_COLORS = [
   '#6366f1', '#a855f7', '#22c55e', '#f59e0b',
   '#ef4444', '#06b6d4', '#ec4899', '#84cc16',
 ];
+
+// ─── Cash / POS ───────────────────────────────────────────────────────────────
+
+export type PaymentMethod = 'cash' | 'card' | 'gift_card' | 'mixed';
+
+export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
+  cash: 'Contanti',
+  card: 'Carta / POS',
+  gift_card: 'Gift Card',
+  mixed: 'Misto',
+};
+
+export interface PaymentItem {
+  serviceId: string;
+  serviceName: string;
+  price: number;
+}
+
+export interface Payment {
+  id: string;
+  appointmentId: string;
+  clientId: string;
+  clientName: string;
+  operatorId: string;
+  date: string; // YYYY-MM-DD
+  items: PaymentItem[];
+  subtotal: number;
+  discountPct: number;
+  discountEur: number;
+  total: number;
+  paymentMethod: PaymentMethod;
+  cashAmount: number;
+  cardAmount: number;
+  giftCardCode: string;
+  giftCardAmount: number;
+  notes: string;
+  createdAt: string;
+}
+
+export interface CashSession {
+  id: string;
+  date: string; // YYYY-MM-DD
+  openingBalance: number;
+  closingBalance: number | null;
+  closedAt: string | null;
+  createdAt: string;
+}
 
 // Default schedule helper
 export function defaultSchedule(): WorkShift[] {

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useSalon } from '@/context/SalonContext';
 import { Operator, OperatorRole, WorkShift, DayOfWeek, DAY_NAMES, DAY_NAMES_FULL, OPERATOR_COLORS, defaultSchedule, Absence } from '@/types/salon';
 import { format, parseISO } from 'date-fns';
@@ -26,11 +26,13 @@ const EMPTY_ABSENCE: Omit<Absence, 'id' | 'createdAt'> = {
   endDate: format(new Date(), 'yyyy-MM-dd'), reason: '',
 };
 
-export default function StaffView() {
+export default function StaffView({ newTrigger }: { newTrigger?: number }) {
   const { operators, addOperator, updateOperator, deleteOperator, services, absences, addAbsence, deleteAbsence, appointments } = useSalon();
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+
+  useEffect(() => { if (newTrigger && newTrigger > 0) { setShowForm(true); setEditOp(null); setForm(EMPTY_OPERATOR); } }, [newTrigger]);
   const [editOp, setEditOp] = useState<Operator | null>(null);
   const [form, setForm] = useState<Omit<Operator, 'id' | 'createdAt'>>(EMPTY_OPERATOR);
   const [showAbsForm, setShowAbsForm] = useState(false);

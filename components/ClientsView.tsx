@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useSalon } from '@/context/SalonContext';
 import { Client, TechnicalCard } from '@/types/salon';
 import { salonGenerateId } from '@/lib/salonStorage';
@@ -24,12 +24,14 @@ const EMPTY_CARD: Omit<TechnicalCard, 'id' | 'createdAt'> = {
   posaDuration: 0, result: '', notes: '',
 };
 
-export default function ClientsView() {
+export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
   const { clients, addClient, updateClient, deleteClient, technicalCards, addTechnicalCard, deleteTechnicalCard, operators, salonConfig } = useSalon();
 
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+
+  useEffect(() => { if (newTrigger && newTrigger > 0) { setShowForm(true); setEditingClient(null); setForm(EMPTY_CLIENT); } }, [newTrigger]);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [form, setForm] = useState<Omit<Client, 'id' | 'createdAt'>>(EMPTY_CLIENT);
   const [tagInput, setTagInput] = useState('');
