@@ -5,7 +5,7 @@ import {
   Client, TechnicalCard, Service, Operator, Absence,
   Appointment, AppointmentStatus, WaitingListEntry,
   Product, StockMovement, GiftCard, SalonConfig, AppointmentHistoryEntry,
-  Payment, CashSession, GamificationConfig, DEFAULT_GAMIFICATION_CONFIG,
+  Payment, CashSession, GamificationConfig, DEFAULT_GAMIFICATION_CONFIG, DEFAULT_SALON_CONFIG,
 } from '@/types/salon';
 import {
   storageGetClients, storageSaveClients,
@@ -23,7 +23,7 @@ import {
   storageGetCashSessions, storageSaveCashSessions,
   storageGetActiveOperatorId, storageSaveActiveOperatorId,
   storageGetGamificationConfig, storageSaveGamificationConfig,
-  salonGenerateId,
+  salonGenerateId, setStorageUserId,
 } from '@/lib/salonStorage';
 import { getCurrentUser } from '@/lib/supabase';
 import { dbGetSalonState, dbSaveSalonState } from '@/lib/salonDb';
@@ -126,7 +126,7 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
   const [stockMovements, setStockMovements] = useState<StockMovement[]>([]);
   const [giftCards, setGiftCards] = useState<GiftCard[]>([]);
   const [gamificationConfig, setGamificationConfig] = useState<GamificationConfig>(DEFAULT_GAMIFICATION_CONFIG);
-  const [salonConfig, setSalonConfig] = useState<SalonConfig>(storageGetSalonConfig());
+  const [salonConfig, setSalonConfig] = useState<SalonConfig>(DEFAULT_SALON_CONFIG);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [cashSessions, setCashSessions] = useState<CashSession[]>([]);
   const [activeOperatorId, setActiveOperatorIdState] = useState<string | null>(null);
@@ -136,20 +136,11 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const init = async () => {
-      // ─── User isolation: clear localStorage if a different user logs in ──
+      // ─── Set per-user storage prefix FIRST, before any localStorage read ───
       try {
         const user = await getCurrentUser();
-        if (user && typeof window !== 'undefined') {
-          const lastUid = localStorage.getItem('stylistgo_last_uid');
-          const currentUid = user.id as string;
-          if (lastUid && lastUid !== currentUid) {
-            // Different user on same device — wipe salon localStorage data
-            Object.keys(localStorage)
-              .filter(k => k.startsWith('stylistgo_') &&
-                !['stylistgo_last_uid', 'stylistgo_users', 'stylistgo_local_user'].includes(k))
-              .forEach(k => localStorage.removeItem(k));
-          }
-          localStorage.setItem('stylistgo_last_uid', currentUid);
+        if (user) {
+          setStorageUserId(user.id as string);
         }
       } catch { /* ignore */ }
 
@@ -179,7 +170,9 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
     const loadCloud = async () => {
       try {
         const user = await getCurrentUser();
-        if (!user) return;
+        // Local-only users (id starts with 'local-') have no Supabase session — skip cloud
+        if (!user || (user.id as string).startsWith('local-')) return;
+        setStorageUserId(user.id as string);
         const cloudState = await dbGetSalonState(user.id as string);
         if (!cloudState) return;
         if (cloudState.clients)            { setClients(cloudState.clients as Client[]); storageSaveClients(cloudState.clients as Client[]); }

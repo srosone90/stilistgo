@@ -34,33 +34,41 @@ export function salonGenerateId(): string {
 
 // ─── Keys ─────────────────────────────────────────────────────────────────────
 
-const K = {
-  clients: 'stylistgo_clients',
-  technicalCards: 'stylistgo_technical_cards',
-  services: 'stylistgo_services',
-  operators: 'stylistgo_operators',
-  absences: 'stylistgo_absences',
-  appointments: 'stylistgo_appointments',
-  waitingList: 'stylistgo_waiting_list',
-  products: 'stylistgo_products',
-  stockMovements: 'stylistgo_stock_movements',
-  giftCards: 'stylistgo_gift_cards',
-  salonConfig: 'stylistgo_salon_config',
-  payments: 'stylistgo_payments',
-  cashSessions: 'stylistgo_cash_sessions',
-  activeOperatorId: 'stylistgo_active_operator',
-  gamificationConfig: 'stylistgo_gamification',
-};
+// User-scoped prefix — set via setStorageUserId() before any read/write
+let _uid = 'default';
+
+/** Call this as soon as the logged-in user is known, before any storage access. */
+export function setStorageUserId(uid: string) {
+  _uid = uid.replace(/[^a-zA-Z0-9_-]/g, '_'); // sanitize
+}
+
+const K = () => ({
+  clients:           `stylistgo_${_uid}_clients`,
+  technicalCards:    `stylistgo_${_uid}_technical_cards`,
+  services:          `stylistgo_${_uid}_services`,
+  operators:         `stylistgo_${_uid}_operators`,
+  absences:          `stylistgo_${_uid}_absences`,
+  appointments:      `stylistgo_${_uid}_appointments`,
+  waitingList:       `stylistgo_${_uid}_waiting_list`,
+  products:          `stylistgo_${_uid}_products`,
+  stockMovements:    `stylistgo_${_uid}_stock_movements`,
+  giftCards:         `stylistgo_${_uid}_gift_cards`,
+  salonConfig:       `stylistgo_${_uid}_salon_config`,
+  payments:          `stylistgo_${_uid}_payments`,
+  cashSessions:      `stylistgo_${_uid}_cash_sessions`,
+  activeOperatorId:  `stylistgo_${_uid}_active_operator`,
+  gamificationConfig:`stylistgo_${_uid}_gamification`,
+});
 
 // ─── Clients ──────────────────────────────────────────────────────────────────
 
-export function storageGetClients(): Client[] { return getList<Client>(K.clients); }
-export function storageSaveClients(data: Client[]): void { saveList(K.clients, data); }
+export function storageGetClients(): Client[] { return getList<Client>(K().clients); }
+export function storageSaveClients(data: Client[]): void { saveList(K().clients, data); }
 
 // ─── Technical Cards ──────────────────────────────────────────────────────────
 
-export function storageGetTechnicalCards(): TechnicalCard[] { return getList<TechnicalCard>(K.technicalCards); }
-export function storageSaveTechnicalCards(data: TechnicalCard[]): void { saveList(K.technicalCards, data); }
+export function storageGetTechnicalCards(): TechnicalCard[] { return getList<TechnicalCard>(K().technicalCards); }
+export function storageSaveTechnicalCards(data: TechnicalCard[]): void { saveList(K().technicalCards, data); }
 
 // ─── Services ─────────────────────────────────────────────────────────────────
 
@@ -76,14 +84,14 @@ const DEFAULT_SERVICES: Service[] = [
 ];
 
 export function storageGetServices(): Service[] {
-  const s = getList<Service>(K.services);
+  const s = getList<Service>(K().services);
   if (s.length === 0) {
-    saveList(K.services, DEFAULT_SERVICES);
+    saveList(K().services, DEFAULT_SERVICES);
     return DEFAULT_SERVICES;
   }
   return s;
 }
-export function storageSaveServices(data: Service[]): void { saveList(K.services, data); }
+export function storageSaveServices(data: Service[]): void { saveList(K().services, data); }
 
 // ─── Operators ────────────────────────────────────────────────────────────────
 
@@ -97,81 +105,81 @@ const DEFAULT_OPERATORS: Operator[] = [
 ];
 
 export function storageGetOperators(): Operator[] {
-  const s = getList<Operator>(K.operators);
+  const s = getList<Operator>(K().operators);
   if (s.length === 0) {
-    saveList(K.operators, DEFAULT_OPERATORS);
+    saveList(K().operators, DEFAULT_OPERATORS);
     return DEFAULT_OPERATORS;
   }
   return s;
 }
-export function storageSaveOperators(data: Operator[]): void { saveList(K.operators, data); }
+export function storageSaveOperators(data: Operator[]): void { saveList(K().operators, data); }
 
 // ─── Absences ─────────────────────────────────────────────────────────────────
 
-export function storageGetAbsences(): Absence[] { return getList<Absence>(K.absences); }
-export function storageSaveAbsences(data: Absence[]): void { saveList(K.absences, data); }
+export function storageGetAbsences(): Absence[] { return getList<Absence>(K().absences); }
+export function storageSaveAbsences(data: Absence[]): void { saveList(K().absences, data); }
 
 // ─── Appointments ─────────────────────────────────────────────────────────────
 
-export function storageGetAppointments(): Appointment[] { return getList<Appointment>(K.appointments); }
-export function storageSaveAppointments(data: Appointment[]): void { saveList(K.appointments, data); }
+export function storageGetAppointments(): Appointment[] { return getList<Appointment>(K().appointments); }
+export function storageSaveAppointments(data: Appointment[]): void { saveList(K().appointments, data); }
 
 // ─── Waiting List ─────────────────────────────────────────────────────────────
 
-export function storageGetWaitingList(): WaitingListEntry[] { return getList<WaitingListEntry>(K.waitingList); }
-export function storageSaveWaitingList(data: WaitingListEntry[]): void { saveList(K.waitingList, data); }
+export function storageGetWaitingList(): WaitingListEntry[] { return getList<WaitingListEntry>(K().waitingList); }
+export function storageSaveWaitingList(data: WaitingListEntry[]): void { saveList(K().waitingList, data); }
 
 // ─── Products ─────────────────────────────────────────────────────────────────
 
-export function storageGetProducts(): Product[] { return getList<Product>(K.products); }
-export function storageSaveProducts(data: Product[]): void { saveList(K.products, data); }
+export function storageGetProducts(): Product[] { return getList<Product>(K().products); }
+export function storageSaveProducts(data: Product[]): void { saveList(K().products, data); }
 
 // ─── Stock Movements ──────────────────────────────────────────────────────────
 
-export function storageGetStockMovements(): StockMovement[] { return getList<StockMovement>(K.stockMovements); }
-export function storageSaveStockMovements(data: StockMovement[]): void { saveList(K.stockMovements, data); }
+export function storageGetStockMovements(): StockMovement[] { return getList<StockMovement>(K().stockMovements); }
+export function storageSaveStockMovements(data: StockMovement[]): void { saveList(K().stockMovements, data); }
 
 // ─── Gift Cards ───────────────────────────────────────────────────────────────
 
-export function storageGetGiftCards(): GiftCard[] { return getList<GiftCard>(K.giftCards); }
-export function storageSaveGiftCards(data: GiftCard[]): void { saveList(K.giftCards, data); }
+export function storageGetGiftCards(): GiftCard[] { return getList<GiftCard>(K().giftCards); }
+export function storageSaveGiftCards(data: GiftCard[]): void { saveList(K().giftCards, data); }
 
 // ─── Salon Config ─────────────────────────────────────────────────────────────
 
 export function storageGetSalonConfig(): SalonConfig {
-  return getItem<SalonConfig>(K.salonConfig, DEFAULT_SALON_CONFIG);
+  return getItem<SalonConfig>(K().salonConfig, DEFAULT_SALON_CONFIG);
 }
 export function storageSaveSalonConfig(data: SalonConfig): void {
-  if (typeof window !== 'undefined') localStorage.setItem(K.salonConfig, JSON.stringify(data));
+  if (typeof window !== 'undefined') localStorage.setItem(K().salonConfig, JSON.stringify(data));
 }
 
 // ─── Payments ──────────────────────────────────────────────────────────────────
 
-export function storageGetPayments(): Payment[] { return getList<Payment>(K.payments); }
-export function storageSavePayments(data: Payment[]): void { saveList(K.payments, data); }
+export function storageGetPayments(): Payment[] { return getList<Payment>(K().payments); }
+export function storageSavePayments(data: Payment[]): void { saveList(K().payments, data); }
 
 // ─── Cash Sessions ────────────────────────────────────────────────────────────
 
-export function storageGetCashSessions(): CashSession[] { return getList<CashSession>(K.cashSessions); }
-export function storageSaveCashSessions(data: CashSession[]): void { saveList(K.cashSessions, data); }
+export function storageGetCashSessions(): CashSession[] { return getList<CashSession>(K().cashSessions); }
+export function storageSaveCashSessions(data: CashSession[]): void { saveList(K().cashSessions, data); }
 
 // ─── Active Operator ─────────────────────────────────────────────────────────
 
 export function storageGetActiveOperatorId(): string | null {
   if (typeof window === 'undefined') return null;
-  return localStorage.getItem(K.activeOperatorId);
+  return localStorage.getItem(K().activeOperatorId);
 }
 export function storageSaveActiveOperatorId(id: string | null): void {
   if (typeof window === 'undefined') return;
-  if (id) localStorage.setItem(K.activeOperatorId, id);
-  else localStorage.removeItem(K.activeOperatorId);
+  if (id) localStorage.setItem(K().activeOperatorId, id);
+  else localStorage.removeItem(K().activeOperatorId);
 }
 
 // ─── Gamification Config ────────────────────────────────────────────────
 
 export function storageGetGamificationConfig(): GamificationConfig {
-  return getItem<GamificationConfig>(K.gamificationConfig, DEFAULT_GAMIFICATION_CONFIG);
+  return getItem<GamificationConfig>(K().gamificationConfig, DEFAULT_GAMIFICATION_CONFIG);
 }
 export function storageSaveGamificationConfig(data: GamificationConfig): void {
-  if (typeof window !== 'undefined') localStorage.setItem(K.gamificationConfig, JSON.stringify(data));
+  if (typeof window !== 'undefined') localStorage.setItem(K().gamificationConfig, JSON.stringify(data));
 }
