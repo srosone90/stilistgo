@@ -74,21 +74,40 @@ export async function GET(req: NextRequest) {
       date: string; startTime: string; endTime: string; status: string; operatorId?: string;
     }[] | null) ?? [];
 
+    // Confirmed appointments from salon_data
     const dayAppts = rawAppts.filter(a =>
       a.date === date &&
       a.status !== 'cancelled' &&
       a.status !== 'no-show' &&
-      // Block if: no operator filter, OR appointment has no operator assigned, OR matches the requested operator
-      (!operatorId || !a.operatorId || a.operatorId === operatorId)
+      // When operator filter is set, only block slots for THAT operator
+      (!operatorId || a.operatorId === operatorId)
     );
+
+    // Also block slots from pending online bookings (not yet imported into salon_data)
+    // Extract operatorId encoded as [op:xxx] prefix in notes
+    const { data: pendingRows } = await supabase
+      .from('online_bookings')
+      .select('preferred_time, notes')
+      .eq('salon_id', salonId)
+      .eq('preferred_date', date)
+      .eq('status', 'pending');
+
+    const pendingAppts: { startTime: string }[] = (pendingRows ?? []).filter(r => {
+      if (!operatorId) return true;
+      const m = (r.notes || '').match(/^\[op:([^\]]+)\]/);
+      const pendingOp = m?.[1] || '';
+      return pendingOp === operatorId;
+    }).map(r => ({ startTime: r.preferred_time }));
 
     const available = ALL_SLOTS.filter(slot => {
       const slotMin = timeToMin(slot);
-      return !dayAppts.some(a => {
+      const blockedByConfirmed = dayAppts.some(a => {
         const start = timeToMin(a.startTime);
         const end = timeToMin(a.endTime || a.startTime);
         return slotMin >= start && slotMin < end;
       });
+      const blockedByPending = pendingAppts.some(a => slotMin === timeToMin(a.startTime));
+      return !blockedByConfirmed && !blockedByPending;
     });
 
     return NextResponse.json({ available, salonName, services, operators });
