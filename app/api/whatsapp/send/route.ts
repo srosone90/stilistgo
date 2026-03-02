@@ -19,10 +19,14 @@ interface SendPayload {
 export async function POST(req: NextRequest) {
   try {
     const body: SendPayload = await req.json();
-    const { phoneNumberId, accessToken, to, templateName, language = 'it', components = [] } = body;
+
+    // Use request creds (test flow) or fall back to platform-level env vars
+    const phoneNumberId = body.phoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID || '';
+    const accessToken   = body.accessToken   || process.env.WHATSAPP_ACCESS_TOKEN   || '';
+    const { to, templateName, language = 'it', components = [] } = body;
 
     if (!phoneNumberId || !accessToken || !to || !templateName) {
-      return NextResponse.json({ error: 'Campi obbligatori mancanti.' }, { status: 400 });
+      return NextResponse.json({ error: 'Credenziali WhatsApp non configurate. Aggiungi WHATSAPP_PHONE_NUMBER_ID e WHATSAPP_ACCESS_TOKEN nelle variabili d\'ambiente Netlify.' }, { status: 400 });
     }
 
     // Normalize phone: ensure +39 prefix for Italian numbers

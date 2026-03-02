@@ -14,12 +14,6 @@ import { createClient } from '@supabase/supabase-js';
 // ─── Types (inline to avoid import issues in Netlify functions) ───────────────
 interface WhatsAppConfig {
   enabled: boolean;
-  phoneNumberId: string;
-  accessToken: string;
-  reminderTemplate: string;
-  birthdayTemplate: string;
-  postVisitTemplate: string;
-  loyaltyTemplate: string;
   reminderEnabled: boolean;
   birthdayEnabled: boolean;
   postVisitEnabled: boolean;
@@ -97,6 +91,15 @@ export default async function handler() {
 
   const supabase = createClient(supabaseUrl, serviceKey);
 
+  // Platform-level WhatsApp credentials (single account for all salons)
+  const platformPhoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  const platformAccessToken   = process.env.WHATSAPP_ACCESS_TOKEN;
+
+  if (!platformPhoneNumberId || !platformAccessToken) {
+    console.error('Missing WHATSAPP_PHONE_NUMBER_ID or WHATSAPP_ACCESS_TOKEN env vars');
+    return new Response('Missing WhatsApp credentials', { status: 500 });
+  }
+
   // Fetch ALL salon_data rows (service key bypasses RLS)
   const { data: rows, error } = await supabase.from('salon_data').select('user_id, state');
   if (error) { console.error('Supabase fetch error:', error); return new Response('DB error', { status: 500 }); }
@@ -111,7 +114,10 @@ export default async function handler() {
   for (const row of rows ?? []) {
     const state = row.state as SalonState;
     const wa = state?.salonConfig?.whatsapp;
-    if (!wa?.enabled || !wa.phoneNumberId || !wa.accessToken) continue;
+    if (!wa?.enabled) continue;
+
+    const phoneNumberId = platformPhoneNumberId;
+    const accessToken   = platformAccessToken;
 
     const clients = state.clients ?? [];
     const appointments = state.appointments ?? [];
@@ -129,8 +135,8 @@ export default async function handler() {
         if (!client?.phone) continue;
         const svcNames = apt.serviceIds.map(id => services.find(s => s.id === id)?.name ?? '').filter(Boolean).join(', ') || 'appuntamento';
         const firstName = client.firstName;
-        const result = await sendWhatsApp(wa.phoneNumberId, wa.accessToken, client.phone, wa.reminderTemplate || 'appointment_reminder', [firstName, tomorrow, apt.startTime, salonName, svcNames]);
-        newLogs.push({ id: genId(), type: 'reminder', clientId: client.id, clientName: `${client.firstName} ${client.lastName}`, phone: client.phone, templateName: wa.reminderTemplate || 'appointment_reminder', status: result.ok ? 'sent' : 'failed', errorMsg: result.error, sentAt: new Date().toISOString() });
+        const result = await sendWhatsApp(phoneNumberId, accessToken, client.phone, 'appointment_reminder', [firstName, tomorrow, apt.startTime, salonName, svcNames]);
+        newLogs.push({ id: genId(), type: 'reminder', clientId: client.id, clientName: `${client.firstName} ${client.lastName}`, phone: client.phone, templateName: 'appointment_reminder', status: result.ok ? 'sent' : 'failed', errorMsg: result.error, sentAt: new Date().toISOString() });
         if (result.ok) totalSent++; else totalFailed++;
       }
     }
@@ -140,8 +146,8 @@ export default async function handler() {
       const todayMMDD = today.slice(5); // "MM-DD"
       const birthdayClients = clients.filter(c => c.birthDate?.slice(5) === todayMMDD && c.phone);
       for (const client of birthdayClients) {
-        const result = await sendWhatsApp(wa.phoneNumberId, wa.accessToken, client.phone, wa.birthdayTemplate || 'birthday_wishes', [client.firstName, salonName]);
-        newLogs.push({ id: genId(), type: 'birthday', clientId: client.id, clientName: `${client.firstName} ${client.lastName}`, phone: client.phone, templateName: wa.birthdayTemplate || 'birthday_wishes', status: result.ok ? 'sent' : 'failed', errorMsg: result.error, sentAt: new Date().toISOString() });
+        const result = await sendWhatsApp(phoneNumberId, accessToken, client.phone, 'birthday_wishes', [client.firstName, salonName]);
+        newLogs.push({ id: genId(), type: 'birthday', clientId: client.id, clientName: `${client.firstName} ${client.lastName}`, phone: client.phone, templateName: 'birthday_wishes', status: result.ok ? 'sent' : 'failed', errorMsg: result.error, sentAt: new Date().toISOString() });
         if (result.ok) totalSent++; else totalFailed++;
       }
     }
@@ -156,8 +162,8 @@ export default async function handler() {
         seen.add(apt.clientId);
         const client = clients.find(c => c.id === apt.clientId);
         if (!client?.phone) continue;
-        const result = await sendWhatsApp(wa.phoneNumberId, wa.accessToken, client.phone, wa.postVisitTemplate || 'post_visit', [client.firstName, salonName]);
-        newLogs.push({ id: genId(), type: 'post_visit', clientId: client.id, clientName: `${client.firstName} ${client.lastName}`, phone: client.phone, templateName: wa.postVisitTemplate || 'post_visit', status: result.ok ? 'sent' : 'failed', errorMsg: result.error, sentAt: new Date().toISOString() });
+        const result = await sendWhatsApp(phoneNumberId, accessToken, client.phone, 'post_visit', [client.firstName, salonName]);
+        newLogs.push({ id: genId(), type: 'post_visit', clientId: client.id, clientName: `${client.firstName} ${client.lastName}`, phone: client.phone, templateName: 'post_visit', status: result.ok ? 'sent' : 'failed', errorMsg: result.error, sentAt: new Date().toISOString() });
         if (result.ok) totalSent++; else totalFailed++;
       }
     }
@@ -170,8 +176,8 @@ export default async function handler() {
       const milestone = wa.loyaltyMilestone;
       const loyaltyClients = clients.filter(c => c.phone && !sentTodayIds.has(c.id) && c.loyaltyPoints >= milestone && c.loyaltyPoints < milestone + 10);
       for (const client of loyaltyClients) {
-        const result = await sendWhatsApp(wa.phoneNumberId, wa.accessToken, client.phone, wa.loyaltyTemplate || 'loyalty_reward', [client.firstName, String(client.loyaltyPoints), String(milestone), salonName]);
-        newLogs.push({ id: genId(), type: 'loyalty', clientId: client.id, clientName: `${client.firstName} ${client.lastName}`, phone: client.phone, templateName: wa.loyaltyTemplate || 'loyalty_reward', status: result.ok ? 'sent' : 'failed', errorMsg: result.error, sentAt: new Date().toISOString() });
+        const result = await sendWhatsApp(phoneNumberId, accessToken, client.phone, 'loyalty_reward', [client.firstName, String(client.loyaltyPoints), String(milestone), salonName]);
+        newLogs.push({ id: genId(), type: 'loyalty', clientId: client.id, clientName: `${client.firstName} ${client.lastName}`, phone: client.phone, templateName: 'loyalty_reward', status: result.ok ? 'sent' : 'failed', errorMsg: result.error, sentAt: new Date().toISOString() });
         if (result.ok) totalSent++; else totalFailed++;
       }
     }
