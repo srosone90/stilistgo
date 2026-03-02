@@ -58,9 +58,30 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Errore durante il salvataggio. Riprova.' }, { status: 500 });
     }
 
-    // Step 2 (direct salon_data write) removed: the SalonContext auto-import
-    // handles importing pending bookings with the correct Client format
-    // (firstName / lastName) on the next app load.
+    // ── 2. WhatsApp booking confirmation ────────────────────────────────────
+    if (salonId) {
+      try {
+        const stateRes = await fetch(
+          `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/api/salon-state?userId=${salonId}`
+        );
+        const stateJson = stateRes.ok ? await stateRes.json() : null;
+        const salonState = stateJson?.state;
+        const wa = salonState?.salonConfig?.whatsapp;
+        if (wa?.bookingConfirmEnabled && wa.enabled && wa.ultraMsgInstanceId && wa.ultraMsgToken && clientPhone) {
+          const salonName = salonState?.salonConfig?.salonName ?? 'il salone';
+          const phone = clientPhone.replace(/\D/g, '');
+          const msg = `Ciao ${clientName}! ✅ La tua prenotazione da *${salonName}* per il ${preferredDate} alle ${preferredTime} è confermata. A presto!`;
+          await fetch(`https://api.ultramsg.com/${wa.ultraMsgInstanceId}/messages/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({ token: wa.ultraMsgToken, to: phone, body: msg }).toString(),
+          });
+        }
+      } catch (waErr) {
+        console.error('Booking WA confirmation error:', waErr);
+        // Non bloccare la risposta se WA fallisce
+      }
+    }
 
     return NextResponse.json({ success: true, id: bookingId });
   } catch (e) {

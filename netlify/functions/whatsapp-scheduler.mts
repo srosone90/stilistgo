@@ -68,6 +68,8 @@ async function sendUltraMsg(instanceId: string, token: string, to: string, messa
   }
 }
 
+const BUCKET = 'salon-data';
+
 // ─── Main ────────────────────────────────────────────────────────────────────
 export default async function handler() {
   const supabase = createClient(
@@ -75,9 +77,10 @@ export default async function handler() {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
-  const { data: rows, error } = await supabase.from('salon_data').select('user_id, data');
-  if (error || !rows) {
-    console.error('Scheduler: cannot fetch salon_data', error);
+  // List all salon state files from Storage bucket
+  const { data: fileList, error } = await supabase.storage.from(BUCKET).list('', { limit: 1000 });
+  if (error || !fileList) {
+    console.error('Scheduler: cannot list storage bucket', error);
     return;
   }
 
@@ -86,8 +89,16 @@ export default async function handler() {
   const yesterday = yesterdayStr();
   const mmdd      = todayMMDD();
 
-  for (const row of rows) {
-    const state = (row.data ?? {}) as SalonState;
+  const rows = fileList.filter(f => f.name.endsWith('.json'));
+
+  for (const file of rows) {
+    const userId = file.name.replace('.json', '');
+    let state: SalonState = {};
+    try {
+      const { data: blob } = await supabase.storage.from(BUCKET).download(file.name);
+      if (blob) state = JSON.parse(await blob.text()) as SalonState;
+    } catch { continue; }
+
     const wa = state.salonConfig?.whatsapp;
     if (!wa?.enabled || !wa.ultraMsgInstanceId || !wa.ultraMsgToken) continue;
 
@@ -153,9 +164,10 @@ export default async function handler() {
       }
     }
 
-    // Save updated log (last 200)
-    const updatedData = { ...state, whatsappMessages: log.slice(-200) };
-    await supabase.from('salon_data').update({ data: updatedData }).eq('user_id', row.user_id);
+    // Save updated log back to Storage (last 200)
+    const updatedState = { ...state, whatsappMessages: log.slice(-200) };
+    const blob = new Blob([JSON.stringify(updatedState)], { type: 'application/json' });
+    await supabase.storage.from(BUCKET).upload(file.name, blob, { upsert: true, contentType: 'application/json' });
   }
 
   console.log('WhatsApp scheduler completed for', rows.length, 'salons');
