@@ -2,11 +2,13 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useSalon } from '@/context/SalonContext';
-import { Payment, PaymentMethod, PAYMENT_METHOD_LABELS, PaymentItem } from '@/types/salon';
-import { format, parseISO, startOfDay, isSameDay } from 'date-fns';
+import { Payment, PaymentMethod, PAYMENT_METHOD_LABELS, PaymentItem, CashSession } from '@/types/salon';
+import { format, parseISO } from 'date-fns';
 import { it } from 'date-fns/locale';
-import { Plus, X, Trash2, CreditCard, Banknote, Gift, TrendingUp, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, X, Trash2, CreditCard, Banknote, Gift, TrendingUp, ChevronDown, ChevronUp, Printer } from 'lucide-react';
 import { formatCurrency } from '@/lib/calculations';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 const inputStyle: React.CSSProperties = { background: '#12121a', border: '1px solid #2e2e40', borderRadius: '10px', padding: '9px 13px', color: '#f4f4f5', fontSize: '13px', outline: 'none', width: '100%' };
 const labelStyle: React.CSSProperties = { fontSize: '12px', color: '#71717a', marginBottom: '4px', display: 'block' };
@@ -54,7 +56,7 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
     payments, addPayment, deletePayment,
     cashSessions, addCashSession, closeCashSession,
     clients, operators, services, appointments,
-    redeemGiftCard,
+    redeemGiftCard, salonConfig,
   } = useSalon();
 
   const [showForm, setShowForm] = useState(false);
@@ -84,8 +86,7 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
     setForm(newForm);
     setShowForm(true);
     onPresetConsumed?.();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cashPreset]);
+  }, [cashPreset, appointments, clients, services, onPresetConsumed, selectedDate]);
   const [showHistory, setShowHistory] = useState(false);
   const [showOpenSession, setShowOpenSession] = useState(false);
   const [openingBalance, setOpeningBalance] = useState('0');
@@ -148,6 +149,110 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
     if (!svc) return;
     setForm(p => ({ ...p, items: [...p.items, { serviceId: svc.id, serviceName: svc.name, price: svc.price }] }));
     setNewItemServiceId('');
+  }
+
+  // --- Generazione PDF report cassa ---
+  function generateCashPdf(session: CashSession) {
+    const doc = new jsPDF();
+    const sp = payments.filter(p => p.date === session.date);
+    const st = {
+      total: sp.reduce((s, p) => s + p.total, 0),
+      cash: sp.reduce((s, p) => s + p.cashAmount, 0),
+      card: sp.reduce((s, p) => s + p.cardAmount, 0),
+      gc: sp.reduce((s, p) => s + p.giftCardAmount, 0),
+      discounts: sp.reduce((s, p) => s + p.discountEur, 0),
+    };
+    const dateStr = format(parseISO(session.date), 'dd MMMM yyyy', { locale: it });
+
+    // Intestazione
+    doc.setFontSize(18);
+    doc.setTextColor(40, 40, 40);
+    doc.text(salonConfig.salonName || 'Stylistgo', 105, 18, { align: 'center' });
+    doc.setFontSize(13);
+    doc.setTextColor(80, 80, 80);
+    doc.text('REPORT CHIUSURA CASSA', 105, 27, { align: 'center' });
+    doc.setFontSize(10);
+    doc.setTextColor(100, 100, 100);
+    doc.text(`Data: ${dateStr}`, 14, 37);
+    if (session.closedAt) doc.text(`Chiuso alle: ${format(parseISO(session.closedAt), 'HH:mm')}`, 14, 43);
+    doc.setDrawColor(200, 200, 200);
+    doc.line(14, 48, 196, 48);
+
+    // Tabella movimenti
+    if (sp.length > 0) {
+      doc.setFontSize(11);
+      doc.setTextColor(40, 40, 40);
+      doc.text('MOVIMENTI', 14, 55);
+      autoTable(doc, {
+        startY: 59,
+        head: [['Cliente', 'Servizi', 'Metodo', 'Sconto', 'Totale']],
+        body: sp.map(p => [
+          p.clientName || '—',
+          p.items.map(i => i.serviceName).join(', '),
+          PAYMENT_METHOD_LABELS[p.paymentMethod],
+          p.discountEur > 0 ? `-€${p.discountEur.toFixed(2)}` : '—',
+          `€${p.total.toFixed(2)}`,
+        ]),
+        theme: 'striped',
+        headStyles: { fillColor: [99, 102, 241], textColor: 255 },
+        styles: { fontSize: 9, cellPadding: 3 },
+        columnStyles: { 4: { halign: 'right', fontStyle: 'bold' } },
+      });
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const y1 = sp.length > 0 ? (doc as any).lastAutoTable?.finalY + 10 : 59;
+
+    // Riepilogo incassi
+    doc.setFontSize(11);
+    doc.setTextColor(40, 40, 40);
+    doc.text('RIEPILOGO INCASSI', 14, y1);
+    autoTable(doc, {
+      startY: y1 + 4,
+      body: [
+        ['N. transazioni', `${sp.length}`],
+        ['Totale incassato', `€${st.total.toFixed(2)}`],
+        ['  Contanti', `€${st.cash.toFixed(2)}`],
+        ['  Carta / POS', `€${st.card.toFixed(2)}`],
+        ['  Gift Card', `€${st.gc.toFixed(2)}`],
+        ['Sconti applicati', `-€${st.discounts.toFixed(2)}`],
+      ],
+      theme: 'plain',
+      columnStyles: { 0: { fontStyle: 'bold', cellWidth: 90 }, 1: { halign: 'right' } },
+      styles: { fontSize: 10, cellPadding: 2.5 },
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const y2 = (doc as any).lastAutoTable?.finalY + 10;
+
+    // Fondo cassa
+    doc.setFontSize(11);
+    doc.setTextColor(40, 40, 40);
+    doc.text('FONDO CASSA', 14, y2);
+    const teorico = session.openingBalance + st.cash;
+    const varianza = session.closingBalance != null ? session.closingBalance - teorico : null;
+    autoTable(doc, {
+      startY: y2 + 4,
+      body: [
+        ['Fondo iniziale', `€${session.openingBalance.toFixed(2)}`],
+        ['+ Incasso contanti', `€${st.cash.toFixed(2)}`],
+        ['= Totale teorico', `€${teorico.toFixed(2)}`],
+        ['Contante effettivo a fine turno', session.closingBalance != null ? `€${session.closingBalance.toFixed(2)}` : '—'],
+        ['Varianza', varianza != null ? `${varianza >= 0 ? '+' : ''}€${varianza.toFixed(2)}` : '—'],
+      ],
+      theme: 'plain',
+      columnStyles: { 0: { fontStyle: 'bold', cellWidth: 90 }, 1: { halign: 'right' } },
+      styles: { fontSize: 10, cellPadding: 2.5 },
+    });
+
+    // Footer
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const y3 = (doc as any).lastAutoTable?.finalY + 12;
+    doc.setFontSize(9);
+    doc.setTextColor(150, 150, 150);
+    doc.text(`Generato da Stylistgo · ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, 105, y3, { align: 'center' });
+
+    doc.save(`cassa-${session.date.replace(/-/g, '')}.pdf`);
   }
 
   function syncPaymentAmounts(method: PaymentMethod, total: number) {
@@ -296,14 +401,18 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
         {showHistory && (
           <div className="mt-4 pt-4" style={{ borderTop: '1px solid #2e2e40' }}>
             <h4 className="text-xs font-semibold mb-3" style={{ color: '#71717a' }}>Sessioni cassa chiuse</h4>
-            {cashSessions.filter(s => s.closedAt).slice(0, 10).map(s => (
-              <div key={s.id} className="flex justify-between text-xs py-2" style={{ borderBottom: '1px solid #2e2e40', color: '#a1a1aa' }}>
-                <span>{format(parseISO(s.date), 'dd/MM/yyyy')}</span>
+            {cashSessions.filter(s => s.closedAt).slice(0, 20).map(s => (
+              <div key={s.id} className="flex justify-between items-center text-xs py-2" style={{ borderBottom: '1px solid #2e2e40', color: '#a1a1aa' }}>
+                <span style={{ fontWeight: 500 }}>{format(parseISO(s.date), 'dd/MM/yyyy')}</span>
                 <span>Apertura: {formatCurrency(s.openingBalance)}</span>
                 <span>Chiusura: {s.closingBalance != null ? formatCurrency(s.closingBalance) : '—'}</span>
                 <span style={{ color: s.closingBalance != null && s.closingBalance >= s.openingBalance ? '#22c55e' : '#f87171' }}>
                   {s.closingBalance != null ? (s.closingBalance >= s.openingBalance ? '+' : '') + formatCurrency(s.closingBalance - s.openingBalance) : '—'}
                 </span>
+                <button onClick={() => generateCashPdf(s)} title="Scarica PDF"
+                  style={{ background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', color: '#818cf8', borderRadius: '6px', padding: '3px 7px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}>
+                  <Printer size={11} /> PDF
+                </button>
               </div>
             ))}
           </div>
@@ -342,8 +451,14 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
             </div>
             <div className="flex gap-2 mt-4">
               <button onClick={() => setShowCloseSession(false)} style={{ flex: 1, background: '#12121a', border: '1px solid #2e2e40', color: '#71717a', borderRadius: '8px', padding: '8px', fontSize: '13px', cursor: 'pointer' }}>Annulla</button>
-              <button onClick={() => { closeCashSession(todaySession.id, parseFloat(closingBalance) || 0); setShowCloseSession(false); }}
-                style={{ ...btnPrimary, flex: 1, justifyContent: 'center', color: '#f59e0b', borderColor: 'rgba(245,158,11,0.4)', background: 'rgba(245,158,11,0.1)' }}>Chiudi turno</button>
+              <button onClick={() => {
+                closeCashSession(todaySession.id, parseFloat(closingBalance) || 0);
+                // Genera PDF immediatamente dopo la chiusura
+                const closedSession: CashSession = { ...todaySession, closingBalance: parseFloat(closingBalance) || 0, closedAt: new Date().toISOString() };
+                setTimeout(() => generateCashPdf(closedSession), 150);
+                setShowCloseSession(false);
+              }}
+                style={{ ...btnPrimary, flex: 1, justifyContent: 'center', color: '#f59e0b', borderColor: 'rgba(245,158,11,0.4)', background: 'rgba(245,158,11,0.1)' }}>Chiudi e scarica PDF</button>
             </div>
           </div>
         </div>

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { LayoutDashboard, Table2, BarChart3, Settings, Scissors, Wifi, WifiOff, LogOut, CalendarDays, Users, Sparkles, UserCog, Package, Banknote, UserCircle, X, Lock } from 'lucide-react';
+import { LayoutDashboard, Table2, BarChart3, Settings, Scissors, Wifi, WifiOff, LogOut, CalendarDays, Users, Sparkles, UserCog, Package, Banknote, UserCircle, X, Lock, LogIn } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { getCurrentUser, signOut } from '@/lib/supabase';
 import { useSalon } from '@/context/SalonContext';
@@ -39,9 +39,10 @@ const navGroups: { label: string; items: NavItem[] }[] = [
 interface SidebarProps {
   activeView: string;
   onNavigate: (view: string) => void;
+  onLock?: () => void;
 }
 
-export default function Sidebar({ activeView, onNavigate }: SidebarProps) {
+export default function Sidebar({ activeView, onNavigate, onLock }: SidebarProps) {
   const { dataSource } = useApp();
   const { operators, activeOperatorId, setActiveOperatorId, verifyOperatorPin } = useSalon();
   const router = useRouter();
@@ -136,6 +137,18 @@ export default function Sidebar({ activeView, onNavigate }: SidebarProps) {
             <p className="text-xs" style={{ color: '#3f3f5a' }}>Tocca per cambiare</p>
           </div>
         </button>
+        {/* Blocca schermo */}
+        {onLock && (
+          <button onClick={onLock}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all"
+            style={{ background: 'transparent', color: '#71717a', border: '1px solid transparent' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(99,102,241,0.1)'; (e.currentTarget as HTMLButtonElement).style.color = '#818cf8'; (e.currentTarget as HTMLButtonElement).style.border = '1px solid rgba(99,102,241,0.2)'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; (e.currentTarget as HTMLButtonElement).style.color = '#71717a'; (e.currentTarget as HTMLButtonElement).style.border = '1px solid transparent'; }}
+          >
+            <LogIn size={16} />
+            Cambia operatore
+          </button>
+        )}
         {/* User info */}
         {userName && (
           <div className="px-1">

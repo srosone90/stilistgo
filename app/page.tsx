@@ -14,7 +14,9 @@ import ServicesView from '@/components/ServicesView';
 import StaffView from '@/components/StaffView';
 import InventoryView from '@/components/InventoryView';
 import CashView from '@/components/CashView';
+import OperatorLockScreen from '@/components/OperatorLockScreen';
 import { useApp } from '@/context/AppContext';
+import { useSalon } from '@/context/SalonContext';
 import { getCurrentUser } from '@/lib/supabase';
 import { Plus, Loader2, CalendarDays, Users, Sparkles, UserCog, Package, Banknote } from 'lucide-react';
 
@@ -27,8 +29,10 @@ export default function Home() {
   const [fabTrigger, setFabTrigger] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
+  const [showLockScreen, setShowLockScreen] = useState(false);
   const [cashPreset, setCashPreset] = useState<{ clientId: string; appointmentId: string } | null>(null);
   const { loading } = useApp();
+  const { activeOperatorId } = useSalon();
 
   // Reset FAB trigger ogni volta che si cambia sezione
   useEffect(() => { setFabTrigger(0); }, [view]);
@@ -40,8 +44,11 @@ export default function Home() {
         router.push('/login');
       } else {
         setAuthChecked(true);
+        // Mostra lock screen solo se non c'è operatore attivo in memoria
+        if (!activeOperatorId) setShowLockScreen(true);
       }
     });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
   const FAB_CONFIG: Record<View, { label: string; icon: React.ReactNode; action: () => void }> = {
@@ -92,7 +99,7 @@ export default function Home() {
     <div className="flex h-screen overflow-hidden" style={{ background: '#0f0f13' }}>
       {/* Desktop sidebar */}
       <div className="hidden md:block">
-        <Sidebar activeView={view} onNavigate={(v) => setView(v as View)} />
+        <Sidebar activeView={view} onNavigate={(v) => setView(v as View)} onLock={() => setShowLockScreen(true)} />
       </div>
 
       {/* Mobile sidebar overlay */}
@@ -100,7 +107,7 @@ export default function Home() {
         <div className="fixed inset-0 z-40 md:hidden">
           <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.6)' }} onClick={() => setSidebarOpen(false)} />
           <div className="relative z-50">
-            <Sidebar activeView={view} onNavigate={(v) => { setView(v as View); setSidebarOpen(false); }} />
+            <Sidebar activeView={view} onNavigate={(v) => { setView(v as View); setSidebarOpen(false); }} onLock={() => { setSidebarOpen(false); setShowLockScreen(true); }} />
           </div>
         </div>
       )}
@@ -138,6 +145,11 @@ export default function Home() {
 
       {/* Entry Form Modal */}
       {showForm && <EntryForm onClose={() => setShowForm(false)} />}
+
+      {/* Operator Lock Screen */}
+      {showLockScreen && (
+        <OperatorLockScreen onUnlock={() => setShowLockScreen(false)} />
+      )}
     </div>
   );
 }

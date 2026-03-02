@@ -60,6 +60,14 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
   const [resizingId, setResizingId] = useState<string | null>(null);
   const [resizingEndTime, setResizingEndTimeState] = useState('');
 
+  // Drag & drop
+  const gridRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<{ apptId: string; origDate: string; origStartMin: number; durationMin: number; startY: number; startX: number; dayIndex: number } | null>(null);
+  const wasDraggedRef = useRef(false);
+  const daysRef = useRef<Date[]>([]); // inizializzato vuoto, aggiornato via useEffect
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [draggingPos, setDraggingPos] = useState<{ date: string; startTime: string; endTime: string } | null>(null);
+
   const openHour = parseInt(salonConfig.openTime.split(':')[0], 10);
   const closeHour = parseInt(salonConfig.closeTime.split(':')[0], 10);
   const hours = Array.from({ length: closeHour - openHour }, (_, i) => openHour + i);
@@ -67,6 +75,9 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
 
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
   const days = view === 'week' ? Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)) : [currentDate];
+
+  // Mantieni daysRef aggiornato per gli event handler del documento
+  useEffect(() => { daysRef.current = days; }, [days]);
 
   const activeOperators = useMemo(() =>
     operators.filter(o => o.active && (!filterOperator || o.id === filterOperator)),
@@ -151,31 +162,89 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
     setResizingEndTimeState(appt.endTime);
   }, []);
 
+  // Drag appuntamento
+  const handleDragStart = useCallback((e: React.MouseEvent, appt: Appointment) => {
+    if (e.button !== 0 || resizeRef.current) return;
+    e.stopPropagation();
+    e.preventDefault();
+    const dIdx = daysRef.current.findIndex(d => format(d, 'yyyy-MM-dd') === appt.date);
+    dragRef.current = {
+      apptId: appt.id,
+      origDate: appt.date,
+      origStartMin: timeToMinutes(appt.startTime),
+      durationMin: timeToMinutes(appt.endTime) - timeToMinutes(appt.startTime),
+      startY: e.clientY,
+      startX: e.clientX,
+      dayIndex: dIdx >= 0 ? dIdx : 0,
+    };
+    wasDraggedRef.current = false;
+    setDraggingId(appt.id);
+    setDraggingPos({ date: appt.date, startTime: appt.startTime, endTime: appt.endTime });
+  }, []);
+
   useEffect(() => {
     function onMove(e: MouseEvent) {
-      if (!resizeRef.current) return;
-      const delta = e.clientY - resizeRef.current.startY;
-      const deltaMin = Math.round((delta / HOUR_PX) * 60 / 15) * 15;
-      const newEnd = Math.max(resizeRef.current.origStartMin + 15, resizeRef.current.origEndMin + deltaMin);
-      setResizingEndTimeState(minutesToTime(newEnd));
+      // RESIZE
+      if (resizeRef.current) {
+        const delta = e.clientY - resizeRef.current.startY;
+        const deltaMin = Math.round((delta / HOUR_PX) * 60 / 15) * 15;
+        const newEnd = Math.max(resizeRef.current.origStartMin + 15, resizeRef.current.origEndMin + deltaMin);
+        setResizingEndTimeState(minutesToTime(newEnd));
+        return;
+      }
+      // DRAG
+      if (dragRef.current) {
+        const totalDelta = Math.abs(e.clientX - dragRef.current.startX) + Math.abs(e.clientY - dragRef.current.startY);
+        if (totalDelta > 5) wasDraggedRef.current = true;
+        const deltaY = e.clientY - dragRef.current.startY;
+        const deltaMin = Math.round(deltaY / HOUR_PX * 60 / 15) * 15;
+        const newStartMin = Math.max(openHour * 60, dragRef.current.origStartMin + deltaMin);
+        const newEndMin = newStartMin + dragRef.current.durationMin;
+        let newDayIdx = dragRef.current.dayIndex;
+        if (gridRef.current) {
+          const rect = gridRef.current.getBoundingClientRect();
+          const colW = (rect.width - 56) / daysRef.current.length;
+          const relX = e.clientX - rect.left - 56;
+          newDayIdx = Math.max(0, Math.min(daysRef.current.length - 1, Math.floor(relX / colW)));
+        }
+        const newDate = format(daysRef.current[newDayIdx], 'yyyy-MM-dd');
+        setDraggingPos({ date: newDate, startTime: minutesToTime(newStartMin), endTime: minutesToTime(newEndMin) });
+      }
     }
     function onUp() {
-      if (!resizeRef.current) return;
-      const { apptId } = resizeRef.current;
-      setResizingId(null);
-      resizeRef.current = null;
-      setResizingEndTimeState(prev => {
-        const appt = appointments.find(a => a.id === apptId);
-        if (appt && prev && prev !== appt.endTime) {
-          updateAppointment({ ...appt, endTime: prev }, 'Durata modificata');
-        }
-        return '';
-      });
+      // RESIZE
+      if (resizeRef.current) {
+        const { apptId } = resizeRef.current;
+        setResizingId(null);
+        resizeRef.current = null;
+        setResizingEndTimeState(prev => {
+          const appt = appointments.find(a => a.id === apptId);
+          if (appt && prev && prev !== appt.endTime) {
+            updateAppointment({ ...appt, endTime: prev }, 'Durata modificata');
+          }
+          return '';
+        });
+        return;
+      }
+      // DRAG
+      if (dragRef.current) {
+        const { apptId } = dragRef.current;
+        dragRef.current = null;
+        setDraggingId(null);
+        setDraggingPos(prev => {
+          if (!wasDraggedRef.current || !prev) return null;
+          const appt = appointments.find(a => a.id === apptId);
+          if (appt && (prev.date !== appt.date || prev.startTime !== appt.startTime)) {
+            updateAppointment({ ...appt, date: prev.date, startTime: prev.startTime, endTime: prev.endTime }, 'Spostato');
+          }
+          return null;
+        });
+      }
     }
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
     return () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };
-  }, [appointments, updateAppointment]);
+  }, [appointments, updateAppointment, openHour]);
 
   return (
     <div className="flex flex-col gap-4 h-full" style={{ minHeight: 0 }}>
@@ -232,7 +301,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
             </div>
           ))}
         </div>
-        <div className="flex" style={{ minHeight: hours.length * HOUR_PX }}>
+        <div ref={gridRef} className="flex" style={{ minHeight: hours.length * HOUR_PX }}>
           <div style={{ width: 56, flexShrink: 0 }}>
             {hours.map(h => (
               <div key={h} style={{ height: HOUR_PX, borderBottom: '1px solid #2e2e40', display: 'flex', alignItems: 'flex-start', paddingTop: 4, paddingLeft: 8 }}>
@@ -242,7 +311,10 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
           </div>
           {days.map((day, di) => {
             const dayStr = format(day, 'yyyy-MM-dd');
-            const dayAppts = filteredAppts.filter(a => a.date === dayStr);
+            // Considera gli appuntamenti in drag nella colonna di destinazione
+            const dayAppts = filteredAppts.filter(a =>
+              draggingId === a.id && draggingPos ? draggingPos.date === dayStr : a.date === dayStr
+            );
             return (
               <div key={di} className="flex-1 relative" style={{ borderLeft: '1px solid #2e2e40' }}>
                 {hours.map(h => (
@@ -254,8 +326,11 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                     className="cursor-pointer hover:bg-white/[0.02] transition-colors" />
                 ))}
                 {dayAppts.map(a => {
-                  const startMin = timeToMinutes(a.startTime) - START_MIN;
-                  const effectiveEnd = resizingId === a.id ? resizingEndTime : a.endTime;
+                  const isDragging = draggingId === a.id;
+                  const effectiveStart = isDragging && draggingPos ? draggingPos.startTime : a.startTime;
+                  const effectiveEndDrag = isDragging && draggingPos ? draggingPos.endTime : a.endTime;
+                  const startMin = timeToMinutes(effectiveStart) - START_MIN;
+                  const effectiveEnd = resizingId === a.id ? resizingEndTime : effectiveEndDrag;
                   const endMin = timeToMinutes(effectiveEnd) - START_MIN;
                   const top = (startMin / 60) * HOUR_PX;
                   const height = Math.max(((endMin - startMin) / 60) * HOUR_PX, 28);
@@ -263,9 +338,10 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                   const client = clients.find(c => c.id === a.clientId);
                   return (
                     <div key={a.id}
-                      onClick={e => { if (resizingId) return; e.stopPropagation(); openEdit(a); }}
-                      className="absolute left-1 right-1 rounded-lg px-2 py-1 cursor-pointer hover:brightness-110 transition-all overflow-hidden"
-                      style={{ top, height, background: `${color}25`, border: `1px solid ${color}60`, zIndex: 2, userSelect: 'none' }}>
+                      onMouseDown={e => handleDragStart(e, a)}
+                      onClick={e => { if (wasDraggedRef.current || draggingId || resizingId) { e.stopPropagation(); return; } e.stopPropagation(); openEdit(a); }}
+                      className="absolute left-1 right-1 rounded-lg px-2 py-1 hover:brightness-110 transition-all overflow-hidden"
+                      style={{ top, height, background: `${color}25`, border: `1px solid ${color}60`, zIndex: isDragging ? 10 : 2, opacity: isDragging ? 0.7 : 1, cursor: isDragging ? 'grabbing' : 'grab', userSelect: 'none' }}>
                       <p className="text-xs font-semibold truncate" style={{ color }}>
                         {a.isBlock ? 'Blocco: ' + a.blockReason : (client ? `${client.firstName} ${client.lastName}` : '—')}
                       </p>
