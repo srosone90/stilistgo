@@ -485,14 +485,18 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
     setAppointments(prev => { const n = [...prev, full]; storageSaveAppointments(n); return n; });
 
     // ── WhatsApp conferma appuntamento (fire-and-forget) ──
+    // Usa latestStateRef così legge sempre salonConfig/clients/services aggiornati
+    // senza dipendenze extra nel useCallback
     try {
-      const wa = storageGetSalonConfig()?.whatsapp;
+      const snap = latestStateRef.current;
+      const wa = (snap.salonConfig as SalonConfig | undefined)?.whatsapp;
       if (wa?.ultraMsgInstanceId && wa?.ultraMsgToken && (wa.appointmentConfirmEnabled ?? true)) {
-        const client = storageGetClients().find(c => c.id === a.clientId);
+        const clients = (snap.clients as Client[]) ?? [];
+        const services = (snap.services as Service[]) ?? [];
+        const client = clients.find(c => c.id === a.clientId);
         if (client?.phone) {
-          const svcs = storageGetServices();
-          const svcNames = svcs.filter(s => (a.serviceIds ?? []).includes(s.id)).map(s => s.name).join(', ') || 'appuntamento';
-          const salonName = storageGetSalonConfig()?.salonName ?? 'il salone';
+          const svcNames = services.filter(s => (a.serviceIds ?? []).includes(s.id)).map(s => s.name).join(', ') || 'appuntamento';
+          const salonName = (snap.salonConfig as SalonConfig | undefined)?.salonName ?? 'il salone';
           const msg = `Ciao ${client.firstName}! ✅ Il tuo appuntamento di *${svcNames}* è confermato per il ${a.date} alle ${a.startTime} da ${salonName}. A presto!`;
           fetch('/api/ultramsg/send', {
             method: 'POST',
@@ -502,7 +506,7 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
         }
       }
     } catch { /* non bloccare il salvataggio */ }
-  }, []);
+  }, []); // latestStateRef è un ref — non serve come dep
 
   const updateAppointment = useCallback((a: Appointment, historyNote?: string) => {
     const updated = historyNote
