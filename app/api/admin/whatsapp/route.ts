@@ -19,13 +19,13 @@ export async function PATCH(req: NextRequest) {
     .from('salon_data')
     .select('state')
     .eq('user_id', user_id)
-    .single();
+    .maybeSingle();
 
-  if (fetchErr || !row) {
-    return NextResponse.json({ error: 'Tenant non trovato' }, { status: 404 });
+  if (fetchErr) {
+    return NextResponse.json({ error: fetchErr.message }, { status: 500 });
   }
 
-  const current = (row.state as Record<string, unknown>) ?? {};
+  const current = ((row?.state as Record<string, unknown>) ?? {});
   const currentSalonConfig = (current.salonConfig as Record<string, unknown>) ?? {};
   const currentWhatsapp = (currentSalonConfig.whatsapp as Record<string, unknown>) ?? {};
 
@@ -67,11 +67,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'user_id obbligatorio' }, { status: 400 });
   }
 
-  // Select both columns so we can fall back to `data` if `state` is empty
-  // (credentials saved by older code ended up in `data`)
   const { data: row, error } = await supabase
     .from('salon_data')
-    .select('state, data')
+    .select('state')
     .eq('user_id', user_id)
     .maybeSingle();
 
@@ -80,21 +78,15 @@ export async function GET(req: NextRequest) {
   }
 
   if (!row) {
-    // Row doesn't exist yet — return empty (not an error)
     return NextResponse.json({ ultraMsgInstanceId: '', ultraMsgToken: '', enabled: false, debug: 'no_row' });
   }
 
-  // Try state column first, fall back to data column
-  const stateObj  = (row.state as Record<string, unknown>) ?? {};
-  const dataObj   = (row.data  as Record<string, unknown>) ?? {};
+  const stateObj = (row.state as Record<string, unknown>) ?? {};
+  const stateCfg = ((stateObj.salonConfig as Record<string, unknown>)?.whatsapp as Record<string, unknown>) ?? {};
 
-  const stateCfg = (stateObj.salonConfig as Record<string, unknown>)?.whatsapp as Record<string, unknown> ?? {};
-  const dataCfg  = (dataObj.salonConfig  as Record<string, unknown>)?.whatsapp as Record<string, unknown> ?? {};
-
-  // Prefer state; fall back to data for legacy rows
-  const instanceId = (stateCfg.ultraMsgInstanceId ?? dataCfg.ultraMsgInstanceId ?? '') as string;
-  const token      = (stateCfg.ultraMsgToken      ?? dataCfg.ultraMsgToken      ?? '') as string;
-  const enabled    = (stateCfg.enabled            ?? dataCfg.enabled            ?? false) as boolean;
+  const instanceId = (stateCfg.ultraMsgInstanceId ?? '') as string;
+  const token      = (stateCfg.ultraMsgToken      ?? '') as string;
+  const enabled    = (stateCfg.enabled            ?? false) as boolean;
 
   return NextResponse.json({
     ultraMsgInstanceId: instanceId,
