@@ -148,9 +148,9 @@ export default function Home() {
 
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
-        <div className="fixed inset-0 z-40 md:hidden">
-          <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.6)' }} onClick={() => setSidebarOpen(false)} />
-          <div className="relative z-50" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-40 md:hidden" onClick={() => setSidebarOpen(false)}>
+          <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.6)' }} />
+          <div className="absolute left-0 top-0 h-full z-50" onClick={e => e.stopPropagation()}>
             <Sidebar activeView={view} onNavigate={(v) => { setView(v as View); setSidebarOpen(false); }} onLock={() => { setSidebarOpen(false); setShowLockScreen(true); }} permissions={effectivePerms} />
           </div>
         </div>

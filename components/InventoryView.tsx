@@ -101,9 +101,9 @@ export default function InventoryView({ newTrigger }: { newTrigger?: number }) {
   }
 
   return (
-    <div className="flex gap-5 h-full" style={{ minHeight: 0 }}>
+    <div className="flex flex-col md:flex-row gap-4 md:gap-5 h-full" style={{ minHeight: 0 }}>
       {/* ── LEFT: product list ── */}
-      <div className="flex flex-col gap-4" style={{ width: '340px', flexShrink: 0 }}>
+      <div className={`flex flex-col gap-4 md:w-80 md:shrink-0${selectedId ? ' hidden md:flex' : ''}`}>
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-2xl font-bold text-white">Magazzino</h1>
@@ -157,9 +157,12 @@ export default function InventoryView({ newTrigger }: { newTrigger?: number }) {
       {/* ── RIGHT: product detail ── */}
       <div className="flex-1 overflow-y-auto">
         {!selected ? (
-          <div className="flex items-center justify-center h-full" style={{ color: '#3f3f5a' }}>Seleziona un prodotto dalla lista</div>
+          <div className="hidden md:flex items-center justify-center h-full" style={{ color: '#3f3f5a' }}>Seleziona un prodotto dalla lista</div>
         ) : (
           <div className="space-y-4">
+            <button className="md:hidden flex items-center gap-1 text-sm mb-1" style={{ color: '#818cf8', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }} onClick={() => setSelectedId(null)}>
+              ← Torna alla lista
+            </button>
             <div className="flex items-start justify-between">
               <div>
                 <h2 className="text-xl font-bold text-white">{selected.name}</h2>

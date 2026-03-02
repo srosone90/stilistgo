@@ -1,34 +1,25 @@
 import { supabase } from './supabase';
 
-// ─── Availability cache ───────────────────────────────────────────────────────
-let _available: boolean | null = null;
-let _availableTs = 0;
-
-async function isAvailable(): Promise<boolean> {
-  const now = Date.now();
-  // Re-check every 60s to handle reconnections
-  if (_available !== null && now - _availableTs < 60000) return _available;
-  try {
-    const res = await fetch(
-      `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/health`,
-      { headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY! } }
-    );
-    _available = res.ok;
-  } catch {
-    _available = false;
-  }
-  _availableTs = now;
-  return _available;
-}
-
-// ─── Salon state via server API route (Supabase Storage — no migration needed) ─
+// ─── Salon state via Supabase DB (salon_data table, anon key + RLS) ───────────
+//
+// SQL to run in Supabase SQL Editor (once):
+//   create table if not exists salon_data (
+//     user_id text primary key,
+//     state   jsonb  not null default '{}',
+//     updated_at timestamptz default now()
+//   );
+//   alter table salon_data enable row level security;
+//   create policy "own" on salon_data using (auth.uid()::text = user_id) with check (auth.uid()::text = user_id);
 
 export async function dbGetSalonState(userId: string): Promise<Record<string, unknown> | null> {
   try {
-    const res = await fetch(`/api/salon-state?userId=${encodeURIComponent(userId)}`, { cache: 'no-store' });
-    if (!res.ok) return null;
-    const json = await res.json();
-    return json.state ?? null;
+    const { data, error } = await supabase
+      .from('salon_data')
+      .select('state')
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (error) return null;
+    return (data?.state as Record<string, unknown>) ?? null;
   } catch {
     return null;
   }
@@ -36,11 +27,9 @@ export async function dbGetSalonState(userId: string): Promise<Record<string, un
 
 export async function dbSaveSalonState(userId: string, state: Record<string, unknown>): Promise<void> {
   try {
-    await fetch(`/api/salon-state?userId=${encodeURIComponent(userId)}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(state),
-    });
+    await supabase
+      .from('salon_data')
+      .upsert({ user_id: userId, state, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
   } catch {
     // ignore — offline
   }
@@ -62,7 +51,6 @@ export interface OnlineBooking {
 }
 
 export async function dbGetOnlineBookings(): Promise<OnlineBooking[]> {
-  if (!await isAvailable()) return [];
   try {
     const { data, error } = await supabase
       .from('online_bookings')
@@ -76,7 +64,6 @@ export async function dbGetOnlineBookings(): Promise<OnlineBooking[]> {
 }
 
 export async function dbUpdateBookingStatus(id: string, status: 'confirmed' | 'cancelled'): Promise<void> {
-  if (!await isAvailable()) return;
   try {
     await supabase.from('online_bookings').update({ status }).eq('id', id);
   } catch {
@@ -85,7 +72,6 @@ export async function dbUpdateBookingStatus(id: string, status: 'confirmed' | 'c
 }
 
 export async function dbDeleteBooking(id: string): Promise<void> {
-  if (!await isAvailable()) return;
   try {
     await supabase.from('online_bookings').delete().eq('id', id);
   } catch {

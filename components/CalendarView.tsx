@@ -38,7 +38,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
     addClient,
   } = useSalon();
 
-  const [view, setView] = useState<'day' | 'week' | 'month'>('week');
+  const [view, setView] = useState<'day' | 'week' | 'month'>('day');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [showForm, setShowForm] = useState(false);
   const [editAppt, setEditAppt] = useState<Appointment | null>(null);

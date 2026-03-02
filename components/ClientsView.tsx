@@ -93,9 +93,9 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
   }
 
   return (
-    <div className="flex gap-5 h-full" style={{ minHeight: 0 }}>
+    <div className="flex flex-col md:flex-row gap-4 md:gap-5 h-full" style={{ minHeight: 0 }}>
       {/* ── LEFT: list ── */}
-      <div className="flex flex-col gap-4" style={{ width: '320px', flexShrink: 0 }}>
+      <div className={`flex flex-col gap-4 md:w-80 md:shrink-0${selectedId ? ' hidden md:flex' : ''}`}>
         <div>
           <h1 className="text-2xl font-bold text-white">Clienti</h1>
           <p className="text-xs mt-1" style={{ color: '#71717a' }}>{clients.length} clienti registrati</p>
@@ -138,11 +138,15 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
       {/* ── RIGHT: detail ── */}
       <div className="flex-1 overflow-y-auto">
         {!selected ? (
-          <div className="flex items-center justify-center h-full" style={{ color: '#3f3f5a' }}>
+          <div className="hidden md:flex items-center justify-center h-full" style={{ color: '#3f3f5a' }}>
             <p>Seleziona un cliente dalla lista</p>
           </div>
         ) : (
           <div className="space-y-4">
+            {/* Back button — mobile only */}
+            <button className="md:hidden flex items-center gap-1 text-sm mb-1" style={{ color: '#818cf8', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }} onClick={() => setSelectedId(null)}>
+              ← Torna alla lista
+            </button>
             {/* Header */}
             <div className="flex items-start justify-between">
               <div>
