@@ -79,6 +79,9 @@ export default function AutomationsView() {
   const [checking, setChecking] = useState(false);
   const [saved, setSaved] = useState(false);
   const [debugInfo, setDebugInfo] = useState<string>('');
+  const [testPhone, setTestPhone] = useState('');
+  const [testSending, setTestSending] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null);
 
   // Fetch credentials directly from DB on mount — never depends on SalonContext timing
   useEffect(() => {
@@ -192,18 +195,67 @@ export default function AutomationsView() {
       )}
 
       {connStatus === 'connected' && (
-        <div style={{ ...card(), background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <Wifi size={18} style={{ color: '#22c55e' }} />
-            <div>
-              <p style={{ color: '#22c55e', fontWeight: 600, fontSize: 14, margin: 0 }}>WhatsApp connesso ✓</p>
-              <p style={{ color: 'var(--muted)', fontSize: 12, margin: '2px 0 0' }}>Istanza: {cfg.ultraMsgInstanceId}</p>
+        <div style={{ ...card(), background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.25)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <Wifi size={18} style={{ color: '#22c55e' }} />
+              <div>
+                <p style={{ color: '#22c55e', fontWeight: 600, fontSize: 14, margin: 0 }}>WhatsApp connesso ✓</p>
+                <p style={{ color: 'var(--muted)', fontSize: 12, margin: '2px 0 0' }}>Istanza: {cfg.ultraMsgInstanceId}</p>
+              </div>
             </div>
+            <button onClick={refresh} disabled={checking}
+              style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 8, padding: '5px 12px', color: 'var(--text-3)', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
+              <RefreshCw size={12} style={checking ? spinStyle : {}} /> Aggiorna
+            </button>
           </div>
-          <button onClick={refresh} disabled={checking}
-            style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 8, padding: '5px 12px', color: 'var(--text-3)', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
-            <RefreshCw size={12} style={checking ? spinStyle : {}} /> Aggiorna
-          </button>
+
+          {/* Messaggio di prova */}
+          <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid rgba(34,197,94,0.2)' }}>
+            <p style={{ color: 'var(--text)', fontSize: 13, fontWeight: 600, margin: '0 0 10px' }}>📨 Invia messaggio di prova</p>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input
+                type="tel"
+                placeholder="es. 393331234567 (senza +)"
+                value={testPhone}
+                onChange={e => { setTestPhone(e.target.value); setTestResult(null); }}
+                style={{ flex: 1, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 10, padding: '8px 12px', color: 'var(--text)', fontSize: 13, outline: 'none' }}
+              />
+              <button
+                disabled={testSending || !testPhone.trim()}
+                onClick={async () => {
+                  setTestSending(true);
+                  setTestResult(null);
+                  try {
+                    const res = await fetch('/api/ultramsg/send', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        instanceId: cfg.ultraMsgInstanceId,
+                        token: cfg.ultraMsgToken,
+                        to: testPhone.trim(),
+                        message: '✅ Messaggio di prova da ' + (salonConfig?.salonName ?? 'il tuo salone') + ' — WhatsApp funziona correttamente!',
+                      }),
+                    });
+                    const d = await res.json();
+                    setTestResult(res.ok && !d.error ? { ok: true, msg: 'Inviato!' } : { ok: false, msg: d.error ?? 'Errore invio' });
+                  } catch (e) {
+                    setTestResult({ ok: false, msg: String(e) });
+                  } finally {
+                    setTestSending(false);
+                  }
+                }}
+                style={{ background: '#22c55e', color: 'white', border: 'none', borderRadius: 10, padding: '8px 16px', fontSize: 13, fontWeight: 600, cursor: testSending || !testPhone.trim() ? 'not-allowed' : 'pointer', opacity: testSending || !testPhone.trim() ? 0.6 : 1, whiteSpace: 'nowrap' }}
+              >
+                {testSending ? 'Invio…' : 'Invia'}
+              </button>
+            </div>
+            {testResult && (
+              <p style={{ marginTop: 8, fontSize: 12, color: testResult.ok ? '#22c55e' : '#f87171' }}>
+                {testResult.ok ? '✓' : '✗'} {testResult.msg}
+              </p>
+            )}
+          </div>
         </div>
       )}
 
