@@ -169,7 +169,7 @@ export default function Home() {
           </button>
           <p className="font-bold text-white text-sm">Stylistgo</p>
           <button
-            onClick={async () => { await signOut(); router.push('/login'); }}
+            onClick={async () => { await signOut(); window.location.href = '/login'; }}
             className="p-2 rounded-lg"
             style={{ background: '#1c1c27' }}
             title="Esci"

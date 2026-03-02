@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { LayoutDashboard, Table2, BarChart3, Settings, Scissors, Wifi, WifiOff, LogOut, CalendarDays, Users, Sparkles, UserCog, Package, Banknote, UserCircle, X, Lock, LogIn, Trophy, Star, Globe } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { getCurrentUser, signOut } from '@/lib/supabase';
@@ -60,7 +59,6 @@ interface SidebarProps {
 export default function Sidebar({ activeView, onNavigate, onLock, permissions }: SidebarProps) {
   const { dataSource } = useApp();
   const { operators, activeOperatorId, setActiveOperatorId, verifyOperatorPin } = useSalon();
-  const router = useRouter();
   const [userName, setUserName] = useState('');
   const [showPinModal, setShowPinModal] = useState(false);
   const [pinStep, setPinStep] = useState<'select' | 'pin'>('select');
@@ -91,8 +89,8 @@ export default function Sidebar({ activeView, onNavigate, onLock, permissions }:
 
   const handleLogout = async () => {
     await signOut();
-    router.push('/login');
-    router.refresh();
+    // Hard reload — forces SalonContext and all providers to re-mount fresh for the next user
+    window.location.href = '/login';
   };
   return (
     <aside className="w-60 shrink-0 h-screen sticky top-0 flex flex-col"

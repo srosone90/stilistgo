@@ -34,7 +34,51 @@ export default function OnlineBookingsView() {
     const data = await dbGetOnlineBookings();
     setBookings(data);
     setLoading(false);
-  }, []);
+    // Auto-convert every pending booking to a calendar appointment
+    const pending = data.filter(b => b.status === 'pending');
+    for (const b of pending) {
+      const existingClient = clients.find(c =>
+        c.phone === b.client_phone || (b.client_email && c.email === b.client_email)
+      );
+      let clientId = existingClient?.id;
+      if (!clientId) {
+        const [firstName, ...rest] = b.client_name.trim().split(' ');
+        clientId = addClient({
+          firstName: firstName || b.client_name,
+          lastName: rest.join(' ') || '',
+          phone: b.client_phone,
+          email: b.client_email,
+          birthDate: '', notes: `Prenotato online il ${format(parseISO(b.created_at), 'dd/MM/yyyy')}`,
+          allergies: '', tags: [], gdprConsent: false, gdprDate: '', loyaltyPoints: 0,
+        });
+      }
+      const matchedService = services.find(s =>
+        s.name.toLowerCase().includes(b.service.toLowerCase()) ||
+        b.service.toLowerCase().includes(s.name.toLowerCase())
+      );
+      // Calculate end time based on service duration (default 60 min)
+      const dur = matchedService?.duration ?? 60;
+      const [hh, mm] = b.preferred_time.split(':').map(Number);
+      const endMin = hh * 60 + mm + dur;
+      const endTime = `${String(Math.floor(endMin / 60) % 24).padStart(2, '0')}:${String(endMin % 60).padStart(2, '0')}`;
+      addAppointment({
+        clientId,
+        operatorId: '',
+        serviceIds: matchedService ? [matchedService.id] : [],
+        date: b.preferred_date,
+        startTime: b.preferred_time,
+        endTime,
+        status: 'scheduled',
+        notes: `📱 Prenotazione online: ${b.service}${b.notes ? ` — ${b.notes}` : ''}`,
+        isBlock: false,
+        blockReason: '',
+        recurringGroupId: '',
+        feedbackScore: 0,
+      });
+      await dbUpdateBookingStatus(b.id, 'confirmed');
+      setBookings(prev => prev.map(x => x.id === b.id ? { ...x, status: 'confirmed' } : x));
+    }
+  }, [clients, services, addClient, addAppointment]);
 
   useEffect(() => { load(); }, [load]);
 
