@@ -27,6 +27,7 @@ interface Tenant {
   registered_at: string; last_seen_at: string | null;
   clients_count: number; appointments_count: number; operators_count: number;
   services_count: number; last_sync: string; phone: string; vat_number: string;
+  is_admin: boolean;
 }
 
 interface Ticket {
@@ -403,6 +404,8 @@ export default function AdminPage() {
               ['Titolare', 'full_name', 'text'],
               ['Email', 'email', 'email'],
               ['Telefono', 'phone', 'tel'],
+              ['P.IVA / CF', 'vat_number', 'text'],
+              ['Settore', 'sector', 'text'],
               ['Regione', 'region', 'text'],
               ['CSM assegnato', 'csm', 'text'],
             ].map(([label, key, type]) => (
@@ -436,6 +439,22 @@ export default function AdminPage() {
                 <input type="date" value={((e.trial_ends_at ?? t.trial_ends_at) as string)?.slice(0, 10) ?? ''}
                   onChange={ev => set('trial_ends_at', ev.target.value ? new Date(ev.target.value).toISOString() : null)} style={inp()} />
               </div>
+            </div>
+
+            {/* Admin toggle */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#12121a', borderRadius: '10px', padding: '10px 14px' }}>
+              <div>
+                <p style={{ margin: 0, fontSize: '13px', color: '#f4f4f5', fontWeight: 600 }}>Accesso Admin</p>
+                <p style={{ margin: 0, fontSize: '11px', color: '#71717a' }}>Permette all&apos;utente di accedere al pannello admin</p>
+              </div>
+              <button
+                onClick={() => set('is_admin', !(e.is_admin ?? t.is_admin))}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: (e.is_admin ?? t.is_admin) ? '#818cf8' : '#3f3f5a' }}
+              >
+                {(e.is_admin ?? t.is_admin)
+                  ? <ToggleRight size={32} />
+                  : <ToggleLeft size={32} />}
+              </button>
             </div>
 
             <div>
@@ -854,18 +873,18 @@ export default function AdminPage() {
           </div>
         ) : (
           <>
-            {section === 'overview'    && <OverviewSection />}
-            {section === 'tenants'     && <TenantsSection />}
-            {section === 'tickets'     && <TicketsSection />}
-            {section === 'broadcasts'  && <BroadcastsSection />}
-            {section === 'flags'       && <FlagsSection />}
-            {section === 'audit'       && <AuditSection />}
+            {section === 'overview'    && OverviewSection()}
+            {section === 'tenants'     && TenantsSection()}
+            {section === 'tickets'     && TicketsSection()}
+            {section === 'broadcasts'  && BroadcastsSection()}
+            {section === 'flags'       && FlagsSection()}
+            {section === 'audit'       && AuditSection()}
           </>
         )}
       </div>
 
       {/* Tenant modal */}
-      {selTenant && <TenantModal />}
+      {selTenant && TenantModal()}
     </div>
   );
 }

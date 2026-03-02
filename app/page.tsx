@@ -22,7 +22,8 @@ import { useApp } from '@/context/AppContext';
 import { useSalon } from '@/context/SalonContext';
 import { getCurrentUser, signOut } from '@/lib/supabase';
 import { DEFAULT_OPERATOR_PERMISSIONS, OperatorPermissions } from '@/types/salon';
-import { Plus, Loader2, CalendarDays, Users, Sparkles, UserCog, Package, Banknote, Trophy, Star, Globe, LogOut } from 'lucide-react';
+import { PLAN_FEATURES, PlanFeatures, VIEW_TO_FEATURE, UPGRADE_TEXT } from '@/lib/planGate';
+import { Plus, Loader2, CalendarDays, Users, Sparkles, UserCog, Package, Banknote, Trophy, Star, Globe, LogOut, Lock } from 'lucide-react';
 
 type View = 'dashboard' | 'tabella' | 'analisi' | 'impostazioni' | 'calendar' | 'clients' | 'services' | 'staff' | 'inventory' | 'cash' | 'gamification' | 'loyalty' | 'bookings';
 
@@ -35,6 +36,8 @@ export default function Home() {
   const [authChecked, setAuthChecked] = useState(false);
   const [showLockScreen, setShowLockScreen] = useState(false);
   const [cashPreset, setCashPreset] = useState<{ clientId: string; appointmentId: string } | null>(null);
+  const [planFeatures, setPlanFeatures] = useState<PlanFeatures>(PLAN_FEATURES.trial);
+  const [currentPlan, setCurrentPlan] = useState('trial');
   const { loading } = useApp();
   const { activeOperatorId, operators } = useSalon();
 
@@ -67,12 +70,21 @@ export default function Home() {
 
   // Auth guard — mostra SEMPRE il lock screen al caricamento
   useEffect(() => {
-    getCurrentUser().then((user) => {
+    getCurrentUser().then(async (user) => {
       if (!user) {
         router.push('/login');
       } else {
         setAuthChecked(true);
-        setShowLockScreen(true); // sempre, ad ogni accesso
+        setShowLockScreen(true);
+        // Fetch plan for this user
+        try {
+          const res = await fetch(`/api/user/plan?userId=${user.id}`);
+          if (res.ok) {
+            const data = await res.json();
+            setPlanFeatures(data.features ?? PLAN_FEATURES.trial);
+            setCurrentPlan(data.plan ?? 'trial');
+          }
+        } catch { /* fall back to trial */ }
       }
     });
   }, [router]);
@@ -88,6 +100,26 @@ export default function Home() {
       <p className="text-sm" style={{ color: '#71717a' }}>Contatta il titolare per richiedere l&apos;accesso a questa sezione.</p>
     </div>
   );
+
+  // Upgrade wall per funzioni non incluse nel piano
+  const upgradeWall = (viewId: string) => {
+    const info = UPGRADE_TEXT[viewId] ?? { plan: 'superiore', description: 'Questa funzione non è disponibile nel tuo piano attuale.' };
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-4 py-20 px-6">
+        <div style={{ background: 'rgba(99,102,241,0.1)', borderRadius: '50%', padding: '20px' }}>
+          <Lock size={36} style={{ color: '#818cf8' }} />
+        </div>
+        <div className="text-center">
+          <p className="text-white font-bold text-xl mb-2">Funzione non disponibile</p>
+          <p className="text-sm mb-1" style={{ color: '#a1a1aa' }}>{info.description}</p>
+          <p className="text-sm" style={{ color: '#71717a' }}>Piano attuale: <span style={{ color: '#fbbf24', fontWeight: 600 }}>{currentPlan.charAt(0).toUpperCase() + currentPlan.slice(1)}</span></p>
+        </div>
+        <div style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: '12px', padding: '12px 24px', textAlign: 'center' }}>
+          <p style={{ color: '#818cf8', fontSize: '13px', margin: 0 }}>Richiedi l&apos;upgrade al piano <strong>{info.plan.charAt(0).toUpperCase() + info.plan.slice(1)}</strong> per sbloccare questa funzione.</p>
+        </div>
+      </div>
+    );
+  };
 
   const FAB_CONFIG: Record<View, { label: string; icon: React.ReactNode; action: () => void }> = {
     dashboard:    { label: 'Nuova Voce',       icon: <Plus size={20} />,      action: () => setShowForm(true) },
@@ -106,6 +138,11 @@ export default function Home() {
   };
 
   const renderView = () => {
+    // Plan gating: check if the active view is locked by the current plan
+    const featureKey = VIEW_TO_FEATURE[view];
+    if (featureKey && !planFeatures[featureKey]) {
+      return upgradeWall(view);
+    }
     switch (view) {
       case 'dashboard': return effectivePerms.accounting ? <Dashboard showAccounting={true} /> : <Dashboard showAccounting={false} />;
       case 'tabella':   return effectivePerms.accounting ? <TabularView /> : AccessDenied;
@@ -143,7 +180,7 @@ export default function Home() {
     <div className="flex h-screen overflow-hidden" style={{ background: '#0f0f13' }}>
       {/* Desktop sidebar */}
       <div className="hidden md:block">
-        <Sidebar activeView={view} onNavigate={(v) => setView(v as View)} onLock={() => setShowLockScreen(true)} permissions={effectivePerms} />
+        <Sidebar activeView={view} onNavigate={(v) => setView(v as View)} onLock={() => setShowLockScreen(true)} permissions={effectivePerms} planFeatures={planFeatures} />
       </div>
 
       {/* Mobile sidebar overlay */}
@@ -151,7 +188,7 @@ export default function Home() {
         <div className="fixed inset-0 z-40 md:hidden" onClick={() => setSidebarOpen(false)}>
           <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.6)' }} />
           <div className="absolute left-0 top-0 h-full z-50" onClick={e => e.stopPropagation()}>
-            <Sidebar activeView={view} onNavigate={(v) => { setView(v as View); setSidebarOpen(false); }} onLock={() => { setSidebarOpen(false); setShowLockScreen(true); }} permissions={effectivePerms} />
+            <Sidebar activeView={view} onNavigate={(v) => { setView(v as View); setSidebarOpen(false); }} onLock={() => { setSidebarOpen(false); setShowLockScreen(true); }} permissions={effectivePerms} planFeatures={planFeatures} />
           </div>
         </div>
       )}

@@ -20,7 +20,8 @@ create table if not exists admin_tenants (
   notes         text        not null default '',
   csm           text        not null default '',
   registered_at timestamptz not null default now(),
-  last_seen_at  timestamptz
+  last_seen_at  timestamptz,
+  is_admin      boolean     not null default false
 );
 
 -- 2) Ticket di supporto
@@ -82,3 +83,6 @@ values
   ('flag-waitlist', 'Lista d''attesa',        'Modulo lista d''attesa appuntamenti',          'all',       true),
   ('flag-cashdesk', 'Cassa/POS',              'Modulo cassa e pagamenti',                    'starter',   true)
 on conflict (id) do nothing;
+
+-- Add is_admin column to existing instances (idempotent)
+alter table admin_tenants add column if not exists is_admin boolean not null default false;

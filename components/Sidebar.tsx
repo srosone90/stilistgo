@@ -6,6 +6,7 @@ import { useApp } from '@/context/AppContext';
 import { getCurrentUser, signOut } from '@/lib/supabase';
 import { useSalon } from '@/context/SalonContext';
 import { OperatorPermissions } from '@/types/salon';
+import { PlanFeatures, PLAN_FEATURES, VIEW_TO_FEATURE } from '@/lib/planGate';
 
 interface NavItem {
   id: string;
@@ -54,9 +55,10 @@ interface SidebarProps {
   onNavigate: (view: string) => void;
   onLock?: () => void;
   permissions?: OperatorPermissions;
+  planFeatures?: PlanFeatures;
 }
 
-export default function Sidebar({ activeView, onNavigate, onLock, permissions }: SidebarProps) {
+export default function Sidebar({ activeView, onNavigate, onLock, permissions, planFeatures }: SidebarProps) {
   const { dataSource } = useApp();
   const { operators, activeOperatorId, setActiveOperatorId, verifyOperatorPin } = useSalon();
   const [userName, setUserName] = useState('');
@@ -126,19 +128,26 @@ export default function Sidebar({ activeView, onNavigate, onLock, permissions }:
                 return true;
               }).map((item) => {
                 const active = activeView === item.id;
+                // Plan gating: check if feature is locked for current plan
+                const featureKey = VIEW_TO_FEATURE[item.id];
+                const effectivePlan = planFeatures ?? PLAN_FEATURES.trial;
+                const planLocked = featureKey ? !(effectivePlan[featureKey] as boolean) : false;
                 return (
                   <button
                     key={item.id}
                     onClick={() => onNavigate(item.id)}
+                    title={planLocked ? `Disponibile dal piano superiore` : undefined}
                     className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all"
                     style={{
                       background: active ? 'rgba(99,102,241,0.15)' : 'transparent',
-                      color: active ? '#818cf8' : '#71717a',
+                      color: planLocked ? '#3f3f5a' : active ? '#818cf8' : '#71717a',
                       border: active ? '1px solid rgba(99,102,241,0.3)' : '1px solid transparent',
+                      opacity: planLocked ? 0.6 : 1,
                     }}
                   >
                     {item.icon}
-                    {item.label}
+                    <span className="flex-1 text-left">{item.label}</span>
+                    {planLocked && <Lock size={13} style={{ flexShrink: 0, color: '#3f3f5a' }} />}
                   </button>
                 );
               })}
