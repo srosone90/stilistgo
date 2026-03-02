@@ -24,6 +24,7 @@ import {
   storageGetActiveOperatorId, storageSaveActiveOperatorId,
   storageGetGamificationConfig, storageSaveGamificationConfig,
   salonGenerateId, setStorageUserId,
+  getLocalSavedAt, setLocalSavedAt,
 } from '@/lib/salonStorage';
 import { getCurrentUser } from '@/lib/supabase';
 import { dbGetSalonState, dbSaveSalonState } from '@/lib/salonDb';
@@ -133,6 +134,9 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
   const [salonLoading, setSalonLoading] = useState(true);
   const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cloudLoadAttempted = useRef(false);
+  // A ref always holding the latest state snapshot — used by the flush-on-hide effect
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const latestStateRef = useRef<Record<string, any>>({});
 
   useEffect(() => {
     const init = async () => {
@@ -190,8 +194,15 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
         if (arr<GiftCard>(cloudState.giftCards))               { setGiftCards(cloudState.giftCards as GiftCard[]); storageSaveGiftCards(cloudState.giftCards as GiftCard[]); }
         if (arr<Payment>(cloudState.payments))                 { setPayments(cloudState.payments as Payment[]); storageSavePayments(cloudState.payments as Payment[]); }
         if (arr<CashSession>(cloudState.cashSessions))         { setCashSessions(cloudState.cashSessions as CashSession[]); storageSaveCashSessions(cloudState.cashSessions as CashSession[]); }
-        if (cloudState.salonConfig)                           { setSalonConfig(cloudState.salonConfig as SalonConfig); storageSaveSalonConfig(cloudState.salonConfig as SalonConfig); }
-        if (cloudState.gamificationConfig)                    { setGamificationConfig(cloudState.gamificationConfig as GamificationConfig); storageSaveGamificationConfig(cloudState.gamificationConfig as GamificationConfig); }
+        // For object fields (salonConfig, gamificationConfig) compare timestamps:
+        // only apply cloud data if cloud saved it MORE RECENTLY than our last local save.
+        const cloudSavedAt = (cloudState._savedAt as number) ?? 0;
+        const localSavedAt = getLocalSavedAt();
+        const cloudIsNewer = cloudSavedAt >= localSavedAt;
+        if (cloudIsNewer) {
+          if (cloudState.salonConfig)        { setSalonConfig(cloudState.salonConfig as SalonConfig); storageSaveSalonConfig(cloudState.salonConfig as SalonConfig); }
+          if (cloudState.gamificationConfig) { setGamificationConfig(cloudState.gamificationConfig as GamificationConfig); storageSaveGamificationConfig(cloudState.gamificationConfig as GamificationConfig); }
+        }
       } catch { /* ignore */ } finally {
         cloudLoadAttempted.current = true;
       }
@@ -204,6 +215,11 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!cloudLoadAttempted.current) return;
     if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
+    const savedAt = Date.now();
+    // Record local modification time IMMEDIATELY, before the timer fires.
+    // This ensures that if the page is closed before the 1.5s timer fires,
+    // we still know local data is newer than the last cloud save.
+    setLocalSavedAt(savedAt);
     syncTimerRef.current = setTimeout(async () => {
       try {
         const user = await getCurrentUser();
@@ -212,14 +228,54 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
           clients, technicalCards, services, operators, absences, appointments,
           waitingList, products, stockMovements, giftCards, payments,
           cashSessions, salonConfig, gamificationConfig,
+          _savedAt: savedAt,
         });
       } catch { /* ignore */ }
-    }, 3000);
-    return () => { if (syncTimerRef.current) clearTimeout(syncTimerRef.current); };
+    }, 1500);
+    // Intentionally NOT cancelling syncTimerRef in cleanup:
+    // if user navigates away before the debounce fires the cleanup would
+    // cancel the only pending save, leaving Supabase stale. The clearTimeout
+    // above already prevents duplicate timers accumulating.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clients, technicalCards, services, operators, absences, appointments,
+      waitingList, products, stockMovements, giftCards, payments,
+      cashSessions, salonConfig, gamificationConfig]);
+
+  // Keep latestStateRef in sync so the flush-on-hide effect has fresh data
+  useEffect(() => {
+    latestStateRef.current = {
+      clients, technicalCards, services, operators, absences, appointments,
+      waitingList, products, stockMovements, giftCards, payments,
+      cashSessions, salonConfig, gamificationConfig,
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clients, technicalCards, services, operators, absences, appointments,
       waitingList, products, stockMovements, giftCards, payments,
       cashSessions, salonConfig, gamificationConfig]);
+
+  // ─── Flush to cloud immediately when tab is hidden or page is unloading ───
+  // This fires BEFORE window.location.href navigations complete, ensuring
+  // the latest data reaches Supabase even if the user logs out quickly.
+  useEffect(() => {
+    const flush = async () => {
+      if (!cloudLoadAttempted.current) return;
+      if (syncTimerRef.current) { clearTimeout(syncTimerRef.current); syncTimerRef.current = null; }
+      try {
+        const user = await getCurrentUser();
+        if (!user) return;
+        const savedAt = Date.now();
+        setLocalSavedAt(savedAt);
+        await dbSaveSalonState(user.id as string, { ...latestStateRef.current, _savedAt: savedAt });
+      } catch { /* ignore */ }
+    };
+    const onVisChange = () => { if (document.visibilityState === 'hidden') flush(); };
+    document.addEventListener('visibilitychange', onVisChange);
+    window.addEventListener('pagehide', flush);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisChange);
+      window.removeEventListener('pagehide', flush);
+    };
+  }, []); // empty deps — reads always-current refs
 
   // ─── Clients ──────────────────────────────────────────────────────────────
 

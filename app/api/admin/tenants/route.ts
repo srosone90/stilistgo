@@ -48,9 +48,10 @@ export async function GET(req: NextRequest) {
 
     return {
       user_id: row.user_id,
-      email: meta?.email ?? cfg.email ?? '',
+      // Always prefer live salon_data over cached admin_tenants for informational fields
+      email: cfg.email || meta?.email || '',
       full_name: meta?.full_name ?? '',
-      salon_name: meta?.salon_name ?? cfg.salonName ?? row.user_id.slice(0, 12),
+      salon_name: cfg.salonName || meta?.salon_name || row.user_id.slice(0, 12),
       plan: meta?.plan ?? 'trial',
       monthly_price: meta?.monthly_price ?? 0,
       trial_ends_at: meta?.trial_ends_at ?? null,
@@ -76,6 +77,19 @@ export async function GET(req: NextRequest) {
   // Auto-upsert new tenants (fire and forget)
   if (toCreate.length > 0) {
     db.from('admin_tenants').upsert(toCreate, { onConflict: 'user_id' }).then(() => {});
+  }
+
+  // Sync live salon info (name, email) back to existing admin_tenants records
+  const toSync = (salonRows ?? []).flatMap((row: { user_id: string; state: SalonState }) => {
+    const cfg2 = ((row.state ?? {}) as SalonState).salonConfig ?? {};
+    const meta2 = metaMap.get(row.user_id) as MetaRow | undefined;
+    if (!meta2) return []; // will be created via toCreate
+    if (!cfg2.salonName && !cfg2.email) return [];
+    if (meta2.salon_name === cfg2.salonName && meta2.email === (cfg2.email ?? '')) return [];
+    return [{ user_id: row.user_id, salon_name: cfg2.salonName ?? meta2.salon_name, email: cfg2.email ?? meta2.email }];
+  });
+  if (toSync.length > 0) {
+    db.from('admin_tenants').upsert(toSync, { onConflict: 'user_id' }).then(() => {});
   }
 
   return NextResponse.json({ tenants });

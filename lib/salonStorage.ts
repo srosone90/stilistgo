@@ -58,7 +58,20 @@ const K = () => ({
   cashSessions:      `stylistgo_${_uid}_cash_sessions`,
   activeOperatorId:  `stylistgo_${_uid}_active_operator`,
   gamificationConfig:`stylistgo_${_uid}_gamification`,
+  savedAt:           `stylistgo_${_uid}_saved_at`,
 });
+
+/** Returns the timestamp (ms) of the last successful local save, or 0 if never saved. */
+export function getLocalSavedAt(): number {
+  if (typeof window === 'undefined') return 0;
+  return parseInt(localStorage.getItem(K().savedAt) || '0', 10);
+}
+
+/** Records a local save timestamp so cloud-vs-local recency comparisons work. */
+export function setLocalSavedAt(ts: number = Date.now()) {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(K().savedAt, ts.toString());
+}
 
 // ─── Clients ──────────────────────────────────────────────────────────────────
 
