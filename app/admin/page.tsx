@@ -161,6 +161,7 @@ export default function AdminPage() {
   const [waSaved, setWaSaved] = useState(false);
   const [waStatuses, setWaStatuses] = useState<Record<string, 'connected' | 'disconnected' | 'none'>>({});
   const [waQrCodes, setWaQrCodes] = useState<Record<string, string | null>>({});
+  const [waInstances, setWaInstances] = useState<Record<string, string>>({});
 
   function getToken() { return sessionStorage.getItem('stylistgo_admin_token') ?? ''; }
 
@@ -213,6 +214,26 @@ export default function AdminPage() {
         const res = await af('/api/admin/audit?limit=100');
         const d = await res.json();
         setAudit(d.entries ?? []);
+      } else if (s === 'whatsapp') {
+        const res = await af('/api/admin/tenants');
+        const d = await res.json();
+        const list: Tenant[] = d.tenants ?? [];
+        setTenants(list);
+        // Bulk-check WA status for all tenants in parallel
+        await Promise.all(list.map(async (t) => {
+          try {
+            const r = await af(`/api/admin/whatsapp?user_id=${t.user_id}`);
+            if (!r.ok) return;
+            const creds = await r.json();
+            if (creds.ultraMsgInstanceId && creds.ultraMsgToken) {
+              setWaInstances(p => ({ ...p, [t.user_id]: creds.ultraMsgInstanceId }));
+              const sr = await fetch(`/api/ultramsg/status?instanceId=${creds.ultraMsgInstanceId}&token=${creds.ultraMsgToken}`);
+              const sd = await sr.json();
+              setWaStatuses(p => ({ ...p, [t.user_id]: sd.connected ? 'connected' : 'disconnected' }));
+              setWaQrCodes(p => ({ ...p, [t.user_id]: sd.qrCode ?? null }));
+            }
+          } catch { /* ignore per tenant */ }
+        }));
       }
     } finally { setLoading(false); }
   }, [af]);
@@ -890,6 +911,7 @@ export default function AdminPage() {
         const instanceId = d.ultraMsgInstanceId ?? '';
         const token = d.ultraMsgToken ?? '';
         setWaForm({ ultraMsgInstanceId: instanceId, ultraMsgToken: token });
+        if (instanceId) setWaInstances(p => ({ ...p, [tenant.user_id]: instanceId }));
         // Auto-check status when opening modal if credentials exist
         if (instanceId && token) {
           checkWaStatus(tenant, instanceId, token);
@@ -919,6 +941,7 @@ export default function AdminPage() {
     });
     setWaSaving(false);
     setWaSaved(true);
+    if (waForm.ultraMsgInstanceId) setWaInstances(p => ({ ...p, [waModal.user_id]: waForm.ultraMsgInstanceId }));
     await checkWaStatus(waModal, waForm.ultraMsgInstanceId, waForm.ultraMsgToken);
     setTimeout(() => setWaSaved(false), 2000);
   };
@@ -933,6 +956,7 @@ export default function AdminPage() {
     setWaForm({ ultraMsgInstanceId: '', ultraMsgToken: '' });
     setWaStatuses(p => ({ ...p, [waModal.user_id]: 'none' }));
     setWaQrCodes(p => ({ ...p, [waModal.user_id]: null }));
+    setWaInstances(p => { const n = { ...p }; delete n[waModal.user_id]; return n; });
     setWaSaving(false);
   };
 
@@ -971,7 +995,7 @@ export default function AdminPage() {
                     <td style={{ padding: '12px 14px', color: '#71717a', fontSize: '11px' }}>{t.email}</td>
                     <td style={{ padding: '12px 14px' }}><Badge s={t.plan} map={PLAN} /></td>
                     <td style={{ padding: '12px 14px', color: '#a1a1aa', fontSize: '11px', fontFamily: 'monospace' }}>
-                      {t.user_id in waStatuses && waForm.ultraMsgInstanceId ? waForm.ultraMsgInstanceId : '—'}
+                      {waInstances[t.user_id] ?? '—'}
                     </td>
                     <td style={{ padding: '12px 14px' }}>
                       {status === 'connected'    && <span style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#4ade80', fontSize: '12px' }}><Wifi size={13} /> Connesso</span>}

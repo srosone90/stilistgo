@@ -487,7 +487,7 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
     // ── WhatsApp conferma appuntamento (fire-and-forget) ──
     try {
       const wa = storageGetSalonConfig()?.whatsapp;
-      if (wa?.appointmentConfirmEnabled && wa.enabled && wa.ultraMsgInstanceId && wa.ultraMsgToken) {
+      if (wa?.ultraMsgInstanceId && wa?.ultraMsgToken && (wa.appointmentConfirmEnabled ?? true)) {
         const client = storageGetClients().find(c => c.id === a.clientId);
         if (client?.phone) {
           const svcs = storageGetServices();
