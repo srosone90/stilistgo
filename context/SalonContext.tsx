@@ -5,7 +5,7 @@ import {
   Client, TechnicalCard, Service, Operator, Absence,
   Appointment, AppointmentStatus, WaitingListEntry,
   Product, StockMovement, GiftCard, SalonConfig, AppointmentHistoryEntry,
-  Payment, CashSession,
+  Payment, CashSession, GamificationConfig, DEFAULT_GAMIFICATION_CONFIG,
 } from '@/types/salon';
 import {
   storageGetClients, storageSaveClients,
@@ -22,6 +22,7 @@ import {
   storageGetPayments, storageSavePayments,
   storageGetCashSessions, storageSaveCashSessions,
   storageGetActiveOperatorId, storageSaveActiveOperatorId,
+  storageGetGamificationConfig, storageSaveGamificationConfig,
   salonGenerateId,
 } from '@/lib/salonStorage';
 
@@ -103,6 +104,10 @@ interface SalonContextValue {
   activeOperatorId: string | null;
   setActiveOperatorId: (id: string | null) => void;
   verifyOperatorPin: (operatorId: string, pin: string) => boolean;
+
+  // Gamification
+  gamificationConfig: GamificationConfig;
+  updateGamificationConfig: (c: Partial<GamificationConfig>) => void;
 }
 
 const SalonContext = createContext<SalonContextValue | null>(null);
@@ -118,6 +123,7 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [stockMovements, setStockMovements] = useState<StockMovement[]>([]);
   const [giftCards, setGiftCards] = useState<GiftCard[]>([]);
+  const [gamificationConfig, setGamificationConfig] = useState<GamificationConfig>(DEFAULT_GAMIFICATION_CONFIG);
   const [salonConfig, setSalonConfig] = useState<SalonConfig>(storageGetSalonConfig());
   const [payments, setPayments] = useState<Payment[]>([]);
   const [cashSessions, setCashSessions] = useState<CashSession[]>([]);
@@ -135,6 +141,7 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
     setProducts(storageGetProducts());
     setStockMovements(storageGetStockMovements());
     setGiftCards(storageGetGiftCards());
+    setGamificationConfig(storageGetGamificationConfig());
     setSalonConfig(storageGetSalonConfig());
     setPayments(storageGetPayments());
     setCashSessions(storageGetCashSessions());
@@ -384,6 +391,10 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
     return op.pin === pin;
   }, []);
 
+  const updateGamificationConfig = useCallback((c: Partial<GamificationConfig>) => {
+    setGamificationConfig(prev => { const n = { ...prev, ...c }; storageSaveGamificationConfig(n); return n; });
+  }, []);
+
   return (
     <SalonContext.Provider value={{
       clients, technicalCards, services, operators, absences,
@@ -402,6 +413,7 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
       updateSalonConfig,
       payments, cashSessions, addPayment, deletePayment, addCashSession, closeCashSession,
       activeOperatorId, setActiveOperatorId, verifyOperatorPin,
+      gamificationConfig, updateGamificationConfig,
     }}>
       {children}
     </SalonContext.Provider>

@@ -5,7 +5,7 @@ import { useSalon } from '@/context/SalonContext';
 import { Payment, PaymentMethod, PAYMENT_METHOD_LABELS, PaymentItem, CashSession } from '@/types/salon';
 import { format, parseISO } from 'date-fns';
 import { it } from 'date-fns/locale';
-import { Plus, X, Trash2, CreditCard, Banknote, Gift, TrendingUp, ChevronDown, ChevronUp, Printer } from 'lucide-react';
+import { Plus, X, Trash2, CreditCard, Banknote, Gift, TrendingUp, ChevronDown, ChevronUp, Printer, Package } from 'lucide-react';
 import { formatCurrency } from '@/lib/calculations';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -57,6 +57,7 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
     cashSessions, addCashSession, closeCashSession,
     clients, operators, services, appointments,
     redeemGiftCard, salonConfig, changeAppointmentStatus,
+    products, addStockMovement,
   } = useSalon();
 
   const [showForm, setShowForm] = useState(false);
@@ -94,6 +95,7 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
   const [closingBalance, setClosingBalance] = useState('');
   const [expandedPaymentId, setExpandedPaymentId] = useState<string | null>(null);
   const [newItemServiceId, setNewItemServiceId] = useState('');
+  const [productSearch, setProductSearch] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   // Today's session
@@ -150,6 +152,11 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
     if (!svc) return;
     setForm(p => ({ ...p, items: [...p.items, { serviceId: svc.id, serviceName: svc.name, price: svc.price }] }));
     setNewItemServiceId('');
+  }
+
+  function addProductItem(prod: typeof products[number]) {
+    setForm(p => ({ ...p, items: [...p.items, { productId: prod.id, serviceName: prod.name, price: prod.salePrice, isProduct: true }] }));
+    setProductSearch('');
   }
 
   // --- Generazione PDF report cassa ---
@@ -292,6 +299,17 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
     if (form.appointmentId) {
       changeAppointmentStatus(form.appointmentId, 'completed');
     }
+    // Register stock movements for sold products
+    form.items.filter(i => i.isProduct && i.productId).forEach(i => {
+      addStockMovement({
+        productId: i.productId!,
+        type: 'sale',
+        quantity: -1,
+        date: form.date,
+        notes: `Vendita cassa — ${form.clientName || 'Cliente'}`,
+        operatorId: form.operatorId,
+      });
+    });
     setShowForm(false);
     setForm(EMPTY_FORM);
   }
@@ -325,6 +343,9 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
           )}
           <button onClick={() => { setForm({ ...EMPTY_FORM, date: selectedDate }); setShowForm(true); }} style={btnPrimary}>
             <Plus size={14} /> Incassa
+          </button>
+          <button onClick={() => { setForm({ ...EMPTY_FORM, date: selectedDate }); setShowForm(true); }} style={{ ...btnPrimary, color: '#a855f7', borderColor: 'rgba(168,85,247,0.4)', background: 'rgba(168,85,247,0.1)' }}>
+            <Package size={14} /> Vendi prodotto
           </button>
         </div>
       </div>
@@ -425,7 +446,13 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
             <p className="text-sm mb-4" style={{ color: '#71717a' }}>Questa azione non è reversibile.</p>
             <div className="flex gap-2">
               <button onClick={() => setConfirmDeleteId(null)} style={{ flex: 1, background: '#12121a', border: '1px solid #2e2e40', color: '#71717a', borderRadius: '8px', padding: '8px', fontSize: '13px', cursor: 'pointer' }}>Annulla</button>
-              <button onClick={() => { deletePayment(confirmDeleteId); setConfirmDeleteId(null); }}
+              <button onClick={() => {
+                  // Restore appointment to calendar if payment was linked
+                  const pay = payments.find(p => p.id === confirmDeleteId);
+                  if (pay?.appointmentId) changeAppointmentStatus(pay.appointmentId, 'confirmed');
+                  deletePayment(confirmDeleteId!);
+                  setConfirmDeleteId(null);
+                }}
                 style={{ flex: 1, background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: '#f87171', borderRadius: '8px', padding: '8px', fontSize: '13px', cursor: 'pointer', fontWeight: 600 }}>Elimina</button>
             </div>
           </div>
@@ -520,7 +547,7 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
 
               {/* Items */}
               <div>
-                <label style={labelStyle}>Servizi / Prodotti</label>
+                <label style={labelStyle}>Servizi</label>
                 <div className="flex gap-2 mb-2">
                   <select value={newItemServiceId} onChange={e => setNewItemServiceId(e.target.value)} style={{ ...inputStyle, flex: 1 }}>
                     <option value="">— Aggiungi servizio —</option>
@@ -528,6 +555,34 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
                   </select>
                   <button onClick={addManualItem} style={{ ...btnPrimary, flexShrink: 0 }}><Plus size={14} /></button>
                 </div>
+
+                {/* Product autocomplete */}
+                <label style={{ ...labelStyle, marginTop: 8 }}>Aggiungi prodotto</label>
+                <div className="relative mb-2">
+                  <input
+                    type="text"
+                    placeholder="Cerca prodotto per nome o marca..."
+                    value={productSearch}
+                    onChange={e => setProductSearch(e.target.value)}
+                    style={inputStyle}
+                  />
+                  {productSearch.length > 0 && (() => {
+                    const matches = products.filter(p => p.active && p.isForSale && (p.name.toLowerCase().includes(productSearch.toLowerCase()) || p.brand.toLowerCase().includes(productSearch.toLowerCase())));
+                    return matches.length > 0 ? (
+                      <div className="absolute z-10 w-full mt-1 rounded-xl overflow-hidden" style={{ background: '#18181f', border: '1px solid #2e2e40', maxHeight: 200, overflowY: 'auto' }}>
+                        {matches.map(p => (
+                          <button key={p.id} onMouseDown={() => addProductItem(p)}
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-[#2e2e40] transition-colors"
+                            style={{ background: 'transparent', border: 'none', color: '#d4d4d8', cursor: 'pointer', display: 'flex', justifyContent: 'space-between' }}>
+                            <span><span style={{ color: '#a855f7' }}>📦</span> {p.name} <span style={{ color: '#71717a', fontSize: 11 }}>{p.brand}</span></span>
+                            <span style={{ color: '#22c55e', fontWeight: 600 }}>{formatCurrency(p.salePrice)}</span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : null;
+                  })()}
+                </div>
+
                 {form.items.map((item, i) => (
                   <div key={i} className="flex items-center justify-between text-sm py-1.5 px-2 rounded-lg mb-1" style={{ background: '#12121a', border: '1px solid #2e2e40' }}>
                     <span style={{ color: '#d4d4d8' }}>{item.serviceName}</span>

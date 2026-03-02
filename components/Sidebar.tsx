@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { LayoutDashboard, Table2, BarChart3, Settings, Scissors, Wifi, WifiOff, LogOut, CalendarDays, Users, Sparkles, UserCog, Package, Banknote, UserCircle, X, Lock, LogIn } from 'lucide-react';
+import { LayoutDashboard, Table2, BarChart3, Settings, Scissors, Wifi, WifiOff, LogOut, CalendarDays, Users, Sparkles, UserCog, Package, Banknote, UserCircle, X, Lock, LogIn, Trophy } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { getCurrentUser, signOut } from '@/lib/supabase';
 import { useSalon } from '@/context/SalonContext';
@@ -33,6 +33,12 @@ const navGroups: { label: string; items: NavItem[] }[] = [
       { id: 'staff', label: 'Personale', icon: <UserCog size={18} /> },
       { id: 'inventory', label: 'Magazzino', icon: <Package size={18} /> },
       { id: 'cash', label: 'Cassa', icon: <Banknote size={18} /> },
+    ],
+  },
+  {
+    label: 'Team',
+    items: [
+      { id: 'gamification', label: 'Gamification', icon: <Trophy size={18} /> },
     ],
   },
 ];
@@ -104,6 +110,7 @@ export default function Sidebar({ activeView, onNavigate, onLock, permissions }:
             <div className="space-y-0.5">
               {group.items.filter(item => {
                 if (!permissions) return true;
+                if (item.id === 'gamification') return true; // always visible
                 if (item.id === 'dashboard' || item.id === 'tabella' || item.id === 'analisi' || item.id === 'impostazioni') return permissions.accounting;
                 if (item.id === 'calendar') return permissions.calendar;
                 if (item.id === 'clients') return permissions.clients;

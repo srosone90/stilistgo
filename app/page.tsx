@@ -14,14 +14,15 @@ import ServicesView from '@/components/ServicesView';
 import StaffView from '@/components/StaffView';
 import InventoryView from '@/components/InventoryView';
 import CashView from '@/components/CashView';
+import GamificationView from '@/components/GamificationView';
 import OperatorLockScreen from '@/components/OperatorLockScreen';
 import { useApp } from '@/context/AppContext';
 import { useSalon } from '@/context/SalonContext';
 import { getCurrentUser } from '@/lib/supabase';
 import { DEFAULT_OPERATOR_PERMISSIONS, OperatorPermissions } from '@/types/salon';
-import { Plus, Loader2, CalendarDays, Users, Sparkles, UserCog, Package, Banknote } from 'lucide-react';
+import { Plus, Loader2, CalendarDays, Users, Sparkles, UserCog, Package, Banknote, Trophy } from 'lucide-react';
 
-type View = 'dashboard' | 'tabella' | 'analisi' | 'impostazioni' | 'calendar' | 'clients' | 'services' | 'staff' | 'inventory' | 'cash';
+type View = 'dashboard' | 'tabella' | 'analisi' | 'impostazioni' | 'calendar' | 'clients' | 'services' | 'staff' | 'inventory' | 'cash' | 'gamification';
 
 export default function Home() {
   const router = useRouter();
@@ -35,11 +36,14 @@ export default function Home() {
   const { loading } = useApp();
   const { activeOperatorId, operators } = useSalon();
 
-  // Calcola permessi effettivi dell'operatore attivo (undefined = admin = tutto)
+  // Calcola permessi effettivi: admin/titolare = accesso totale, altri operatori = permissions
+  const FULL_PERMISSIONS: OperatorPermissions = { calendar: true, clients: true, services: true, staff: true, inventory: true, cash: true, accounting: true };
   const activeOp = operators.find(o => o.id === activeOperatorId);
-  const effectivePerms: OperatorPermissions = activeOperatorId && activeOp
-    ? (activeOp.permissions ?? DEFAULT_OPERATOR_PERMISSIONS)
-    : { calendar: true, clients: true, services: true, staff: true, inventory: true, cash: true, accounting: true };
+  const effectivePerms: OperatorPermissions = !activeOperatorId || !activeOp
+    ? FULL_PERMISSIONS
+    : activeOp.role === 'owner'
+      ? FULL_PERMISSIONS
+      : activeOp.permissions ?? DEFAULT_OPERATOR_PERMISSIONS;
 
   // Se la vista attuale non è accessibile dopo cambio permessi, torna a calendar o dashboard
   useEffect(() => {
@@ -50,6 +54,7 @@ export default function Home() {
       calendar: effectivePerms.calendar, clients: effectivePerms.clients,
       services: effectivePerms.services, staff: effectivePerms.staff,
       inventory: effectivePerms.inventory, cash: effectivePerms.cash,
+      gamification: true,
     };
     if (!viewPermsMap[view]) {
       const fallback = (Object.keys(viewPermsMap) as View[]).find(v => viewPermsMap[v]);
@@ -93,6 +98,7 @@ export default function Home() {
     staff:        { label: 'Nuovo Operatore',  icon: <UserCog size={20} />,   action: () => setFabTrigger(t => t + 1) },
     inventory:    { label: 'Nuovo Prodotto',   icon: <Package size={20} />,   action: () => setFabTrigger(t => t + 1) },
     cash:         { label: 'Incassa',          icon: <Banknote size={20} />,  action: () => setFabTrigger(t => t + 1) },
+    gamification: { label: 'Gamification',     icon: <Trophy size={20} />,    action: () => {} },
   };
 
   const renderView = () => {
@@ -107,6 +113,7 @@ export default function Home() {
       case 'staff':    return effectivePerms.staff     ? <StaffView newTrigger={fabTrigger} /> : AccessDenied;
       case 'inventory':return effectivePerms.inventory ? <InventoryView newTrigger={fabTrigger} /> : AccessDenied;
       case 'cash':     return effectivePerms.cash      ? <CashView newTrigger={fabTrigger} cashPreset={cashPreset} onPresetConsumed={() => setCashPreset(null)} /> : AccessDenied;
+      case 'gamification': return <GamificationView />;
     }
   };
 

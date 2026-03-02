@@ -273,9 +273,11 @@ export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
 };
 
 export interface PaymentItem {
-  serviceId: string;
-  serviceName: string;
+  serviceId?: string;    // service id (if service)
+  productId?: string;   // product id (if product)
+  serviceName: string;  // name (service or product label)
   price: number;
+  isProduct?: boolean;  // true = inventory product sale
 }
 
 export interface Payment {
@@ -307,6 +309,34 @@ export interface CashSession {
   closedAt: string | null;
   createdAt: string;
 }
+
+// ─── Gamification ───────────────────────────────────────────────────────────
+
+export interface GamificationBonus {
+  id: string;
+  label: string;       // e.g. "Dipendente del mese"
+  description: string; // e.g. "10 appuntamenti in un giorno"
+  amount: number;      // € bonus da assegnare
+  icon: string;        // emoji
+}
+
+export interface GamificationConfig {
+  isEnabled: boolean;
+  participantOperatorIds: string[];  // operatori che partecipano
+  bonuses: GamificationBonus[];      // bonus definiti dal titolare
+  bronzeThreshold: number;   // fatturato mensile min trofeo bronzo (€)
+  silverThreshold: number;   // trofeo argento
+  goldThreshold: number;     // trofeo oro
+}
+
+export const DEFAULT_GAMIFICATION_CONFIG: GamificationConfig = {
+  isEnabled: false,
+  participantOperatorIds: [],
+  bonuses: [],
+  bronzeThreshold: 500,
+  silverThreshold: 1500,
+  goldThreshold: 3000,
+};
 
 // Default schedule helper
 export function defaultSchedule(): WorkShift[] {

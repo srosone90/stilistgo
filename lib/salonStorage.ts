@@ -3,6 +3,7 @@ import {
   Appointment, WaitingListEntry, Product, StockMovement,
   GiftCard, SalonConfig, DEFAULT_SALON_CONFIG, defaultSchedule,
   OPERATOR_COLORS, Payment, CashSession,
+  GamificationConfig, DEFAULT_GAMIFICATION_CONFIG,
 } from '@/types/salon';
 
 // ─── Generic helpers ──────────────────────────────────────────────────────────
@@ -48,6 +49,7 @@ const K = {
   payments: 'stylistgo_payments',
   cashSessions: 'stylistgo_cash_sessions',
   activeOperatorId: 'stylistgo_active_operator',
+  gamificationConfig: 'stylistgo_gamification',
 };
 
 // ─── Clients ──────────────────────────────────────────────────────────────────
@@ -163,4 +165,13 @@ export function storageSaveActiveOperatorId(id: string | null): void {
   if (typeof window === 'undefined') return;
   if (id) localStorage.setItem(K.activeOperatorId, id);
   else localStorage.removeItem(K.activeOperatorId);
+}
+
+// ─── Gamification Config ────────────────────────────────────────────────
+
+export function storageGetGamificationConfig(): GamificationConfig {
+  return getItem<GamificationConfig>(K.gamificationConfig, DEFAULT_GAMIFICATION_CONFIG);
+}
+export function storageSaveGamificationConfig(data: GamificationConfig): void {
+  if (typeof window !== 'undefined') localStorage.setItem(K.gamificationConfig, JSON.stringify(data));
 }
