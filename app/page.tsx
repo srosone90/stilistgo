@@ -27,7 +27,11 @@ export default function Home() {
   const [fabTrigger, setFabTrigger] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
+  const [cashPreset, setCashPreset] = useState<{ clientId: string; appointmentId: string } | null>(null);
   const { loading } = useApp();
+
+  // Reset FAB trigger ogni volta che si cambia sezione
+  useEffect(() => { setFabTrigger(0); }, [view]);
 
   // Auth guard
   useEffect(() => {
@@ -59,12 +63,12 @@ export default function Home() {
       case 'tabella': return <TabularView />;
       case 'analisi': return <AnalysisView />;
       case 'impostazioni': return <SettingsView />;
-      case 'calendar': return <CalendarView newTrigger={fabTrigger} />;
+      case 'calendar': return <CalendarView newTrigger={fabTrigger} onGoToCash={(clientId, appointmentId) => { setCashPreset({ clientId, appointmentId }); setView('cash'); }} />;
       case 'clients': return <ClientsView newTrigger={fabTrigger} />;
       case 'services': return <ServicesView newTrigger={fabTrigger} />;
       case 'staff': return <StaffView newTrigger={fabTrigger} />;
       case 'inventory': return <InventoryView newTrigger={fabTrigger} />;
-      case 'cash': return <CashView newTrigger={fabTrigger} />;
+      case 'cash': return <CashView newTrigger={fabTrigger} cashPreset={cashPreset} onPresetConsumed={() => setCashPreset(null)} />;
     }
   };
 

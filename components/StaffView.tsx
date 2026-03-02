@@ -18,7 +18,7 @@ const ROLE_LABELS: Record<OperatorRole, string> = { owner: 'Titolare', operator:
 const EMPTY_OPERATOR: Omit<Operator, 'id' | 'createdAt'> = {
   name: '', email: '', role: 'operator', serviceIds: [],
   color: OPERATOR_COLORS[0], commissionRate: 0,
-  schedule: defaultSchedule(), active: true,
+  schedule: defaultSchedule(), active: true, pin: '',
 };
 
 const EMPTY_ABSENCE: Omit<Absence, 'id' | 'createdAt'> = {
@@ -60,7 +60,7 @@ export default function StaffView({ newTrigger }: { newTrigger?: number }) {
 
   function openEdit(o: Operator) {
     setEditOp(o);
-    setForm({ name: o.name, email: o.email, role: o.role, serviceIds: [...o.serviceIds], color: o.color, commissionRate: o.commissionRate, schedule: o.schedule.map(s => ({ ...s })), active: o.active });
+    setForm({ name: o.name, email: o.email, role: o.role, serviceIds: [...o.serviceIds], color: o.color, commissionRate: o.commissionRate, schedule: o.schedule.map(s => ({ ...s })), active: o.active, pin: o.pin || '' });
     setShowForm(true);
   }
 
@@ -248,6 +248,11 @@ export default function StaffView({ newTrigger }: { newTrigger?: number }) {
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2"><label style={labelStyle}>Nome *</label><input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} style={inputStyle} /></div>
               <div><label style={labelStyle}>Email</label><input type="email" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} style={inputStyle} /></div>
+              <div>
+                <label style={labelStyle}>PIN accesso (4 cifre)</label>
+                <input type="password" maxLength={8} value={form.pin || ''} onChange={e => setForm(p => ({ ...p, pin: e.target.value.replace(/\D/g, '') }))} placeholder="Lascia vuoto per nessun PIN" style={inputStyle} />
+                <p style={{ fontSize: '11px', color: '#3f3f5a', marginTop: 4 }}>L'operatore usa questo PIN per accedere al gestionale dalla sidebar.</p>
+              </div>
               <div>
                 <label style={labelStyle}>Ruolo</label>
                 <select value={form.role} onChange={e => setForm(p => ({ ...p, role: e.target.value as OperatorRole }))} style={inputStyle}>

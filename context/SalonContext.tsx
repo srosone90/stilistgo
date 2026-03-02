@@ -41,7 +41,7 @@ interface SalonContextValue {
   salonLoading: boolean;
 
   // Clients
-  addClient: (c: Omit<Client, 'id' | 'createdAt'>) => void;
+  addClient: (c: Omit<Client, 'id' | 'createdAt'>) => string;
   updateClient: (c: Client) => void;
   deleteClient: (id: string) => void;
   addLoyaltyPoints: (clientId: string, points: number) => void;
@@ -144,9 +144,10 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
 
   // ─── Clients ──────────────────────────────────────────────────────────────
 
-  const addClient = useCallback((c: Omit<Client, 'id' | 'createdAt'>) => {
+  const addClient = useCallback((c: Omit<Client, 'id' | 'createdAt'>): string => {
     const full: Client = { ...c, id: salonGenerateId(), createdAt: new Date().toISOString() };
     setClients(prev => { const n = [full, ...prev]; storageSaveClients(n); return n; });
+    return full.id;
   }, []);
 
   const updateClient = useCallback((c: Client) => {

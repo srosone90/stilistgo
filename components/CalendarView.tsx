@@ -31,7 +31,7 @@ function minutesToTime(m: number) {
 }
 const HOUR_PX = 64;
 
-export default function CalendarView({ newTrigger }: { newTrigger?: number }) {
+export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: number; onGoToCash?: (clientId: string, appointmentId: string) => void }) {
   const {
     appointments, operators, services, clients, salonConfig,
     addAppointment, updateAppointment, changeAppointmentStatus, deleteAppointment,
@@ -56,7 +56,7 @@ export default function CalendarView({ newTrigger }: { newTrigger?: number }) {
   }, [newTrigger, operators]);
 
   // Resize
-  const resizeRef = useRef<{ apptId: string; origEndMin: number; startY: number } | null>(null);
+  const resizeRef = useRef<{ apptId: string; origStartMin: number; origEndMin: number; startY: number } | null>(null);
   const [resizingId, setResizingId] = useState<string | null>(null);
   const [resizingEndTime, setResizingEndTimeState] = useState('');
 
@@ -132,11 +132,12 @@ export default function CalendarView({ newTrigger }: { newTrigger?: number }) {
 
   function handleQuickClientSave() {
     if (!quickClient.firstName.trim()) return;
-    addClient({
+    const newId = addClient({
       firstName: quickClient.firstName, lastName: quickClient.lastName,
       phone: quickClient.phone, email: '', birthDate: '', notes: '',
       allergies: '', tags: [], gdprConsent: false, gdprDate: '', loyaltyPoints: 0,
     });
+    setForm(p => ({ ...p, clientId: newId }));
     setShowQuickClient(false);
     setQuickClient(EMPTY_QUICK_CLIENT);
   }
@@ -145,7 +146,7 @@ export default function CalendarView({ newTrigger }: { newTrigger?: number }) {
   const handleResizeStart = useCallback((e: React.MouseEvent, appt: Appointment) => {
     e.stopPropagation();
     e.preventDefault();
-    resizeRef.current = { apptId: appt.id, origEndMin: timeToMinutes(appt.endTime), startY: e.clientY };
+    resizeRef.current = { apptId: appt.id, origStartMin: timeToMinutes(appt.startTime), origEndMin: timeToMinutes(appt.endTime), startY: e.clientY };
     setResizingId(appt.id);
     setResizingEndTimeState(appt.endTime);
   }, []);
@@ -155,7 +156,7 @@ export default function CalendarView({ newTrigger }: { newTrigger?: number }) {
       if (!resizeRef.current) return;
       const delta = e.clientY - resizeRef.current.startY;
       const deltaMin = Math.round((delta / HOUR_PX) * 60 / 15) * 15;
-      const newEnd = Math.max(resizeRef.current.origEndMin + 15, resizeRef.current.origEndMin + deltaMin);
+      const newEnd = Math.max(resizeRef.current.origStartMin + 15, resizeRef.current.origEndMin + deltaMin);
       setResizingEndTimeState(minutesToTime(newEnd));
     }
     function onUp() {
@@ -372,11 +373,17 @@ export default function CalendarView({ newTrigger }: { newTrigger?: number }) {
               <div><label style={labelStyle}>Note</label><textarea rows={2} value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} style={{ ...inputStyle, resize: 'vertical' }} /></div>
             </div>
             <div className="flex justify-between mt-4">
-              <div>
+              <div className="flex gap-2">
                 {editAppt && (
                   <button onClick={() => { deleteAppointment(editAppt.id); setShowForm(false); }}
                     style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: '#f87171', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', cursor: 'pointer' }}>
                     Elimina
+                  </button>
+                )}
+                {editAppt && form.clientId && onGoToCash && (
+                  <button onClick={() => { setShowForm(false); onGoToCash(form.clientId, editAppt.id); }}
+                    style={{ background: 'rgba(34,197,94,0.15)', border: '1px solid rgba(34,197,94,0.3)', color: '#4ade80', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', cursor: 'pointer' }}>
+                    Incassa
                   </button>
                 )}
               </div>

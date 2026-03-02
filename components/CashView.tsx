@@ -45,7 +45,11 @@ const EMPTY_FORM: FormState = {
   giftCardCode: '', giftCardAmount: 0, notes: '',
 };
 
-export default function CashView({ newTrigger }: { newTrigger?: number }) {
+export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
+  newTrigger?: number;
+  cashPreset?: { clientId: string; appointmentId: string } | null;
+  onPresetConsumed?: () => void;
+}) {
   const {
     payments, addPayment, deletePayment,
     cashSessions, addCashSession, closeCashSession,
@@ -58,6 +62,30 @@ export default function CashView({ newTrigger }: { newTrigger?: number }) {
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
 
   useEffect(() => { if (newTrigger && newTrigger > 0) { setShowForm(true); setForm({ ...EMPTY_FORM, date: selectedDate }); } }, [newTrigger, selectedDate]);
+
+  // Apertura automatica da calendario (bottone Incassa)
+  useEffect(() => {
+    if (!cashPreset) return;
+    const client = clients.find(c => c.id === cashPreset.clientId);
+    const appt = appointments.find(a => a.id === cashPreset.appointmentId);
+    const newForm: FormState = { ...EMPTY_FORM, date: selectedDate };
+    if (client) { newForm.clientId = client.id; newForm.clientName = `${client.firstName} ${client.lastName}`.trim(); }
+    if (appt) {
+      newForm.appointmentId = appt.id;
+      newForm.operatorId = appt.operatorId;
+      if (appt.date) newForm.date = appt.date;
+      if (appt.serviceIds.length > 0) {
+        newForm.items = appt.serviceIds.map(sid => {
+          const svc = services.find(s => s.id === sid);
+          return svc ? { serviceId: svc.id, serviceName: svc.name, price: svc.price } : null;
+        }).filter(Boolean) as PaymentItem[];
+      }
+    }
+    setForm(newForm);
+    setShowForm(true);
+    onPresetConsumed?.();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cashPreset]);
   const [showHistory, setShowHistory] = useState(false);
   const [showOpenSession, setShowOpenSession] = useState(false);
   const [openingBalance, setOpeningBalance] = useState('0');

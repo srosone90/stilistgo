@@ -27,6 +27,7 @@ export default function InventoryView({ newTrigger }: { newTrigger?: number }) {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showProdForm, setShowProdForm] = useState(false);
+  const [isNewCategory, setIsNewCategory] = useState(false);
 
   useEffect(() => { if (newTrigger && newTrigger > 0) { setShowProdForm(true); setEditProd(null); setForm(EMPTY_PRODUCT); } }, [newTrigger]);
   const [editProd, setEditProd] = useState<Product | null>(null);
@@ -54,9 +55,10 @@ export default function InventoryView({ newTrigger }: { newTrigger?: number }) {
 
   const lowStockCount = useMemo(() => products.filter(p => p.active && p.stock <= p.minStock).length, [products]);
 
-  function openNew() { setEditProd(null); setForm(EMPTY_PRODUCT); setShowProdForm(true); }
+  function openNew() { setEditProd(null); setForm(EMPTY_PRODUCT); setIsNewCategory(false); setShowProdForm(true); }
   function openEdit(p: Product) {
     setEditProd(p);
+    setIsNewCategory(false);
     setForm({ name: p.name, brand: p.brand, category: p.category, unit: p.unit, purchasePrice: p.purchasePrice, salePrice: p.salePrice, stock: p.stock, minStock: p.minStock, isForSale: p.isForSale, active: p.active });
     setShowProdForm(true);
   }
@@ -210,15 +212,24 @@ export default function InventoryView({ newTrigger }: { newTrigger?: number }) {
               <div><label style={labelStyle}>Brand</label><input value={form.brand} onChange={e => setForm(p => ({ ...p, brand: e.target.value }))} style={inputStyle} /></div>
               <div>
                 <label style={labelStyle}>Categoria</label>
-                <select value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value === '__new__' ? '' : e.target.value }))}
-                  style={inputStyle}>
-                  <option value="">— Seleziona o digita —</option>
-                  {categories.map(c => <option key={c} value={c}>{c}</option>)}
-                  <option value="__new__">+ Nuova categoria...</option>
-                </select>
-                {(form.category === '' || !categories.includes(form.category)) && (
-                  <input value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))}
-                    placeholder="Scrivi nome categoria..." style={{ ...inputStyle, marginTop: 6 }} />
+                {!isNewCategory ? (
+                  <select value={form.category}
+                    onChange={e => {
+                      if (e.target.value === '__new__') { setIsNewCategory(true); setForm(p => ({ ...p, category: '' })); }
+                      else setForm(p => ({ ...p, category: e.target.value }));
+                    }}
+                    style={inputStyle}>
+                    <option value="">— Seleziona categoria —</option>
+                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                    <option value="__new__">+ Nuova categoria...</option>
+                  </select>
+                ) : (
+                  <div className="flex gap-2">
+                    <input autoFocus value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))}
+                      placeholder="Nome nuova categoria..." style={inputStyle} />
+                    <button type="button" onClick={() => { setIsNewCategory(false); setForm(p => ({ ...p, category: '' })); }}
+                      style={{ background: '#12121a', border: '1px solid #2e2e40', color: '#71717a', borderRadius: '8px', padding: '0 10px', fontSize: '12px', cursor: 'pointer', whiteSpace: 'nowrap' }}>← Annulla</button>
+                  </div>
                 )}
               </div>
               <div><label style={labelStyle}>Unità</label><input value={form.unit} onChange={e => setForm(p => ({ ...p, unit: e.target.value }))} placeholder="pz, ml, g…" style={inputStyle} /></div>
