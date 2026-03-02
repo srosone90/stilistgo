@@ -1,13 +1,29 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSalon } from '@/context/SalonContext';
 import { DEFAULT_WHATSAPP_CONFIG } from '@/types/salon';
 import type { WhatsAppConfig } from '@/types/salon';
 import {
   MessageSquare, CheckCircle, XCircle, Eye, EyeOff,
-  Send, RefreshCw, ChevronDown, ChevronUp,
+  Send, RefreshCw, ChevronDown, ChevronUp, Plug, PlugZap,
 } from 'lucide-react';
+
+/* ── Meta WhatsApp Embedded Signup globals ──────────────────── */
+declare global {
+  interface Window {
+    FB: {
+      init: (opts: Record<string, unknown>) => void;
+      login: (
+        cb: (res: { authResponse?: { code?: string } }) => void,
+        opts: Record<string, unknown>
+      ) => void;
+    };
+    fbAsyncInit?: () => void;
+  }
+}
+const META_APP_ID    = process.env.NEXT_PUBLIC_META_APP_ID    ?? '';
+const META_CONFIG_ID = process.env.NEXT_PUBLIC_META_EMBEDDED_SIGNUP_CONFIG_ID ?? '';
 
 /* ─────────────────────────────────────────────
    Small helpers
@@ -86,6 +102,92 @@ export default function AutomationsView() {
   const [testError, setTestError] = useState('');
   const [saved, setSaved] = useState(false);
 
+  // ─── Embedded Signup ───────────────────────────────────────
+  const [connectStatus, setConnectStatus] = useState<'idle' | 'loading' | 'ok' | 'error'>(
+    () => (cfg.phoneNumberId && cfg.accessToken ? 'ok' : 'idle')
+  );
+  const [connectError, setConnectError] = useState('');
+  const [showManual, setShowManual] = useState(
+    () => Boolean(cfg.phoneNumberId || cfg.accessToken)
+  );
+
+  // Load Facebook SDK once
+  useEffect(() => {
+    if (!META_APP_ID) return;
+    if (document.getElementById('facebook-jssdk')) return;
+    const script = document.createElement('script');
+    script.id    = 'facebook-jssdk';
+    script.src   = 'https://connect.facebook.net/en_US/sdk.js';
+    script.async = true;
+    script.defer = true;
+    document.body.appendChild(script);
+    window.fbAsyncInit = () => {
+      window.FB.init({ appId: META_APP_ID, autoLogAppEvents: true, xfbml: true, version: 'v19.0' });
+    };
+  }, []);
+
+  const handleEmbeddedSignup = useCallback(() => {
+    if (!META_APP_ID || !META_CONFIG_ID) {
+      setConnectError('NEXT_PUBLIC_META_APP_ID o NEXT_PUBLIC_META_EMBEDDED_SIGNUP_CONFIG_ID non configurati nel server. Usa i campi manuali.');
+      setConnectStatus('error');
+      return;
+    }
+    setConnectStatus('loading');
+    setConnectError('');
+
+    let phoneNumberIdFromSession = '';
+    function onMessage(event: MessageEvent) {
+      if (event.origin !== 'https://www.facebook.com') return;
+      try {
+        const d = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+        if (d?.type === 'WA_EMBEDDED_SIGNUP' && d?.event === 'FINISH') {
+          phoneNumberIdFromSession = d?.data?.phone_number_id ?? '';
+        }
+      } catch { /* ignore */ }
+    }
+    window.addEventListener('message', onMessage);
+
+    window.FB.login(async (response) => {
+      window.removeEventListener('message', onMessage);
+      const code = response?.authResponse?.code;
+      if (!code) {
+        setConnectStatus('idle');
+        setConnectError('Connessione annullata.');
+        return;
+      }
+      try {
+        const res = await fetch('/api/whatsapp/exchange-token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code, phoneNumberId: phoneNumberIdFromSession }),
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error ?? 'Errore scambio token');
+        const next: Partial<WhatsAppConfig> = {
+          accessToken:   data.accessToken,
+          phoneNumberId: data.phoneNumberId || phoneNumberIdFromSession,
+          enabled: true,
+        };
+        setCfg(prev => ({ ...prev, ...next }));
+        updateSalonConfig({ whatsapp: { ...cfg, ...next } });
+        setConnectStatus('ok');
+      } catch (err: unknown) {
+        setConnectError(err instanceof Error ? err.message : 'Errore sconosciuto');
+        setConnectStatus('error');
+      }
+    }, {
+      config_id: META_CONFIG_ID,
+      response_type: 'code',
+      override_default_response_type: true,
+      extras: {
+        setup: {},
+        featureName: 'whatsapp_embedded_signup',
+        sessionInfoVersion: '3',
+      },
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cfg, updateSalonConfig]);
+
   function patch(updates: Partial<WhatsAppConfig>) {
     setCfg(prev => ({ ...prev, ...updates }));
     setSaved(false);
@@ -155,31 +257,82 @@ export default function AutomationsView() {
             description="Invia template approvati via Meta Business API"
           />
 
-          <Input
-            label="Phone Number ID"
-            value={cfg.phoneNumberId}
-            onChange={v => patch({ phoneNumberId: v })}
-            placeholder="1234567890123456"
-          />
-
-          <label className="block">
-            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Access Token</span>
-            <div className="relative mt-1">
-              <input
-                type={showToken ? 'text' : 'password'}
-                value={cfg.accessToken}
-                onChange={e => patch({ accessToken: e.target.value })}
-                placeholder="EAAxxxxxxx..."
-                className="block w-full rounded-lg border border-gray-200 px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-              />
+          {/* ── Embedded Signup button ── */}
+          <div className="pt-1">
+            {connectStatus === 'ok' ? (
+              <div className="flex items-center justify-between rounded-xl bg-green-50 border border-green-200 px-4 py-3">
+                <div className="flex items-center gap-2 text-green-700">
+                  <CheckCircle size={18} />
+                  <div>
+                    <p className="text-sm font-semibold">WhatsApp Business connesso</p>
+                    {cfg.phoneNumberId && <p className="text-xs text-green-600">ID: {cfg.phoneNumberId}</p>}
+                  </div>
+                </div>
+                <button
+                  onClick={() => { setConnectStatus('idle'); patch({ phoneNumberId: '', accessToken: '', enabled: false }); }}
+                  className="text-xs text-red-500 hover:text-red-700 underline"
+                >
+                  Disconnetti
+                </button>
+              </div>
+            ) : (
               <button
-                onClick={() => setShowToken(s => !s)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                onClick={handleEmbeddedSignup}
+                disabled={connectStatus === 'loading'}
+                className="w-full flex items-center justify-center gap-3 rounded-xl bg-[#25D366] hover:bg-[#1ebe5d] text-white font-semibold py-3 text-sm transition-colors disabled:opacity-60"
               >
-                {showToken ? <EyeOff size={16} /> : <Eye size={16} />}
+                {connectStatus === 'loading'
+                  ? <RefreshCw size={18} className="animate-spin" />
+                  : <PlugZap size={18} />}
+                {connectStatus === 'loading' ? 'Connessione in corso...' : 'Connetti WhatsApp Business'}
               </button>
-            </div>
-          </label>
+            )}
+            {connectStatus === 'error' && connectError && (
+              <p className="mt-2 text-xs text-red-500 flex items-center gap-1">
+                <XCircle size={13} /> {connectError}
+              </p>
+            )}
+          </div>
+
+          {/* ── Advanced / manual fields ── */}
+          <div>
+            <button
+              onClick={() => setShowManual(s => !s)}
+              className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1 mt-1"
+            >
+              <Plug size={12} />
+              {showManual ? 'Nascondi configurazione manuale' : 'Inserisci credenziali manualmente'}
+            </button>
+            {showManual && (
+              <div className="mt-3 space-y-3 p-4 rounded-xl border border-dashed border-gray-200 bg-gray-50">
+                <p className="text-xs text-gray-400">Alternativa se il popup non funziona o hai già le credenziali da Meta Business Manager.</p>
+                <Input
+                  label="Phone Number ID"
+                  value={cfg.phoneNumberId}
+                  onChange={v => patch({ phoneNumberId: v })}
+                  placeholder="1234567890123456"
+                />
+                <label className="block">
+                  <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Access Token</span>
+                  <div className="relative mt-1">
+                    <input
+                      type={showToken ? 'text' : 'password'}
+                      value={cfg.accessToken}
+                      onChange={e => patch({ accessToken: e.target.value })}
+                      placeholder="EAAxxxxxxx..."
+                      className="block w-full rounded-lg border border-gray-200 px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                    />
+                    <button
+                      onClick={() => setShowToken(s => !s)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      {showToken ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                </label>
+              </div>
+            )}
+          </div>
 
           {/* Test */}
           <div className="pt-2 border-t border-gray-100">
