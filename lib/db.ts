@@ -105,7 +105,10 @@ export async function dbAddTransaction(t: Transaction): Promise<void> {
   local.addTransaction(t); // Always save locally first
   if (await isSupabaseAvailable()) {
     const { error } = await supabase.from('transactions').insert(transactionToRow(t));
-    if (error) throw error;
+    if (error) {
+      // Log but don't throw — local save already succeeded
+      console.warn('Transaction Supabase sync error (saved locally):', error.message);
+    }
   }
 }
 

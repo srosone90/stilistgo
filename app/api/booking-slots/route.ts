@@ -1,25 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-// All 30-min slots between 09:00 and 18:30
-const ALL_SLOTS: string[] = [];
-for (let h = 9; h < 19; h++) {
-  ALL_SLOTS.push(`${String(h).padStart(2, '0')}:00`);
-  ALL_SLOTS.push(`${String(h).padStart(2, '0')}:30`);
-}
-
 function timeToMin(t: string) {
   const [h, m] = t.split(':').map(Number);
   return h * 60 + m;
 }
 
+/** Build 30-min slots between openTime and closeTime (e.g. "09:00", "19:00") */
+function buildSlots(openTime = '09:00', closeTime = '19:00'): string[] {
+  const slots: string[] = [];
+  let cur = timeToMin(openTime);
+  const end = timeToMin(closeTime);
+  while (cur < end) {
+    const h = String(Math.floor(cur / 60)).padStart(2, '0');
+    const m = String(cur % 60).padStart(2, '0');
+    slots.push(`${h}:${m}`);
+    cur += 30;
+  }
+  return slots;
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const salonId = searchParams.get('salonId');
-  const date = searchParams.get('date'); // yyyy-MM-dd
+  const date = searchParams.get('date');       // yyyy-MM-dd  (optional)
+  const operatorId = searchParams.get('operatorId'); // optional filter
+
+  const fallbackSlots = buildSlots();
 
   if (!salonId) {
-    return NextResponse.json({ available: ALL_SLOTS, salonName: '', services: [] });
+    return NextResponse.json({ available: fallbackSlots, salonName: '', services: [], operators: [] });
   }
 
   try {
@@ -36,21 +46,39 @@ export async function GET(req: NextRequest) {
 
     const state = data?.state as Record<string, unknown> | null;
 
-    // Always return salon name + services for public display
+    // ── Salon metadata ──────────────────────────────────────────────────────
     const salonConfig = state?.salonConfig as Record<string, string> | null;
     const salonName: string = salonConfig?.salonName || '';
+    const openTime: string = salonConfig?.openTime || '09:00';
+    const closeTime: string = salonConfig?.closeTime || '19:00';
+    const ALL_SLOTS = buildSlots(openTime, closeTime);
+
+    // ── Services ────────────────────────────────────────────────────────────
     const rawServices = state?.services as { id: string; name: string; duration: number; category: string; active: boolean }[] | null;
     const services = (rawServices ?? []).filter(s => s.active).map(s => ({
       id: s.id, name: s.name, duration: s.duration, category: s.category,
     }));
 
+    // ── Operators ───────────────────────────────────────────────────────────
+    const rawOperators = state?.operators as { id: string; name: string; color: string; active: boolean }[] | null;
+    const operators = (rawOperators ?? []).filter(o => o.active).map(o => ({
+      id: o.id, name: o.name, color: o.color,
+    }));
+
     if (!date) {
-      return NextResponse.json({ available: ALL_SLOTS, salonName, services });
+      return NextResponse.json({ available: ALL_SLOTS, salonName, services, operators });
     }
 
-    const appointments = (state?.appointments as { date: string; startTime: string; endTime: string; status: string }[] | null) ?? [];
-    const dayAppts = appointments.filter(
-      a => a.date === date && a.status !== 'cancelled' && a.status !== 'no-show'
+    // ── Filter slots by date (and optionally by operator) ───────────────────
+    const rawAppts = (state?.appointments as {
+      date: string; startTime: string; endTime: string; status: string; operatorId?: string;
+    }[] | null) ?? [];
+
+    const dayAppts = rawAppts.filter(a =>
+      a.date === date &&
+      a.status !== 'cancelled' &&
+      a.status !== 'no-show' &&
+      (!operatorId || a.operatorId === operatorId)           // filter by operator if given
     );
 
     const available = ALL_SLOTS.filter(slot => {
@@ -62,8 +90,9 @@ export async function GET(req: NextRequest) {
       });
     });
 
-    return NextResponse.json({ available, salonName, services });
+    return NextResponse.json({ available, salonName, services, operators });
   } catch {
-    return NextResponse.json({ available: ALL_SLOTS, salonName: '', services: [] });
+    return NextResponse.json({ available: fallbackSlots, salonName: '', services: [], operators: [] });
   }
 }
+

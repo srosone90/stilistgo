@@ -13,6 +13,12 @@ interface SalonService {
   category: string;
 }
 
+interface SalonOperator {
+  id: string;
+  name: string;
+  color: string;
+}
+
 // Default hardcoded catalogue used when a salon has no services configured
 const DEFAULT_CATEGORIES = [
   { label: 'Capelli',     items: ['Taglio', 'Piega', 'Permanente', 'Extension'] },
@@ -27,6 +33,8 @@ export default function DynamicBookingPage({ params }: { params: Promise<{ salon
   const [step, setStep] = useState<Step>('menu');
   const [salonName, setSalonName] = useState('');
   const [salonServices, setSalonServices] = useState<SalonService[]>([]);
+  const [operators, setOperators] = useState<SalonOperator[]>([]);
+  const [selectedOperator, setSelectedOperator] = useState('');
   const [loadingInfo, setLoadingInfo] = useState(true);
 
   // Available time slots state
@@ -45,6 +53,10 @@ export default function DynamicBookingPage({ params }: { params: Promise<{ salon
       .then(d => {
         setSalonName(d.salonName || '');
         setSalonServices(d.services || []);
+        if (d.operators?.length > 0) {
+          setOperators(d.operators);
+          setSelectedOperator(d.operators[0].id); // default to first operator
+        }
       })
       .catch(() => {})
       .finally(() => setLoadingInfo(false));
@@ -54,14 +66,15 @@ export default function DynamicBookingPage({ params }: { params: Promise<{ salon
   useEffect(() => {
     if (!form.preferredDate) { setAvailableSlots([]); return; }
     setLoadingSlots(true);
-    fetch(`/api/booking-slots?salonId=${encodeURIComponent(salonId)}&date=${form.preferredDate}`)
+    const opParam = selectedOperator ? `&operatorId=${encodeURIComponent(selectedOperator)}` : '';
+    fetch(`/api/booking-slots?salonId=${encodeURIComponent(salonId)}&date=${form.preferredDate}${opParam}`)
       .then(r => r.json())
       .then(d => setAvailableSlots(d.available || []))
       .catch(() => setAvailableSlots([]))
       .finally(() => setLoadingSlots(false));
     // Reset time if not in new available slots
     setForm(p => ({ ...p, preferredTime: '' }));
-  }, [form.preferredDate, salonId]);
+  }, [form.preferredDate, salonId, selectedOperator]);
 
   const set = (k: keyof typeof form, v: string) => setForm(p => ({ ...p, [k]: v }));
 
@@ -112,6 +125,9 @@ export default function DynamicBookingPage({ params }: { params: Promise<{ salon
         body: JSON.stringify({
           clientName: form.clientName, clientPhone: form.clientPhone, clientEmail: form.clientEmail,
           service: selectedNames.join(', ') || 'Da concordare',
+          serviceIds: selectedServices,
+          duration: totalDuration || 45,
+          operatorId: selectedOperator,
           preferredDate: form.preferredDate, preferredTime: form.preferredTime,
           notes: form.notes,
           salonId,
@@ -137,9 +153,9 @@ export default function DynamicBookingPage({ params }: { params: Promise<{ salon
             style={{ background: 'rgba(34,197,94,0.15)', border: '2px solid rgba(34,197,94,0.4)' }}>
             <CheckCircle2 size={36} style={{ color: '#22c55e' }} />
           </div>
-          <h2 className="text-2xl font-bold text-white mb-3">Richiesta inviata!</h2>
+          <h2 className="text-2xl font-bold text-white mb-3">Prenotazione confermata!</h2>
           <p className="text-base mb-4" style={{ color: '#a1a1aa' }}>
-            Abbiamo ricevuto la tua richiesta. {salonName ? salonName : 'Il salone'} ti contatterà presto per confermare l&apos;appuntamento.
+            Il tuo appuntamento è confermato{salonName ? ` presso ${salonName}` : ''}. Ti aspettiamo!
           </p>
           {selectedNames.length > 0 && (
             <div className="rounded-xl p-3 mb-5 text-sm" style={{ background: '#12121a', color: '#71717a' }}>
@@ -190,6 +206,28 @@ export default function DynamicBookingPage({ params }: { params: Promise<{ salon
               <input type="email" value={form.clientEmail} onChange={e => set('clientEmail', e.target.value)} style={inp} placeholder="maria@email.com" />
             </div>
 
+            {/* Operator selector — only shown if salon has multiple operators */}
+            {operators.length > 1 && (
+              <div>
+                <label style={lbl}>Operatore preferito</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {operators.map(op => (
+                    <button key={op.id} type="button" onClick={() => setSelectedOperator(op.id)}
+                      className="py-2.5 px-3 rounded-xl text-sm font-medium text-left flex items-center gap-2 transition-all"
+                      style={{
+                        background: selectedOperator === op.id ? 'rgba(99,102,241,0.2)' : '#12121a',
+                        border: `1px solid ${selectedOperator === op.id ? 'rgba(99,102,241,0.6)' : '#2e2e40'}`,
+                        color: selectedOperator === op.id ? '#c4b5fd' : '#d4d4d8',
+                        cursor: 'pointer',
+                      }}>
+                      <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: op.color }} />
+                      {op.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Date — selecting date triggers slot fetch */}
             <div>
               <label style={lbl}><Calendar size={13} className="inline mr-1" />Data *</label>
@@ -238,7 +276,7 @@ export default function DynamicBookingPage({ params }: { params: Promise<{ salon
             <button onClick={handleSubmit} disabled={submitting}
               className="w-full py-4 rounded-2xl font-semibold text-white text-base"
               style={{ background: submitting ? '#2e2e40' : 'linear-gradient(135deg,#6366f1,#a855f7)', cursor: submitting ? 'not-allowed' : 'pointer' }}>
-              {submitting ? 'Invio in corso…' : 'Invia richiesta'}
+              {submitting ? 'Prenotazione in corso…' : 'Prenota ora'}
             </button>
           </div>
         </div>

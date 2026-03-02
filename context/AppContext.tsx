@@ -45,13 +45,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const full = { ...t, id: generateId(), createdAt: new Date().toISOString() } as Transaction;
     // Optimistic update
     setTransactions(prev => [full, ...prev]);
-    try {
-      await dbAddTransaction(full);
-    } catch (e) {
-      // Rollback on error
-      setTransactions(prev => prev.filter(x => x.id !== full.id));
-      throw e;
-    }
+    // dbAddTransaction always saves locally first and never throws — no rollback needed
+    await dbAddTransaction(full);
   }, []);
 
   const updateEntry = useCallback(async (t: Transaction) => {

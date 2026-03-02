@@ -68,8 +68,34 @@ export default function InventoryView({ newTrigger }: { newTrigger?: number }) {
 
   function handleSave() {
     if (!form.name.trim()) return;
-    if (editProd) updateProduct({ ...editProd, ...form });
-    else addProduct(form);
+    if (editProd) {
+      // Always preserve the live stock so editing product info never resets stock movements
+      const liveStock = products.find(p => p.id === editProd.id)?.stock ?? editProd.stock;
+      updateProduct({ ...editProd, ...form, stock: liveStock });
+    } else {
+      // Creating new product: save with initial stock
+      const initialStock = form.stock;
+      addProduct({ ...form, stock: 0 }); // start at 0, movement below sets the real stock
+      // If the user specified an initial stock, create a load movement for traceability
+      if (initialStock > 0) {
+        // We need the new product id — addProduct is synchronous state update,
+        // so we schedule the movement via a tiny timeout to let the id propagate
+        setTimeout(() => {
+          // find the just-created product by name+brand
+          const newProd = products.find(p => p.name === form.name && p.brand === form.brand);
+          if (newProd) {
+            addStockMovement({
+              productId: newProd.id,
+              type: 'load',
+              quantity: initialStock,
+              date: format(new Date(), 'yyyy-MM-dd'),
+              notes: 'Giacenza iniziale',
+              operatorId: '',
+            });
+          }
+        }, 50);
+      }
+    }
     setShowProdForm(false);
   }
 
@@ -259,7 +285,17 @@ export default function InventoryView({ newTrigger }: { newTrigger?: number }) {
                 )}
               </div>
               <div><label style={labelStyle}>Unità</label><input value={form.unit} onChange={e => setForm(p => ({ ...p, unit: e.target.value }))} placeholder="pz, ml, g…" style={inputStyle} /></div>
-              <div><label style={labelStyle}>Giacenza attuale</label><input type="number" min={0} value={form.stock} onChange={e => setForm(p => ({ ...p, stock: Number(e.target.value) }))} style={inputStyle} /></div>
+              <div>
+                <label style={labelStyle}>Giacenza attuale</label>
+                {editProd ? (
+                  <div style={{ ...inputStyle, color: '#71717a', userSelect: 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span>{products.find(p => p.id === editProd.id)?.stock ?? editProd.stock} {form.unit}</span>
+                    <span style={{ fontSize: '11px', opacity: 0.7 }}>modifica tramite movimenti</span>
+                  </div>
+                ) : (
+                  <input type="number" min={0} value={form.stock} onChange={e => setForm(p => ({ ...p, stock: Number(e.target.value) }))} style={inputStyle} />
+                )}
+              </div>
               <div><label style={labelStyle}>Soglia minima riordino</label><input type="number" min={0} value={form.minStock} onChange={e => setForm(p => ({ ...p, minStock: Number(e.target.value) }))} style={inputStyle} /></div>
               <div><label style={labelStyle}>Prezzo acquisto (€)</label><input type="number" min={0} step={0.01} value={form.purchasePrice} onChange={e => setForm(p => ({ ...p, purchasePrice: Number(e.target.value) }))} style={inputStyle} /></div>
               <div><label style={labelStyle}>Prezzo vendita (€)</label><input type="number" min={0} step={0.01} value={form.salePrice} onChange={e => setForm(p => ({ ...p, salePrice: Number(e.target.value) }))} style={inputStyle} /></div>
