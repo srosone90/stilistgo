@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useMemo } from 'react';
 import { useSalon } from '@/context/SalonContext';
@@ -8,16 +8,16 @@ import { it } from 'date-fns/locale';
 import { Trophy, Medal, Star, Plus, X, Trash2, Settings, Users, Award, TrendingUp, Package } from 'lucide-react';
 import { formatCurrency } from '@/lib/calculations';
 
-const inputStyle: React.CSSProperties = { background: '#12121a', border: '1px solid #2e2e40', borderRadius: '10px', padding: '9px 13px', color: '#f4f4f5', fontSize: '13px', outline: 'none', width: '100%' };
-const labelStyle: React.CSSProperties = { fontSize: '12px', color: '#71717a', marginBottom: '4px', display: 'block' };
-const card: React.CSSProperties = { background: '#1c1c27', border: '1px solid #2e2e40', borderRadius: '16px', padding: '20px' };
-const btnPrimary: React.CSSProperties = { background: 'rgba(99,102,241,0.2)', border: '1px solid rgba(99,102,241,0.4)', color: '#818cf8', borderRadius: '10px', padding: '8px 16px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' };
+const inputStyle: React.CSSProperties = { background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '10px', padding: '9px 13px', color: 'var(--text)', fontSize: '13px', outline: 'none', width: '100%' };
+const labelStyle: React.CSSProperties = { fontSize: '12px', color: 'var(--muted)', marginBottom: '4px', display: 'block' };
+const card: React.CSSProperties = { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '16px', padding: '20px' };
+const btnPrimary: React.CSSProperties = { background: 'rgba(99,102,241,0.2)', border: '1px solid rgba(99,102,241,0.4)', color: 'var(--accent-light)', borderRadius: '10px', padding: '8px 16px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' };
 
 const TROPHY_CONFIG = [
   { key: 'gold',   icon: '🥇', label: 'Oro',    color: '#f59e0b', glow: 'rgba(245,158,11,0.25)' },
   { key: 'silver', icon: '🥈', label: 'Argento', color: '#94a3b8', glow: 'rgba(148,163,184,0.2)' },
   { key: 'bronze', icon: '🥉', label: 'Bronzo',  color: '#d97706', glow: 'rgba(217,119,6,0.2)' },
-  { key: 'none',   icon: '🌱', label: '—',       color: '#3f3f5a', glow: 'transparent' },
+  { key: 'none',   icon: '🌱', label: '—',       color: 'var(--border-light)', glow: 'transparent' },
 ];
 
 function getTrophy(revenue: number, bronze: number, silver: number, gold: number): typeof TROPHY_CONFIG[number] {
@@ -102,7 +102,7 @@ export default function GamificationView() {
       <div className="flex flex-col items-center justify-center h-full gap-3 py-24">
         <div className="text-6xl">🏆</div>
         <p className="text-white font-semibold text-lg">Gamification non attiva</p>
-        <p className="text-sm" style={{ color: '#71717a' }}>Chiedi al titolare di attivare il programma.</p>
+        <p className="text-sm" style={{ color: 'var(--muted)' }}>Chiedi al titolare di attivare il programma.</p>
       </div>
     );
   }
@@ -115,7 +115,7 @@ export default function GamificationView() {
           <h1 className="text-2xl font-bold text-white flex items-center gap-2">
             <Trophy size={24} style={{ color: '#f59e0b' }} /> Gamification
           </h1>
-          <p className="text-xs mt-0.5" style={{ color: '#71717a' }}>Classifica e premi mensili del team</p>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>Classifica e premi mensili del team</p>
         </div>
         <div className="flex items-center gap-2">
           <input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}
@@ -137,11 +137,11 @@ export default function GamificationView() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-white font-medium">Programma attivo</p>
-              <p className="text-xs" style={{ color: '#71717a' }}>Attiva o disattiva la gamification per tutto il team</p>
+              <p className="text-xs" style={{ color: 'var(--muted)' }}>Attiva o disattiva la gamification per tutto il team</p>
             </div>
             <button onClick={() => updateGamificationConfig({ isEnabled: !gamificationConfig.isEnabled })}
               className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
-              style={{ background: gamificationConfig.isEnabled ? '#6366f1' : '#2e2e40' }}>
+              style={{ background: gamificationConfig.isEnabled ? '#6366f1' : 'var(--border)' }}>
               <span className="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
                 style={{ transform: gamificationConfig.isEnabled ? 'translateX(22px)' : 'translateX(2px)' }} />
             </button>
@@ -156,7 +156,7 @@ export default function GamificationView() {
                 return (
                   <button key={op.id} onClick={() => toggleParticipant(op.id)}
                     className="px-3 py-1.5 rounded-full text-xs font-medium transition-all"
-                    style={{ background: active ? 'rgba(99,102,241,0.2)' : '#12121a', border: `1px solid ${active ? 'rgba(99,102,241,0.5)' : '#2e2e40'}`, color: active ? '#818cf8' : '#52525b' }}>
+                    style={{ background: active ? 'rgba(99,102,241,0.2)' : 'var(--bg-input)', border: `1px solid ${active ? 'rgba(99,102,241,0.5)' : 'var(--border)'}`, color: active ? 'var(--accent-light)' : '#52525b' }}>
                     {active ? '✓ ' : ''}{op.name}
                   </button>
                 );
@@ -193,18 +193,18 @@ export default function GamificationView() {
             </div>
             <div className="space-y-2">
               {gamificationConfig.bonuses.map(b => (
-                <div key={b.id} className="flex items-center justify-between px-3 py-2 rounded-xl" style={{ background: '#12121a', border: '1px solid #2e2e40' }}>
+                <div key={b.id} className="flex items-center justify-between px-3 py-2 rounded-xl" style={{ background: 'var(--bg-input)', border: '1px solid var(--border)' }}>
                   <div className="flex items-center gap-3">
                     <span className="text-xl">{b.icon}</span>
                     <div>
                       <p className="text-sm font-medium text-white">{b.label}</p>
-                      <p className="text-xs" style={{ color: '#71717a' }}>{b.description}</p>
+                      <p className="text-xs" style={{ color: 'var(--muted)' }}>{b.description}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="font-bold text-sm" style={{ color: '#22c55e' }}>+{formatCurrency(b.amount)}</span>
                     <button onClick={() => { setBonusForm({ label: b.label, description: b.description, amount: b.amount, icon: b.icon }); setEditBonusId(b.id); }}
-                      style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.3)', color: '#818cf8', borderRadius: '6px', padding: '4px 8px', cursor: 'pointer', fontSize: 11 }}>Modifica</button>
+                      style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.3)', color: 'var(--accent-light)', borderRadius: '6px', padding: '4px 8px', cursor: 'pointer', fontSize: 11 }}>Modifica</button>
                     <button onClick={() => updateGamificationConfig({ bonuses: gamificationConfig.bonuses.filter(x => x.id !== b.id) })}
                       style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#f87171', borderRadius: '6px', padding: '4px 8px', cursor: 'pointer' }}>
                       <Trash2 size={12} />
@@ -213,7 +213,7 @@ export default function GamificationView() {
                 </div>
               ))}
               {gamificationConfig.bonuses.length === 0 && (
-                <p className="text-xs py-2" style={{ color: '#3f3f5a' }}>Nessun bonus definito. Crea il primo bonus per motivare il team.</p>
+                <p className="text-xs py-2" style={{ color: 'var(--border-light)' }}>Nessun bonus definito. Crea il primo bonus per motivare il team.</p>
               )}
             </div>
           </div>
@@ -223,10 +223,10 @@ export default function GamificationView() {
       {/* Bonus form modal */}
       {bonusForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
-          <div className="w-full max-w-md rounded-2xl p-6" style={{ background: '#18181f', border: '1px solid #2e2e40' }}>
+          <div className="w-full max-w-md rounded-2xl p-6" style={{ background: '#18181f', border: '1px solid var(--border)' }}>
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-semibold text-white">{editBonusId ? 'Modifica bonus' : 'Nuovo bonus'}</h3>
-              <button onClick={() => { setBonusForm(null); setEditBonusId(null); }} style={{ background: 'none', border: 'none', color: '#71717a', cursor: 'pointer' }}><X size={18} /></button>
+              <button onClick={() => { setBonusForm(null); setEditBonusId(null); }} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}><X size={18} /></button>
             </div>
             <div className="space-y-3">
               <div>
@@ -235,7 +235,7 @@ export default function GamificationView() {
                   {BONUS_ICONS.map(icon => (
                     <button key={icon} onClick={() => setBonusForm(p => p ? { ...p, icon } : p)}
                       className="text-2xl w-10 h-10 rounded-lg flex items-center justify-center transition-all"
-                      style={{ background: bonusForm.icon === icon ? 'rgba(99,102,241,0.3)' : '#12121a', border: `1px solid ${bonusForm.icon === icon ? 'rgba(99,102,241,0.5)' : '#2e2e40'}` }}>
+                      style={{ background: bonusForm.icon === icon ? 'rgba(99,102,241,0.3)' : 'var(--bg-input)', border: `1px solid ${bonusForm.icon === icon ? 'rgba(99,102,241,0.5)' : 'var(--border)'}` }}>
                       {icon}
                     </button>
                   ))}
@@ -255,7 +255,7 @@ export default function GamificationView() {
               </div>
             </div>
             <div className="flex justify-end gap-2 mt-4">
-              <button onClick={() => { setBonusForm(null); setEditBonusId(null); }} style={{ background: '#12121a', border: '1px solid #2e2e40', color: '#71717a', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', cursor: 'pointer' }}>Annulla</button>
+              <button onClick={() => { setBonusForm(null); setEditBonusId(null); }} style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--muted)', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', cursor: 'pointer' }}>Annulla</button>
               <button onClick={saveBonusForm} disabled={!bonusForm.label} style={{ ...btnPrimary, opacity: !bonusForm.label ? 0.4 : 1 }}>Salva</button>
             </div>
           </div>
@@ -267,18 +267,18 @@ export default function GamificationView() {
         <div style={card} className="text-center py-10">
           <p className="text-4xl mb-2">💤</p>
           <p className="text-white font-medium">Gamification disattivata</p>
-          <p className="text-sm mt-1" style={{ color: '#71717a' }}>Attiva il programma dalle impostazioni per vedere la classifica.</p>
+          <p className="text-sm mt-1" style={{ color: 'var(--muted)' }}>Attiva il programma dalle impostazioni per vedere la classifica.</p>
         </div>
       ) : participantOps.length === 0 ? (
         <div style={card} className="text-center py-10">
           <p className="text-4xl mb-2">👥</p>
           <p className="text-white font-medium">Nessun partecipante selezionato</p>
-          {isOwner && <p className="text-sm mt-1" style={{ color: '#71717a' }}>Scegli chi partecipa al programma dalle impostazioni.</p>}
+          {isOwner && <p className="text-sm mt-1" style={{ color: 'var(--muted)' }}>Scegli chi partecipa al programma dalle impostazioni.</p>}
         </div>
       ) : (
         <>
           {/* Month label */}
-          <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: '#3f3f5a' }}>
+          <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--border-light)' }}>
             Classifica — {format(parseISO(selectedMonth + '-01'), 'MMMM yyyy', { locale: it })}
           </p>
 
@@ -306,14 +306,14 @@ export default function GamificationView() {
                     </div>
                     <p className="font-bold text-white text-sm">{s.op.name}</p>
                     <p className="text-xl font-bold mt-1" style={{ color: '#22c55e' }}>{formatCurrency(s.revenue)}</p>
-                    <div className="flex justify-center gap-3 mt-2 text-xs" style={{ color: '#71717a' }}>
+                    <div className="flex justify-center gap-3 mt-2 text-xs" style={{ color: 'var(--muted)' }}>
                       <span title="Appuntamenti completati">📅 {s.appts}</span>
                       <span title="Servizi">✂️ {s.services}</span>
                       <span title="Prodotti venduti">📦 {s.products}</span>
                     </div>
                     {/* Progress bar to next trophy */}
                     <div className="mt-3">
-                      <div className="h-1.5 rounded-full" style={{ background: '#2e2e40' }}>
+                      <div className="h-1.5 rounded-full" style={{ background: 'var(--border)' }}>
                         <div className="h-1.5 rounded-full transition-all" style={{ width: `${progressToNext}%`, background: s.trophy.color }} />
                       </div>
                       <p className="text-xs mt-1" style={{ color: s.trophy.color }}>{s.trophy.icon} {s.trophy.label}</p>
@@ -330,7 +330,7 @@ export default function GamificationView() {
               <h3 className="text-sm font-semibold text-white mb-3">Classifica completa</h3>
               <div className="space-y-2">
                 {stats.slice(3).map((s, idx) => (
-                  <div key={s.op.id} className="flex items-center gap-4 px-3 py-2 rounded-xl" style={{ background: '#12121a', border: '1px solid #2e2e40' }}>
+                  <div key={s.op.id} className="flex items-center gap-4 px-3 py-2 rounded-xl" style={{ background: 'var(--bg-input)', border: '1px solid var(--border)' }}>
                     <span className="text-sm font-bold w-5 text-center" style={{ color: '#52525b' }}>{idx + 4}</span>
                     <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
                       style={{ background: s.op.color }}>
@@ -338,7 +338,7 @@ export default function GamificationView() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-white truncate">{s.op.name}</p>
-                      <p className="text-xs" style={{ color: '#71717a' }}>📅 {s.appts} app. · ✂️ {s.services} serv. · 📦 {s.products} prod.</p>
+                      <p className="text-xs" style={{ color: 'var(--muted)' }}>📅 {s.appts} app. · ✂️ {s.services} serv. · 📦 {s.products} prod.</p>
                     </div>
                     <div className="text-right">
                       <p className="text-sm font-bold" style={{ color: '#22c55e' }}>{formatCurrency(s.revenue)}</p>
@@ -360,7 +360,7 @@ export default function GamificationView() {
                     <span className="text-2xl flex-shrink-0">{b.icon}</span>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-white">{b.label}</p>
-                      {b.description && <p className="text-xs" style={{ color: '#71717a' }}>{b.description}</p>}
+                      {b.description && <p className="text-xs" style={{ color: 'var(--muted)' }}>{b.description}</p>}
                     </div>
                     <span className="text-sm font-bold flex-shrink-0" style={{ color: '#22c55e' }}>+{formatCurrency(b.amount)}</span>
                   </div>
@@ -376,17 +376,17 @@ export default function GamificationView() {
             const rank = stats.findIndex(s => s.op.id === activeOperatorId) + 1;
             return (
               <div style={{ ...card, border: '1px solid rgba(99,102,241,0.4)', background: 'rgba(99,102,241,0.07)' }}>
-                <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2"><Star size={15} style={{ color: '#818cf8' }} /> Le tue statistiche</h3>
+                <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2"><Star size={15} style={{ color: 'var(--accent-light)' }} /> Le tue statistiche</h3>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
                   {[
-                    { label: 'Posizione', value: `#${rank}`, color: '#818cf8' },
+                    { label: 'Posizione', value: `#${rank}`, color: 'var(--accent-light)' },
                     { label: 'Fatturato', value: formatCurrency(my.revenue), color: '#22c55e' },
                     { label: 'Appuntamenti', value: `${my.appts}`, color: '#06b6d4' },
                     { label: 'Trofeo', value: `${my.trophy.icon} ${my.trophy.label}`, color: my.trophy.color },
                   ].map(k => (
                     <div key={k.label}>
                       <p className="text-lg font-bold" style={{ color: k.color }}>{k.value}</p>
-                      <p className="text-xs mt-0.5" style={{ color: '#71717a' }}>{k.label}</p>
+                      <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>{k.label}</p>
                     </div>
                   ))}
                 </div>

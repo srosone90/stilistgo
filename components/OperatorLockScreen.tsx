@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState } from 'react';
 import { Scissors, Lock } from 'lucide-react';
@@ -42,7 +42,7 @@ export default function OperatorLockScreen({ onUnlock }: { onUnlock: () => void 
   return (
     <div
       className="fixed inset-0 z-[100] flex flex-col items-center justify-center p-6"
-      style={{ background: '#0f0f13' }}
+      style={{ background: 'var(--bg-page)' }}
     >
       {/* Logo */}
       <div className="flex items-center gap-3 mb-10">
@@ -56,7 +56,7 @@ export default function OperatorLockScreen({ onUnlock }: { onUnlock: () => void 
           <p className="font-bold text-white text-xl leading-tight">
             {salonConfig.salonName || 'Stylistgo'}
           </p>
-          <p className="text-sm" style={{ color: '#71717a' }}>
+          <p className="text-sm" style={{ color: 'var(--muted)' }}>
             Chi sta lavorando oggi?
           </p>
         </div>
@@ -65,7 +65,7 @@ export default function OperatorLockScreen({ onUnlock }: { onUnlock: () => void 
       {step === 'select' ? (
         <div className="w-full max-w-sm space-y-2.5">
           {activeOps.length === 0 ? (
-            <p className="text-center text-sm py-8" style={{ color: '#71717a' }}>
+            <p className="text-center text-sm py-8" style={{ color: 'var(--muted)' }}>
               Nessun operatore attivo. Accedi come titolare e crea gli operatori dalla sezione Personale.
             </p>
           ) : (
@@ -75,7 +75,7 @@ export default function OperatorLockScreen({ onUnlock }: { onUnlock: () => void 
                 onClick={() => handleSelect(op.id)}
                 className="w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-left transition-all hover:scale-[1.02] active:scale-[0.98]"
                 style={{
-                  background: '#1c1c27',
+                  background: 'var(--bg-card)',
                   border: `1px solid ${op.color}50`,
                   cursor: 'pointer',
                 }}
@@ -88,7 +88,7 @@ export default function OperatorLockScreen({ onUnlock }: { onUnlock: () => void 
                 </div>
                 <div className="flex-1">
                   <p className="font-semibold text-white text-sm">{op.name}</p>
-                  <p className="text-xs mt-0.5" style={{ color: '#71717a' }}>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>
                     {op.pin ? (
                       <>
                         <Lock size={10} style={{ display: 'inline', marginRight: 3 }} />
@@ -120,7 +120,7 @@ export default function OperatorLockScreen({ onUnlock }: { onUnlock: () => void 
               {selectedOp?.name.charAt(0).toUpperCase()}
             </div>
             <p className="font-semibold text-white text-lg">{selectedOp?.name}</p>
-            <p className="text-sm mt-1" style={{ color: '#71717a' }}>
+            <p className="text-sm mt-1" style={{ color: 'var(--muted)' }}>
               Inserisci il tuo PIN
             </p>
           </div>
@@ -138,11 +138,11 @@ export default function OperatorLockScreen({ onUnlock }: { onUnlock: () => void 
             autoFocus
             placeholder="••••"
             style={{
-              background: '#1c1c27',
-              border: `2px solid ${pinError ? '#ef4444' : '#2e2e40'}`,
+              background: 'var(--bg-card)',
+              border: `2px solid ${pinError ? '#ef4444' : 'var(--border)'}`,
               borderRadius: '14px',
               padding: '16px',
-              color: '#f4f4f5',
+              color: 'var(--text)',
               fontSize: '28px',
               outline: 'none',
               width: '100%',
@@ -172,7 +172,7 @@ export default function OperatorLockScreen({ onUnlock }: { onUnlock: () => void 
               setPinError(false);
             }}
             className="w-full mt-2 py-2 text-xs"
-            style={{ background: 'none', border: 'none', color: '#71717a', cursor: 'pointer' }}
+            style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}
           >
             ← Cambia operatore
           </button>

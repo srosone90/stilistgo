@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React from 'react';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
@@ -16,12 +16,12 @@ interface KpiCardProps {
 
 export default function KpiCard({ title, value, subValue, icon, trend, trendText, color = '#6366f1', gradient }: KpiCardProps) {
   const TrendIcon = trend === 'up' ? TrendingUp : trend === 'down' ? TrendingDown : Minus;
-  const trendColor = trend === 'up' ? '#22c55e' : trend === 'down' ? '#ef4444' : '#71717a';
+  const trendColor = trend === 'up' ? '#22c55e' : trend === 'down' ? '#ef4444' : 'var(--muted)';
 
   return (
     <div
       className="rounded-2xl p-5 relative overflow-hidden"
-      style={{ background: '#1c1c27', border: '1px solid #2e2e40' }}
+      style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
     >
       {/* Gradient glow */}
       {gradient && (
@@ -46,10 +46,10 @@ export default function KpiCard({ title, value, subValue, icon, trend, trendText
         )}
       </div>
 
-      <p className="text-xs font-medium mb-1" style={{ color: '#71717a' }}>{title}</p>
+      <p className="text-xs font-medium mb-1" style={{ color: 'var(--muted)' }}>{title}</p>
       <p className="text-2xl font-bold text-white tracking-tight">{value}</p>
       {subValue && (
-        <p className="text-xs mt-1" style={{ color: '#71717a' }}>{subValue}</p>
+        <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>{subValue}</p>
       )}
     </div>
   );

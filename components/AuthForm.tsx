@@ -9,11 +9,11 @@ type Mode = 'login' | 'register';
 
 const inputStyle: React.CSSProperties = {
   width: '100%',
-  background: '#12121a',
-  border: '1px solid #2e2e40',
+  background: 'var(--bg-input)',
+  border: '1px solid var(--border)',
   borderRadius: '10px',
   padding: '11px 14px',
-  color: '#f4f4f5',
+  color: 'var(--text)',
   fontSize: '14px',
   outline: 'none',
   transition: 'border-color 0.2s',
@@ -23,7 +23,7 @@ const labelStyle: React.CSSProperties = {
   display: 'block',
   fontSize: '12px',
   fontWeight: 500,
-  color: '#71717a',
+  color: 'var(--muted)',
   marginBottom: '6px',
 };
 
@@ -107,7 +107,7 @@ export default function AuthForm() {
   return (
     <div
       className="w-full max-w-md rounded-2xl p-8 shadow-2xl"
-      style={{ background: '#1c1c27', border: '1px solid #2e2e40' }}
+      style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
     >
       {/* Logo */}
       <div className="flex flex-col items-center mb-8">
@@ -118,7 +118,7 @@ export default function AuthForm() {
           <Scissors size={26} className="text-white" />
         </div>
         <h1 className="text-xl font-bold text-white">Stylistgo</h1>
-        <p className="text-sm mt-1" style={{ color: '#71717a' }}>
+        <p className="text-sm mt-1" style={{ color: 'var(--muted)' }}>
           {mode === 'login' ? 'Accedi al gestionale' : 'Crea il tuo account'}
         </p>
       </div>
@@ -182,7 +182,7 @@ export default function AuthForm() {
         </div>
 
         <div>
-          <label style={labelStyle}>Password {mode === 'register' && <span style={{ color: '#3f3f5a' }}>(min. 6 caratteri)</span>}</label>
+          <label style={labelStyle}>Password {mode === 'register' && <span style={{ color: 'var(--border-light)' }}>(min. 6 caratteri)</span>}</label>
           <input
             type="password"
             required
@@ -214,12 +214,12 @@ export default function AuthForm() {
         <button
           onClick={toggleMode}
           className="text-sm transition-colors"
-          style={{ color: '#71717a', background: 'none', border: 'none', cursor: 'pointer' }}
+          style={{ color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer' }}
         >
           {mode === 'login' ? (
-            <>Non hai un account? <span style={{ color: '#818cf8' }}>Registrati</span></>
+            <>Non hai un account? <span style={{ color: 'var(--accent-light)' }}>Registrati</span></>
           ) : (
-            <>Hai già un account? <span style={{ color: '#818cf8' }}>Accedi</span></>
+            <>Hai già un account? <span style={{ color: 'var(--accent-light)' }}>Accedi</span></>
           )}
         </button>
       </div>

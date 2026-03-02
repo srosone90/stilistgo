@@ -7,9 +7,9 @@ import { format, parseISO, addDays, startOfWeek, isSameDay, startOfMonth, endOfM
 import { it } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, Plus, X, UserPlus, LayoutGrid } from 'lucide-react';
 
-const inputStyle: React.CSSProperties = { background: '#12121a', border: '1px solid #2e2e40', borderRadius: '10px', padding: '9px 13px', color: '#f4f4f5', fontSize: '13px', outline: 'none', width: '100%' };
-const labelStyle: React.CSSProperties = { fontSize: '12px', color: '#71717a', marginBottom: '4px', display: 'block' };
-const btnPrimary: React.CSSProperties = { background: 'rgba(99,102,241,0.2)', border: '1px solid rgba(99,102,241,0.4)', color: '#818cf8', borderRadius: '10px', padding: '8px 16px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' };
+const inputStyle: React.CSSProperties = { background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '10px', padding: '9px 13px', color: 'var(--text)', fontSize: '13px', outline: 'none', width: '100%' };
+const labelStyle: React.CSSProperties = { fontSize: '12px', color: 'var(--muted)', marginBottom: '4px', display: 'block' };
+const btnPrimary: React.CSSProperties = { background: 'rgba(99,102,241,0.2)', border: '1px solid rgba(99,102,241,0.4)', color: 'var(--accent-light)', borderRadius: '10px', padding: '8px 16px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' };
 
 const EMPTY_APPT: Omit<Appointment, 'id' | 'createdAt' | 'history'> = {
   clientId: '', operatorId: '', serviceIds: [],
@@ -279,7 +279,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-white">Agenda</h1>
-          <p className="text-xs mt-0.5" style={{ color: '#71717a' }}>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>
             {view === 'week'
               ? `Settimana del ${format(weekStart, 'dd MMM', { locale: it })} ${String.fromCharCode(8211)} ${format(addDays(weekStart, 6), 'dd MMM yyyy', { locale: it })}`
               : view === 'month'
@@ -288,10 +288,10 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex rounded-lg overflow-hidden" style={{ border: '1px solid #2e2e40' }}>
+          <div className="flex rounded-lg overflow-hidden" style={{ border: '1px solid var(--border)' }}>
             {(['day', 'week', 'month'] as const).map(v => (
               <button key={v} onClick={() => setView(v)} className="px-3 py-1.5 text-xs font-medium"
-                style={{ background: view === v ? 'rgba(99,102,241,0.2)' : '#12121a', color: view === v ? '#818cf8' : '#71717a', border: 'none', cursor: 'pointer' }}>
+                style={{ background: view === v ? 'rgba(99,102,241,0.2)' : 'var(--bg-input)', color: view === v ? 'var(--accent-light)' : 'var(--muted)', border: 'none', cursor: 'pointer' }}>
                 {v === 'day' ? 'Giorno' : v === 'week' ? 'Settimana' : 'Mese'}
               </button>
             ))}
@@ -311,7 +311,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
       {view !== 'day' && activeOperators.length > 1 && (
         <div className="flex gap-3 flex-wrap">
           {activeOperators.map(o => (
-            <span key={o.id} className="flex items-center gap-1.5 text-xs" style={{ color: '#d4d4d8' }}>
+            <span key={o.id} className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--text-2)' }}>
               <span className="inline-block w-3 h-3 rounded-full" style={{ background: o.color }} />
               {o.name}
             </span>
@@ -328,11 +328,11 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
         const gridDays = eachDayOfInterval({ start: gridStart, end: addDays(gridEnd, 7) }).slice(0, 42);
         const DAY_NAMES = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'];
         return (
-          <div className="flex-1 overflow-auto rounded-2xl" style={{ border: '1px solid #2e2e40', background: '#1c1c27', minHeight: 0 }}>
+          <div className="flex-1 overflow-auto rounded-2xl" style={{ border: '1px solid var(--border)', background: 'var(--bg-card)', minHeight: 0 }}>
             {/* Day names header */}
-            <div className="grid grid-cols-7 sticky top-0 z-10" style={{ background: '#18181f', borderBottom: '1px solid #2e2e40' }}>
+            <div className="grid grid-cols-7 sticky top-0 z-10" style={{ background: '#18181f', borderBottom: '1px solid var(--border)' }}>
               {DAY_NAMES.map(d => (
-                <div key={d} className="text-center py-2 text-xs font-medium" style={{ color: '#71717a' }}>{d}</div>
+                <div key={d} className="text-center py-2 text-xs font-medium" style={{ color: 'var(--muted)' }}>{d}</div>
               ))}
             </div>
             {/* Day cells */}
@@ -350,7 +350,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                     <span className="text-xs font-bold inline-flex items-center justify-center w-6 h-6 rounded-full"
                       style={{
                         background: isNow ? '#6366f1' : 'transparent',
-                        color: isNow ? '#fff' : isThisMonth ? '#d4d4d8' : '#3f3f5a',
+                        color: isNow ? '#fff' : isThisMonth ? 'var(--text-2)' : 'var(--border-light)',
                       }}>
                       {format(day, 'd')}
                     </span>
@@ -361,13 +361,13 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                           const client = clients.find(c => c.id === a.clientId);
                           return (
                             <div key={a.id} className="text-xs truncate rounded px-1 py-0.5"
-                              style={{ background: `${op?.color || '#6366f1'}25`, color: op?.color || '#818cf8', fontSize: 10 }}>
+                              style={{ background: `${op?.color || '#6366f1'}25`, color: op?.color || 'var(--accent-light)', fontSize: 10 }}>
                               {a.startTime} {client ? `${client.firstName}` : a.isBlock ? 'Blocco' : '—'}
                             </div>
                           );
                         })}
                         {dayAppts.length > 3 && (
-                          <div className="text-xs px-1" style={{ color: '#71717a', fontSize: 10 }}>+{dayAppts.length - 3} altri</div>
+                          <div className="text-xs px-1" style={{ color: 'var(--muted)', fontSize: 10 }}>+{dayAppts.length - 3} altri</div>
                         )}
                       </div>
                     )}
@@ -381,18 +381,18 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
 
       {/* ─── DAY VIEW: one column per operator ───────────────────────────── */}
       {view === 'day' && (
-      <div className="flex-1 overflow-auto rounded-2xl" style={{ border: '1px solid #2e2e40', background: '#1c1c27' }}>
+      <div className="flex-1 overflow-auto rounded-2xl" style={{ border: '1px solid var(--border)', background: 'var(--bg-card)' }}>
         {/* Sticky header: date on left, operator columns */}
-        <div className="flex sticky top-0 z-10" style={{ background: '#18181f', borderBottom: '1px solid #2e2e40' }}>
+        <div className="flex sticky top-0 z-10" style={{ background: '#18181f', borderBottom: '1px solid var(--border)' }}>
           <div style={{ width: 56, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span className="text-xs font-bold" style={{ color: isSameDay(currentDate, new Date()) ? '#818cf8' : '#71717a' }}>
+            <span className="text-xs font-bold" style={{ color: isSameDay(currentDate, new Date()) ? 'var(--accent-light)' : 'var(--muted)' }}>
               {format(currentDate, 'dd')}
             </span>
           </div>
           {activeOperators.length === 0 ? (
-            <div className="flex-1 text-center py-3 text-xs" style={{ color: '#71717a', borderLeft: '1px solid #2e2e40' }}>Nessun operatore attivo</div>
+            <div className="flex-1 text-center py-3 text-xs" style={{ color: 'var(--muted)', borderLeft: '1px solid var(--border)' }}>Nessun operatore attivo</div>
           ) : activeOperators.map(op => (
-            <div key={op.id} className="flex-1 py-2 px-2" style={{ borderLeft: '1px solid #2e2e40', minWidth: 0 }}>
+            <div key={op.id} className="flex-1 py-2 px-2" style={{ borderLeft: '1px solid var(--border)', minWidth: 0 }}>
               <div className="flex items-center justify-center gap-1.5">
                 <span className="inline-block w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: op.color }} />
                 <span className="text-xs font-semibold truncate" style={{ color: op.color }}>{op.name}</span>
@@ -405,8 +405,8 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
           {/* Hour labels */}
           <div style={{ width: 56, flexShrink: 0 }}>
             {hours.map(h => (
-              <div key={h} style={{ height: HOUR_PX, borderBottom: '1px solid #2e2e40', display: 'flex', alignItems: 'flex-start', paddingTop: 4, paddingLeft: 8 }}>
-                <span style={{ fontSize: 11, color: '#3f3f5a' }}>{String(h).padStart(2, '0')}:00</span>
+              <div key={h} style={{ height: HOUR_PX, borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'flex-start', paddingTop: 4, paddingLeft: 8 }}>
+                <span style={{ fontSize: 11, color: 'var(--border-light)' }}>{String(h).padStart(2, '0')}:00</span>
               </div>
             ))}
           </div>
@@ -419,7 +419,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
               return a.date === dayStr && effectiveOp === op.id;
             });
             return (
-              <div key={op.id} className="flex-1 relative" style={{ borderLeft: '1px solid #2e2e40', minWidth: 0 }}>
+              <div key={op.id} className="flex-1 relative" style={{ borderLeft: '1px solid var(--border)', minWidth: 0 }}>
                 {hours.map(h => (
                   <div key={h} style={{ height: HOUR_PX, borderBottom: '1px solid #1e1e2e' }}
                     onClick={() => openNew(dayStr, op.id, resolveStartTime(dayStr, op.id, h))}
@@ -446,8 +446,8 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                       <p className="text-xs font-semibold truncate" style={{ color }}>
                         {a.isBlock ? '🔒 ' + (a.blockReason || 'Blocco') : (client ? `${client.firstName} ${client.lastName}` : '—')}
                       </p>
-                      <p className="text-xs" style={{ color: '#a1a1aa', fontSize: 10 }}>{effectiveStart}–{effectiveEnd}</p>
-                      {svcNames && <p className="truncate" style={{ color: '#71717a', fontSize: 10 }}>{svcNames}</p>}
+                      <p className="text-xs" style={{ color: 'var(--text-3)', fontSize: 10 }}>{effectiveStart}–{effectiveEnd}</p>
+                      {svcNames && <p className="truncate" style={{ color: 'var(--muted)', fontSize: 10 }}>{svcNames}</p>}
                       <div onMouseDown={e => handleResizeStart(e, a)}
                         className="absolute bottom-0 left-0 right-0 flex items-center justify-center"
                         style={{ height: 10, cursor: 'ns-resize', background: `${color}30` }}>
@@ -465,22 +465,22 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
 
       {/* ─── WEEK VIEW: one column per day ───────────────────────────────── */}
       {view === 'week' && (
-      <div className="flex-1 overflow-auto rounded-2xl" style={{ border: '1px solid #2e2e40', background: '#1c1c27' }}>
-        <div className="flex sticky top-0 z-10" style={{ background: '#18181f', borderBottom: '1px solid #2e2e40' }}>
+      <div className="flex-1 overflow-auto rounded-2xl" style={{ border: '1px solid var(--border)', background: 'var(--bg-card)' }}>
+        <div className="flex sticky top-0 z-10" style={{ background: '#18181f', borderBottom: '1px solid var(--border)' }}>
           <div style={{ width: 56, flexShrink: 0 }} />
           {days.map((day, di) => (
             <div key={di} className="flex-1 text-center py-2 text-xs font-medium"
-              style={{ color: isSameDay(day, new Date()) ? '#818cf8' : '#71717a', borderLeft: '1px solid #2e2e40' }}>
+              style={{ color: isSameDay(day, new Date()) ? 'var(--accent-light)' : 'var(--muted)', borderLeft: '1px solid var(--border)' }}>
               <span className="block">{format(day, 'EEE', { locale: it })}</span>
-              <span className="block text-base font-bold" style={{ color: isSameDay(day, new Date()) ? '#818cf8' : '#d4d4d8' }}>{format(day, 'dd')}</span>
+              <span className="block text-base font-bold" style={{ color: isSameDay(day, new Date()) ? 'var(--accent-light)' : 'var(--text-2)' }}>{format(day, 'dd')}</span>
             </div>
           ))}
         </div>
         <div ref={gridRef} className="flex" style={{ minHeight: hours.length * HOUR_PX }}>
           <div style={{ width: 56, flexShrink: 0 }}>
             {hours.map(h => (
-              <div key={h} style={{ height: HOUR_PX, borderBottom: '1px solid #2e2e40', display: 'flex', alignItems: 'flex-start', paddingTop: 4, paddingLeft: 8 }}>
-                <span style={{ fontSize: 11, color: '#3f3f5a' }}>{String(h).padStart(2, '0')}:00</span>
+              <div key={h} style={{ height: HOUR_PX, borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'flex-start', paddingTop: 4, paddingLeft: 8 }}>
+                <span style={{ fontSize: 11, color: 'var(--border-light)' }}>{String(h).padStart(2, '0')}:00</span>
               </div>
             ))}
           </div>
@@ -490,7 +490,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
               draggingId === a.id && draggingPos ? draggingPos.date === dayStr : a.date === dayStr
             );
             return (
-              <div key={di} className="flex-1 relative" style={{ borderLeft: '1px solid #2e2e40' }}>
+              <div key={di} className="flex-1 relative" style={{ borderLeft: '1px solid var(--border)' }}>
                 {hours.map(h => (
                   <div key={h} style={{ height: HOUR_PX, borderBottom: '1px solid #1e1e2e' }}
                     onClick={() => {
@@ -519,7 +519,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                       <p className="text-xs font-semibold truncate" style={{ color }}>
                         {a.isBlock ? 'Blocco: ' + a.blockReason : (client ? `${client.firstName} ${client.lastName}` : '—')}
                       </p>
-                      <p className="text-xs truncate" style={{ color: '#a1a1aa' }}>{a.startTime}–{effectiveEnd}</p>
+                      <p className="text-xs truncate" style={{ color: 'var(--text-3)' }}>{a.startTime}–{effectiveEnd}</p>
                       <div onMouseDown={e => handleResizeStart(e, a)}
                         className="absolute bottom-0 left-0 right-0 flex items-center justify-center"
                         style={{ height: 10, cursor: 'ns-resize', background: `${color}30` }}>
@@ -538,10 +538,10 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
       {/* Quick Client Modal */}
       {showQuickClient && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)' }}>
-          <div className="w-full max-w-sm rounded-2xl p-5" style={{ background: '#18181f', border: '1px solid #2e2e40' }}>
+          <div className="w-full max-w-sm rounded-2xl p-5" style={{ background: '#18181f', border: '1px solid var(--border)' }}>
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-semibold text-white text-sm">Nuovo cliente rapido</h3>
-              <button onClick={() => setShowQuickClient(false)} style={{ background: 'none', border: 'none', color: '#71717a', cursor: 'pointer' }}><X size={16} /></button>
+              <button onClick={() => setShowQuickClient(false)} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}><X size={16} /></button>
             </div>
             <div className="space-y-2">
               <div><label style={labelStyle}>Nome *</label><input autoFocus value={quickClient.firstName} onChange={e => setQuickClient(p => ({ ...p, firstName: e.target.value }))} style={inputStyle} /></div>
@@ -549,7 +549,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
               <div><label style={labelStyle}>Telefono</label><input value={quickClient.phone} onChange={e => setQuickClient(p => ({ ...p, phone: e.target.value }))} style={inputStyle} /></div>
             </div>
             <div className="flex gap-2 mt-4">
-              <button onClick={() => setShowQuickClient(false)} style={{ flex: 1, background: '#12121a', border: '1px solid #2e2e40', color: '#71717a', borderRadius: '8px', padding: '8px', fontSize: '13px', cursor: 'pointer' }}>Annulla</button>
+              <button onClick={() => setShowQuickClient(false)} style={{ flex: 1, background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--muted)', borderRadius: '8px', padding: '8px', fontSize: '13px', cursor: 'pointer' }}>Annulla</button>
               <button onClick={handleQuickClientSave} style={{ ...btnPrimary, flex: 1, justifyContent: 'center' }}>Crea e seleziona</button>
             </div>
           </div>
@@ -559,7 +559,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
       {/* Appointment Modal */}
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
-          <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl p-6" style={{ background: '#18181f', border: '1px solid #2e2e40' }}>
+          <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl p-6" style={{ background: '#18181f', border: '1px solid var(--border)' }}>
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-semibold text-white">{editAppt ? 'Modifica Appuntamento' : 'Nuovo Appuntamento'}</h3>
               <div className="flex gap-2 items-center">
@@ -569,13 +569,13 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                     {(Object.keys(STATUS_LABELS) as AppointmentStatus[]).map(s => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
                   </select>
                 )}
-                <button onClick={() => setShowForm(false)} style={{ background: 'none', border: 'none', color: '#71717a', cursor: 'pointer' }}><X size={18} /></button>
+                <button onClick={() => setShowForm(false)} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}><X size={18} /></button>
               </div>
             </div>
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <input type="checkbox" id="isBlock" checked={form.isBlock} onChange={e => setForm(p => ({ ...p, isBlock: e.target.checked }))} />
-                <label htmlFor="isBlock" style={{ fontSize: '13px', color: '#d4d4d8' }}>Blocca orario (pausa / riunione)</label>
+                <label htmlFor="isBlock" style={{ fontSize: '13px', color: 'var(--text-2)' }}>Blocca orario (pausa / riunione)</label>
               </div>
               {form.isBlock ? (
                 <div><label style={labelStyle}>Motivo blocco</label><input value={form.blockReason} onChange={e => setForm(p => ({ ...p, blockReason: e.target.value }))} style={inputStyle} /></div>
@@ -583,7 +583,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label style={{ ...labelStyle, marginBottom: 0 }}>Cliente</label>
-                    <button onClick={() => setShowQuickClient(true)} style={{ background: 'none', border: 'none', color: '#818cf8', cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <button onClick={() => setShowQuickClient(true)} style={{ background: 'none', border: 'none', color: 'var(--accent-light)', cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', gap: 4 }}>
                       <UserPlus size={12} /> Nuovo cliente
                     </button>
                   </div>
@@ -614,7 +614,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                     {services.filter(s => s.active).map(s => (
                       <button key={s.id} type="button" onClick={() => handleServiceToggle(s.id)}
                         className="text-xs px-2.5 py-1 rounded-lg transition-all"
-                        style={{ background: form.serviceIds.includes(s.id) ? 'rgba(99,102,241,0.25)' : '#12121a', border: `1px solid ${form.serviceIds.includes(s.id) ? 'rgba(99,102,241,0.5)' : '#2e2e40'}`, color: form.serviceIds.includes(s.id) ? '#818cf8' : '#71717a', cursor: 'pointer' }}>
+                        style={{ background: form.serviceIds.includes(s.id) ? 'rgba(99,102,241,0.25)' : 'var(--bg-input)', border: `1px solid ${form.serviceIds.includes(s.id) ? 'rgba(99,102,241,0.5)' : 'var(--border)'}`, color: form.serviceIds.includes(s.id) ? 'var(--accent-light)' : 'var(--muted)', cursor: 'pointer' }}>
                         {s.name} ({s.duration}')
                       </button>
                     ))}
@@ -639,16 +639,16 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                 )}
               </div>
               <div className="flex gap-2">
-                <button onClick={() => setShowForm(false)} style={{ background: '#12121a', border: '1px solid #2e2e40', color: '#71717a', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', cursor: 'pointer' }}>Annulla</button>
+                <button onClick={() => setShowForm(false)} style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--muted)', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', cursor: 'pointer' }}>Annulla</button>
                 <button onClick={handleSave} style={btnPrimary}>Salva</button>
               </div>
             </div>
             {editAppt?.history && editAppt.history.length > 0 && (
-              <div className="mt-4 pt-4" style={{ borderTop: '1px solid #2e2e40' }}>
-                <p className="text-xs font-semibold mb-2" style={{ color: '#71717a' }}>Storico modifiche</p>
+              <div className="mt-4 pt-4" style={{ borderTop: '1px solid var(--border)' }}>
+                <p className="text-xs font-semibold mb-2" style={{ color: 'var(--muted)' }}>Storico modifiche</p>
                 <div className="space-y-1">
                   {[...editAppt.history].reverse().map((h, i) => (
-                    <p key={i} className="text-xs" style={{ color: '#3f3f5a' }}>
+                    <p key={i} className="text-xs" style={{ color: 'var(--border-light)' }}>
                       {format(parseISO(h.timestamp), 'dd/MM/yyyy HH:mm')} {String.fromCharCode(8212)} {h.action}
                     </p>
                   ))}
@@ -662,11 +662,11 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
       {/* Confirm delete appointment */}
       {confirmDeleteId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
-          <div className="w-full max-w-sm rounded-2xl p-6" style={{ background: '#18181f', border: '1px solid #2e2e40' }}>
+          <div className="w-full max-w-sm rounded-2xl p-6" style={{ background: '#18181f', border: '1px solid var(--border)' }}>
             <h3 className="font-semibold text-white mb-2">Eliminare appuntamento?</h3>
-            <p className="text-sm mb-4" style={{ color: '#71717a' }}>Questa azione non è reversibile.</p>
+            <p className="text-sm mb-4" style={{ color: 'var(--muted)' }}>Questa azione non è reversibile.</p>
             <div className="flex gap-2">
-              <button onClick={() => setConfirmDeleteId(null)} style={{ flex: 1, background: '#12121a', border: '1px solid #2e2e40', color: '#71717a', borderRadius: '8px', padding: '8px', fontSize: '13px', cursor: 'pointer' }}>Annulla</button>
+              <button onClick={() => setConfirmDeleteId(null)} style={{ flex: 1, background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--muted)', borderRadius: '8px', padding: '8px', fontSize: '13px', cursor: 'pointer' }}>Annulla</button>
               <button onClick={() => { deleteAppointment(confirmDeleteId); setConfirmDeleteId(null); setShowForm(false); }}
                 style={{ flex: 1, background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: '#f87171', borderRadius: '8px', padding: '8px', fontSize: '13px', cursor: 'pointer', fontWeight: 600 }}>Elimina</button>
             </div>

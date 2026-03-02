@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useSalon } from '@/context/SalonContext';
@@ -10,14 +10,14 @@ import { formatCurrency } from '@/lib/calculations';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-const inputStyle: React.CSSProperties = { background: '#12121a', border: '1px solid #2e2e40', borderRadius: '10px', padding: '9px 13px', color: '#f4f4f5', fontSize: '13px', outline: 'none', width: '100%' };
-const labelStyle: React.CSSProperties = { fontSize: '12px', color: '#71717a', marginBottom: '4px', display: 'block' };
-const btnPrimary: React.CSSProperties = { background: 'rgba(99,102,241,0.2)', border: '1px solid rgba(99,102,241,0.4)', color: '#818cf8', borderRadius: '10px', padding: '8px 16px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' };
-const card: React.CSSProperties = { background: '#1c1c27', border: '1px solid #2e2e40', borderRadius: '16px', padding: '20px' };
+const inputStyle: React.CSSProperties = { background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '10px', padding: '9px 13px', color: 'var(--text)', fontSize: '13px', outline: 'none', width: '100%' };
+const labelStyle: React.CSSProperties = { fontSize: '12px', color: 'var(--muted)', marginBottom: '4px', display: 'block' };
+const btnPrimary: React.CSSProperties = { background: 'rgba(99,102,241,0.2)', border: '1px solid rgba(99,102,241,0.4)', color: 'var(--accent-light)', borderRadius: '10px', padding: '8px 16px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' };
+const card: React.CSSProperties = { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '16px', padding: '20px' };
 
 const METHOD_ICONS: Record<PaymentMethod, React.ReactNode> = {
   cash: <Banknote size={14} style={{ color: '#22c55e' }} />,
-  card: <CreditCard size={14} style={{ color: '#818cf8' }} />,
+  card: <CreditCard size={14} style={{ color: 'var(--accent-light)' }} />,
   gift_card: <Gift size={14} style={{ color: '#f59e0b' }} />,
   mixed: <TrendingUp size={14} style={{ color: '#06b6d4' }} />,
 };
@@ -322,7 +322,7 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-white">Cassa</h1>
-          <p className="text-xs mt-0.5" style={{ color: '#71717a' }}>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>
             {format(parseISO(selectedDate), 'EEEE dd MMMM yyyy', { locale: it })}
           </p>
         </div>
@@ -352,13 +352,13 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
           { label: 'Totale incassato', value: formatCurrency(totals.total), color: '#22c55e', icon: <TrendingUp size={16} /> },
-          { label: 'Contanti', value: formatCurrency(totals.cash), color: '#d4d4d8', icon: <Banknote size={16} /> },
-          { label: 'Carta / POS', value: formatCurrency(totals.card), color: '#818cf8', icon: <CreditCard size={16} /> },
-          { label: 'Pagamenti', value: `${totals.count}`, color: '#71717a', icon: null },
+          { label: 'Contanti', value: formatCurrency(totals.cash), color: 'var(--text-2)', icon: <Banknote size={16} /> },
+          { label: 'Carta / POS', value: formatCurrency(totals.card), color: 'var(--accent-light)', icon: <CreditCard size={16} /> },
+          { label: 'Pagamenti', value: `${totals.count}`, color: 'var(--muted)', icon: null },
         ].map(k => (
           <div key={k.label} style={card} className="text-center">
             <p className="text-xl font-bold" style={{ color: k.color }}>{k.value}</p>
-            <p className="text-xs mt-1" style={{ color: '#71717a' }}>{k.label}</p>
+            <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>{k.label}</p>
           </div>
         ))}
       </div>
@@ -368,21 +368,21 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-semibold text-white">Movimenti del giorno</h3>
           <button onClick={() => setShowHistory(!showHistory)}
-            style={{ background: 'none', border: 'none', color: '#71717a', cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', gap: 4 }}>
+            style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', gap: 4 }}>
             {showHistory ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
             {showHistory ? 'Nascondi storico' : 'Mostra storico'}
           </button>
         </div>
-        {dayPayments.length === 0 && <p style={{ color: '#3f3f5a', fontSize: '13px' }}>Nessun pagamento registrato per questa data.</p>}
+        {dayPayments.length === 0 && <p style={{ color: 'var(--border-light)', fontSize: '13px' }}>Nessun pagamento registrato per questa data.</p>}
         <div className="space-y-2">
           {dayPayments.map(p => (
-            <div key={p.id} style={{ background: '#12121a', border: '1px solid #2e2e40', borderRadius: '12px' }}>
+            <div key={p.id} style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '12px' }}>
               <div className="flex items-center justify-between p-3 cursor-pointer" onClick={() => setExpandedPaymentId(expandedPaymentId === p.id ? null : p.id)}>
                 <div className="flex items-center gap-3">
                   {METHOD_ICONS[p.paymentMethod]}
                   <div>
                     <p className="text-sm font-medium text-white">{p.clientName || '— Cliente non registrato —'}</p>
-                    <p style={{ fontSize: '11px', color: '#71717a' }}>
+                    <p style={{ fontSize: '11px', color: 'var(--muted)' }}>
                       {PAYMENT_METHOD_LABELS[p.paymentMethod]} · {p.items.map(i => i.serviceName).join(', ')}
                     </p>
                   </div>
@@ -396,9 +396,9 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
                 </div>
               </div>
               {expandedPaymentId === p.id && (
-                <div className="px-3 pb-3 space-y-1" style={{ borderTop: '1px solid #2e2e40', paddingTop: 8 }}>
+                <div className="px-3 pb-3 space-y-1" style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}>
                   {p.items.map((item, i) => (
-                    <div key={i} className="flex justify-between text-xs" style={{ color: '#a1a1aa' }}>
+                    <div key={i} className="flex justify-between text-xs" style={{ color: 'var(--text-3)' }}>
                       <span>{item.serviceName}</span><span>{formatCurrency(item.price)}</span>
                     </div>
                   ))}
@@ -407,7 +407,7 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
                       <span>Sconto {p.discountPct > 0 ? `(${p.discountPct}%)` : ''}</span><span>-{formatCurrency(p.discountEur)}</span>
                     </div>
                   )}
-                  {p.notes && <p className="text-xs mt-1" style={{ color: '#71717a' }}>Note: {p.notes}</p>}
+                  {p.notes && <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>Note: {p.notes}</p>}
                 </div>
               )}
             </div>
@@ -416,10 +416,10 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
 
         {/* Historical sessions */}
         {showHistory && (
-          <div className="mt-4 pt-4" style={{ borderTop: '1px solid #2e2e40' }}>
-            <h4 className="text-xs font-semibold mb-3" style={{ color: '#71717a' }}>Sessioni cassa chiuse</h4>
+          <div className="mt-4 pt-4" style={{ borderTop: '1px solid var(--border)' }}>
+            <h4 className="text-xs font-semibold mb-3" style={{ color: 'var(--muted)' }}>Sessioni cassa chiuse</h4>
             {cashSessions.filter(s => s.closedAt).slice(0, 20).map(s => (
-              <div key={s.id} className="flex justify-between items-center text-xs py-2" style={{ borderBottom: '1px solid #2e2e40', color: '#a1a1aa' }}>
+              <div key={s.id} className="flex justify-between items-center text-xs py-2" style={{ borderBottom: '1px solid var(--border)', color: 'var(--text-3)' }}>
                 <span style={{ fontWeight: 500 }}>{format(parseISO(s.date), 'dd/MM/yyyy')}</span>
                 <span>Apertura: {formatCurrency(s.openingBalance)}</span>
                 <span>Chiusura: {s.closingBalance != null ? formatCurrency(s.closingBalance) : '—'}</span>
@@ -427,7 +427,7 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
                   {s.closingBalance != null ? (s.closingBalance >= s.openingBalance ? '+' : '') + formatCurrency(s.closingBalance - s.openingBalance) : '—'}
                 </span>
                 <button onClick={() => generateCashPdf(s)} title="Scarica PDF"
-                  style={{ background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', color: '#818cf8', borderRadius: '6px', padding: '3px 7px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}>
+                  style={{ background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', color: 'var(--accent-light)', borderRadius: '6px', padding: '3px 7px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}>
                   <Printer size={11} /> PDF
                 </button>
               </div>
@@ -439,11 +439,11 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
       {/* Confirm delete modal */}
       {confirmDeleteId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
-          <div className="w-full max-w-sm rounded-2xl p-6" style={{ background: '#18181f', border: '1px solid #2e2e40' }}>
+          <div className="w-full max-w-sm rounded-2xl p-6" style={{ background: '#18181f', border: '1px solid var(--border)' }}>
             <h3 className="font-semibold text-white mb-2">Eliminare incasso?</h3>
-            <p className="text-sm mb-4" style={{ color: '#71717a' }}>Questa azione non è reversibile.</p>
+            <p className="text-sm mb-4" style={{ color: 'var(--muted)' }}>Questa azione non è reversibile.</p>
             <div className="flex gap-2">
-              <button onClick={() => setConfirmDeleteId(null)} style={{ flex: 1, background: '#12121a', border: '1px solid #2e2e40', color: '#71717a', borderRadius: '8px', padding: '8px', fontSize: '13px', cursor: 'pointer' }}>Annulla</button>
+              <button onClick={() => setConfirmDeleteId(null)} style={{ flex: 1, background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--muted)', borderRadius: '8px', padding: '8px', fontSize: '13px', cursor: 'pointer' }}>Annulla</button>
               <button onClick={() => {
                   // Restore appointment to calendar if payment was linked
                   const pay = payments.find(p => p.id === confirmDeleteId);
@@ -460,13 +460,13 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
       {/* Open session modal */}
       {showOpenSession && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
-          <div className="w-full max-w-sm rounded-2xl p-6" style={{ background: '#18181f', border: '1px solid #2e2e40' }}>
+          <div className="w-full max-w-sm rounded-2xl p-6" style={{ background: '#18181f', border: '1px solid var(--border)' }}>
             <h3 className="font-semibold text-white mb-4">Apri turno cassa</h3>
             <div><label style={labelStyle}>Fondo cassa iniziale (€)</label>
               <input type="number" min={0} step={0.01} value={openingBalance} onChange={e => setOpeningBalance(e.target.value)} style={inputStyle} />
             </div>
             <div className="flex gap-2 mt-4">
-              <button onClick={() => setShowOpenSession(false)} style={{ flex: 1, background: '#12121a', border: '1px solid #2e2e40', color: '#71717a', borderRadius: '8px', padding: '8px', fontSize: '13px', cursor: 'pointer' }}>Annulla</button>
+              <button onClick={() => setShowOpenSession(false)} style={{ flex: 1, background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--muted)', borderRadius: '8px', padding: '8px', fontSize: '13px', cursor: 'pointer' }}>Annulla</button>
               <button onClick={() => { addCashSession(parseFloat(openingBalance) || 0); setShowOpenSession(false); }}
                 style={{ ...btnPrimary, flex: 1, justifyContent: 'center' }}>Apri turno</button>
             </div>
@@ -477,9 +477,9 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
       {/* Close session modal */}
       {showCloseSession && todaySession && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
-          <div className="w-full max-w-sm rounded-2xl p-6" style={{ background: '#18181f', border: '1px solid #2e2e40' }}>
+          <div className="w-full max-w-sm rounded-2xl p-6" style={{ background: '#18181f', border: '1px solid var(--border)' }}>
             <h3 className="font-semibold text-white mb-4">Chiudi turno cassa</h3>
-            <div className="space-y-2 mb-4 text-sm" style={{ color: '#a1a1aa' }}>
+            <div className="space-y-2 mb-4 text-sm" style={{ color: 'var(--text-3)' }}>
               <div className="flex justify-between"><span>Fondo iniziale:</span><span>{formatCurrency(todaySession.openingBalance)}</span></div>
               <div className="flex justify-between"><span>Incasso contanti:</span><span>{formatCurrency(totals.cash)}</span></div>
               <div className="flex justify-between font-semibold text-white"><span>Totale in cassa:</span><span>{formatCurrency(todaySession.openingBalance + totals.cash)}</span></div>
@@ -488,7 +488,7 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
               <input type="number" min={0} step={0.01} value={closingBalance} onChange={e => setClosingBalance(e.target.value)} style={inputStyle} />
             </div>
             <div className="flex gap-2 mt-4">
-              <button onClick={() => setShowCloseSession(false)} style={{ flex: 1, background: '#12121a', border: '1px solid #2e2e40', color: '#71717a', borderRadius: '8px', padding: '8px', fontSize: '13px', cursor: 'pointer' }}>Annulla</button>
+              <button onClick={() => setShowCloseSession(false)} style={{ flex: 1, background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--muted)', borderRadius: '8px', padding: '8px', fontSize: '13px', cursor: 'pointer' }}>Annulla</button>
               <button onClick={() => {
                 closeCashSession(todaySession.id, parseFloat(closingBalance) || 0);
                 // Genera PDF immediatamente dopo la chiusura
@@ -505,10 +505,10 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
       {/* New Payment modal */}
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
-          <div className="w-full max-w-lg max-h-[92vh] overflow-y-auto rounded-2xl p-6" style={{ background: '#18181f', border: '1px solid #2e2e40' }}>
+          <div className="w-full max-w-lg max-h-[92vh] overflow-y-auto rounded-2xl p-6" style={{ background: '#18181f', border: '1px solid var(--border)' }}>
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-semibold text-white">Nuovo incasso</h3>
-              <button onClick={() => setShowForm(false)} style={{ background: 'none', border: 'none', color: '#71717a', cursor: 'pointer' }}><X size={18} /></button>
+              <button onClick={() => setShowForm(false)} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}><X size={18} /></button>
             </div>
             <div className="space-y-3">
               {/* Link to appointment */}
@@ -578,8 +578,8 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
                 </div>
 
                 {form.items.map((item, i) => (
-                  <div key={i} className="flex items-center justify-between text-sm py-1.5 px-2 rounded-lg mb-1" style={{ background: '#12121a', border: '1px solid #2e2e40' }}>
-                    <span style={{ color: '#d4d4d8' }}>{item.serviceName}</span>
+                  <div key={i} className="flex items-center justify-between text-sm py-1.5 px-2 rounded-lg mb-1" style={{ background: 'var(--bg-input)', border: '1px solid var(--border)' }}>
+                    <span style={{ color: 'var(--text-2)' }}>{item.serviceName}</span>
                     <div className="flex items-center gap-3">
                       <input type="number" min={0} step={0.01} value={item.price}
                         onChange={e => setForm(p => ({ ...p, items: p.items.map((it, j) => j === i ? { ...it, price: parseFloat(e.target.value) || 0 } : it) }))}
@@ -598,11 +598,11 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
               </div>
 
               {/* Total preview */}
-              <div className="flex justify-between text-sm px-1" style={{ color: '#a1a1aa' }}>
+              <div className="flex justify-between text-sm px-1" style={{ color: 'var(--text-3)' }}>
                 <span>Subtotale</span><span>{formatCurrency(formSubtotal)}</span>
               </div>
               {formDiscount > 0 && <div className="flex justify-between text-sm px-1" style={{ color: '#f59e0b' }}><span>Sconto</span><span>-{formatCurrency(formDiscount)}</span></div>}
-              <div className="flex justify-between font-bold px-1" style={{ color: '#22c55e', fontSize: 15, borderTop: '1px solid #2e2e40', paddingTop: 8 }}>
+              <div className="flex justify-between font-bold px-1" style={{ color: '#22c55e', fontSize: 15, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
                 <span>Totale</span><span>{formatCurrency(formTotal)}</span>
               </div>
 
@@ -613,7 +613,7 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
                   {(Object.keys(PAYMENT_METHOD_LABELS) as PaymentMethod[]).map(m => (
                     <button key={m} onClick={() => setForm(p => ({ ...p, paymentMethod: m }))}
                       className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg"
-                      style={{ background: form.paymentMethod === m ? 'rgba(99,102,241,0.2)' : '#12121a', border: `1px solid ${form.paymentMethod === m ? 'rgba(99,102,241,0.5)' : '#2e2e40'}`, color: form.paymentMethod === m ? '#818cf8' : '#71717a', cursor: 'pointer' }}>
+                      style={{ background: form.paymentMethod === m ? 'rgba(99,102,241,0.2)' : 'var(--bg-input)', border: `1px solid ${form.paymentMethod === m ? 'rgba(99,102,241,0.5)' : 'var(--border)'}`, color: form.paymentMethod === m ? 'var(--accent-light)' : 'var(--muted)', cursor: 'pointer' }}>
                       {METHOD_ICONS[m]} {PAYMENT_METHOD_LABELS[m]}
                     </button>
                   ))}
@@ -638,7 +638,7 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
             </div>
 
             <div className="flex justify-end gap-2 mt-4">
-              <button onClick={() => setShowForm(false)} style={{ background: '#12121a', border: '1px solid #2e2e40', color: '#71717a', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', cursor: 'pointer' }}>Annulla</button>
+              <button onClick={() => setShowForm(false)} style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--muted)', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', cursor: 'pointer' }}>Annulla</button>
               <button onClick={handleSave} disabled={form.items.length === 0} style={{ ...btnPrimary, opacity: form.items.length === 0 ? 0.4 : 1 }}>Registra incasso</button>
             </div>
           </div>

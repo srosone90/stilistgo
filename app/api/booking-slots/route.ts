@@ -78,7 +78,8 @@ export async function GET(req: NextRequest) {
       a.date === date &&
       a.status !== 'cancelled' &&
       a.status !== 'no-show' &&
-      (!operatorId || a.operatorId === operatorId)           // filter by operator if given
+      // Block if: no operator filter, OR appointment has no operator assigned, OR matches the requested operator
+      (!operatorId || !a.operatorId || a.operatorId === operatorId)
     );
 
     const available = ALL_SLOTS.filter(slot => {

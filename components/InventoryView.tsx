@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useSalon } from '@/context/SalonContext';
@@ -9,10 +9,10 @@ import { format, parseISO } from 'date-fns';
 import { formatCurrency } from '@/lib/calculations';
 import { Plus, X, Pencil, Trash2, AlertTriangle, Package } from 'lucide-react';
 
-const card: React.CSSProperties = { background: '#1c1c27', border: '1px solid #2e2e40', borderRadius: '16px', padding: '20px' };
-const inputStyle: React.CSSProperties = { background: '#12121a', border: '1px solid #2e2e40', borderRadius: '10px', padding: '9px 13px', color: '#f4f4f5', fontSize: '13px', outline: 'none', width: '100%' };
-const labelStyle: React.CSSProperties = { fontSize: '12px', color: '#71717a', marginBottom: '4px', display: 'block' };
-const btnPrimary: React.CSSProperties = { background: 'rgba(99,102,241,0.2)', border: '1px solid rgba(99,102,241,0.4)', color: '#818cf8', borderRadius: '10px', padding: '8px 16px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' };
+const card: React.CSSProperties = { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '16px', padding: '20px' };
+const inputStyle: React.CSSProperties = { background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '10px', padding: '9px 13px', color: 'var(--text)', fontSize: '13px', outline: 'none', width: '100%' };
+const labelStyle: React.CSSProperties = { fontSize: '12px', color: 'var(--muted)', marginBottom: '4px', display: 'block' };
+const btnPrimary: React.CSSProperties = { background: 'rgba(99,102,241,0.2)', border: '1px solid rgba(99,102,241,0.4)', color: 'var(--accent-light)', borderRadius: '10px', padding: '8px 16px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' };
 
 const EMPTY_PRODUCT: Omit<Product, 'id' | 'createdAt'> = {
   name: '', brand: '', category: '', unit: 'pz',
@@ -69,31 +69,35 @@ export default function InventoryView({ newTrigger }: { newTrigger?: number }) {
   function handleSave() {
     if (!form.name.trim()) return;
     if (editProd) {
-      // Always preserve the live stock so editing product info never resets stock movements
+      // Preserve the live stock so editing product info never resets stock movements
       const liveStock = products.find(p => p.id === editProd.id)?.stock ?? editProd.stock;
       updateProduct({ ...editProd, ...form, stock: liveStock });
     } else {
-      // Creating new product: save with initial stock
-      const initialStock = form.stock;
-      addProduct({ ...form, stock: 0 }); // start at 0, movement below sets the real stock
-      // If the user specified an initial stock, create a load movement for traceability
-      if (initialStock > 0) {
-        // We need the new product id — addProduct is synchronous state update,
-        // so we schedule the movement via a tiny timeout to let the id propagate
-        setTimeout(() => {
-          // find the just-created product by name+brand
-          const newProd = products.find(p => p.name === form.name && p.brand === form.brand);
-          if (newProd) {
-            addStockMovement({
-              productId: newProd.id,
-              type: 'load',
-              quantity: initialStock,
-              date: format(new Date(), 'yyyy-MM-dd'),
-              notes: 'Giacenza iniziale',
-              operatorId: '',
-            });
-          }
-        }, 50);
+      // Creating new product: start stock at 0, then add a movement if needed
+      const newId = addProduct({ ...form, stock: 0 });
+      if (form.stock > 0) {
+        addStockMovement({
+          productId: newId,
+          type: 'load',
+          quantity: form.stock,
+          date: format(new Date(), 'yyyy-MM-dd'),
+          notes: 'Giacenza iniziale',
+          operatorId: '',
+        });
+        // Registra anche la spesa in contabilità se il prodotto ha un prezzo di acquisto
+        if (form.purchasePrice > 0) {
+          const totalCost = form.purchasePrice * form.stock;
+          addEntry({
+            type: 'expense',
+            date: format(new Date(), 'yyyy-MM-dd'),
+            amount: totalCost,
+            supplier: form.brand || 'Fornitore',
+            expenseType: 'Acquisto Prodotti',
+            dueDate: '',
+            status: 'Pagato',
+            notes: `Carico magazzino: ${form.name} ×${form.stock} ${form.unit}`,
+          } as Parameters<typeof addEntry>[0]);
+        }
       }
     }
     setShowProdForm(false);
@@ -133,7 +137,7 @@ export default function InventoryView({ newTrigger }: { newTrigger?: number }) {
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-2xl font-bold text-white">Magazzino</h1>
-            <p className="text-xs mt-1" style={{ color: '#71717a' }}>{products.filter(p => p.active).length} prodotti</p>
+            <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>{products.filter(p => p.active).length} prodotti</p>
           </div>
           <button onClick={openNew} style={btnPrimary}><Plus size={14} /></button>
         </div>
@@ -154,22 +158,22 @@ export default function InventoryView({ newTrigger }: { newTrigger?: number }) {
             </select>
             <button onClick={() => setShowOnlyLow(p => !p)}
               className="px-3 py-2 rounded-lg text-xs font-medium"
-              style={{ background: showOnlyLow ? 'rgba(245,158,11,0.2)' : '#12121a', border: `1px solid ${showOnlyLow ? 'rgba(245,158,11,0.5)' : '#2e2e40'}`, color: showOnlyLow ? '#f59e0b' : '#71717a', cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap' }}>
+              style={{ background: showOnlyLow ? 'rgba(245,158,11,0.2)' : 'var(--bg-input)', border: `1px solid ${showOnlyLow ? 'rgba(245,158,11,0.5)' : 'var(--border)'}`, color: showOnlyLow ? '#f59e0b' : 'var(--muted)', cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap' }}>
               ⚠ Scorte basse
             </button>
           </div>
         </div>
 
         <div className="flex flex-col gap-2 overflow-y-auto" style={{ flex: 1 }}>
-          {filtered.length === 0 && <p style={{ color: '#3f3f5a', fontSize: '13px' }}>Nessun prodotto trovato.</p>}
+          {filtered.length === 0 && <p style={{ color: 'var(--border-light)', fontSize: '13px' }}>Nessun prodotto trovato.</p>}
           {filtered.map(p => (
             <button key={p.id} onClick={() => setSelectedId(p.id)}
               className="text-left rounded-xl px-3 py-3 transition-all"
-              style={{ background: selectedId === p.id ? 'rgba(99,102,241,0.15)' : '#1c1c27', border: `1px solid ${selectedId === p.id ? 'rgba(99,102,241,0.5)' : p.stock <= p.minStock ? 'rgba(245,158,11,0.4)' : '#2e2e40'}` }}>
+              style={{ background: selectedId === p.id ? 'rgba(99,102,241,0.15)' : 'var(--bg-card)', border: `1px solid ${selectedId === p.id ? 'rgba(99,102,241,0.5)' : p.stock <= p.minStock ? 'rgba(245,158,11,0.4)' : 'var(--border)'}` }}>
               <div className="flex justify-between items-start">
                 <div>
                   <p className="text-sm font-medium text-white">{p.name}</p>
-                  <p style={{ fontSize: '11px', color: '#71717a' }}>{p.brand}{p.category ? ` · ${p.category}` : ''}</p>
+                  <p style={{ fontSize: '11px', color: 'var(--muted)' }}>{p.brand}{p.category ? ` · ${p.category}` : ''}</p>
                 </div>
                 <span className="text-xs font-bold" style={{ color: p.stock <= p.minStock ? '#f59e0b' : '#22c55e' }}>
                   {p.stock} {p.unit}
@@ -183,20 +187,20 @@ export default function InventoryView({ newTrigger }: { newTrigger?: number }) {
       {/* ── RIGHT: product detail ── */}
       <div className="flex-1 overflow-y-auto">
         {!selected ? (
-          <div className="hidden md:flex items-center justify-center h-full" style={{ color: '#3f3f5a' }}>Seleziona un prodotto dalla lista</div>
+          <div className="hidden md:flex items-center justify-center h-full" style={{ color: 'var(--border-light)' }}>Seleziona un prodotto dalla lista</div>
         ) : (
           <div className="space-y-4">
-            <button className="md:hidden flex items-center gap-1 text-sm mb-1" style={{ color: '#818cf8', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }} onClick={() => setSelectedId(null)}>
+            <button className="md:hidden flex items-center gap-1 text-sm mb-1" style={{ color: 'var(--accent-light)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }} onClick={() => setSelectedId(null)}>
               ← Torna alla lista
             </button>
             <div className="flex items-start justify-between">
               <div>
                 <h2 className="text-xl font-bold text-white">{selected.name}</h2>
-                <p style={{ fontSize: '13px', color: '#71717a' }}>{selected.brand}{selected.category ? ` · ${selected.category}` : ''}</p>
+                <p style={{ fontSize: '13px', color: 'var(--muted)' }}>{selected.brand}{selected.category ? ` · ${selected.category}` : ''}</p>
               </div>
               <div className="flex gap-2">
                 <button onClick={() => { setShowMoveForm(true); setMoveForm({ ...EMPTY_MOVEMENT, productId: selected.id }); }} style={btnPrimary}><Plus size={14} /> Movimento</button>
-                <button onClick={() => openEdit(selected)} style={{ ...btnPrimary, color: '#71717a', borderColor: '#2e2e40', background: '#12121a' }}><Pencil size={14} /></button>
+                <button onClick={() => openEdit(selected)} style={{ ...btnPrimary, color: 'var(--muted)', borderColor: 'var(--border)', background: 'var(--bg-input)' }}><Pencil size={14} /></button>
                 <button onClick={() => { deleteProduct(selected.id); setSelectedId(null); }}
                   style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: '#f87171', borderRadius: '10px', padding: '8px 12px', fontSize: '13px', cursor: 'pointer' }}>
                   <Trash2 size={14} />
@@ -208,13 +212,13 @@ export default function InventoryView({ newTrigger }: { newTrigger?: number }) {
             <div className="grid grid-cols-4 gap-3">
               {[
                 { label: 'Giacenza', value: `${selected.stock} ${selected.unit}`, color: selected.stock <= selected.minStock ? '#f59e0b' : '#22c55e' },
-                { label: 'Soglia minima', value: `${selected.minStock} ${selected.unit}`, color: '#71717a' },
-                { label: 'Prezzo acquisto', value: formatCurrency(selected.purchasePrice), color: '#d4d4d8' },
-                { label: 'Prezzo vendita', value: selected.isForSale ? formatCurrency(selected.salePrice) : '—', color: '#818cf8' },
+                { label: 'Soglia minima', value: `${selected.minStock} ${selected.unit}`, color: 'var(--muted)' },
+                { label: 'Prezzo acquisto', value: formatCurrency(selected.purchasePrice), color: 'var(--text-2)' },
+                { label: 'Prezzo vendita', value: selected.isForSale ? formatCurrency(selected.salePrice) : '—', color: 'var(--accent-light)' },
               ].map(k => (
                 <div key={k.label} style={card} className="text-center">
                   <p className="text-xl font-bold" style={{ color: k.color }}>{k.value}</p>
-                  <p className="text-xs mt-1" style={{ color: '#71717a' }}>{k.label}</p>
+                  <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>{k.label}</p>
                 </div>
               ))}
             </div>
@@ -229,16 +233,16 @@ export default function InventoryView({ newTrigger }: { newTrigger?: number }) {
             {/* Movement history */}
             <div style={card}>
               <h3 className="text-sm font-semibold text-white mb-3">Storico movimenti</h3>
-              {productMovements.length === 0 && <p style={{ color: '#3f3f5a', fontSize: '13px' }}>Nessun movimento registrato.</p>}
+              {productMovements.length === 0 && <p style={{ color: 'var(--border-light)', fontSize: '13px' }}>Nessun movimento registrato.</p>}
               <div className="space-y-2">
                 {productMovements.map(m => (
-                  <div key={m.id} className="flex items-center justify-between text-sm py-1.5" style={{ borderBottom: '1px solid #2e2e40' }}>
+                  <div key={m.id} className="flex items-center justify-between text-sm py-1.5" style={{ borderBottom: '1px solid var(--border)' }}>
                     <div>
-                      <span style={{ color: '#d4d4d8' }}>{STOCK_MOVEMENT_LABELS[m.type]}</span>
-                      {m.notes && <span style={{ color: '#71717a', marginLeft: 8, fontSize: '12px' }}>{m.notes}</span>}
+                      <span style={{ color: 'var(--text-2)' }}>{STOCK_MOVEMENT_LABELS[m.type]}</span>
+                      {m.notes && <span style={{ color: 'var(--muted)', marginLeft: 8, fontSize: '12px' }}>{m.notes}</span>}
                     </div>
                     <div className="flex items-center gap-4">
-                      <span style={{ fontSize: '12px', color: '#71717a' }}>{format(parseISO(m.date), 'dd/MM/yyyy')}</span>
+                      <span style={{ fontSize: '12px', color: 'var(--muted)' }}>{format(parseISO(m.date), 'dd/MM/yyyy')}</span>
                       <span className="font-semibold" style={{ color: m.quantity > 0 ? '#22c55e' : '#ef4444', minWidth: 60, textAlign: 'right' }}>
                         {m.quantity > 0 ? '+' : ''}{m.quantity} {selected.unit}
                       </span>
@@ -254,10 +258,10 @@ export default function InventoryView({ newTrigger }: { newTrigger?: number }) {
       {/* ── Modal: Product Form ── */}
       {showProdForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
-          <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl p-6" style={{ background: '#18181f', border: '1px solid #2e2e40' }}>
+          <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl p-6" style={{ background: '#18181f', border: '1px solid var(--border)' }}>
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-semibold text-white">{editProd ? 'Modifica Prodotto' : 'Nuovo Prodotto'}</h3>
-              <button onClick={() => setShowProdForm(false)} style={{ background: 'none', border: 'none', color: '#71717a', cursor: 'pointer' }}><X size={18} /></button>
+              <button onClick={() => setShowProdForm(false)} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}><X size={18} /></button>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2"><label style={labelStyle}>Nome *</label><input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} style={inputStyle} /></div>
@@ -280,7 +284,7 @@ export default function InventoryView({ newTrigger }: { newTrigger?: number }) {
                     <input autoFocus value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))}
                       placeholder="Nome nuova categoria..." style={inputStyle} />
                     <button type="button" onClick={() => { setIsNewCategory(false); setForm(p => ({ ...p, category: '' })); }}
-                      style={{ background: '#12121a', border: '1px solid #2e2e40', color: '#71717a', borderRadius: '8px', padding: '0 10px', fontSize: '12px', cursor: 'pointer', whiteSpace: 'nowrap' }}>← Annulla</button>
+                      style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--muted)', borderRadius: '8px', padding: '0 10px', fontSize: '12px', cursor: 'pointer', whiteSpace: 'nowrap' }}>← Annulla</button>
                   </div>
                 )}
               </div>
@@ -288,7 +292,7 @@ export default function InventoryView({ newTrigger }: { newTrigger?: number }) {
               <div>
                 <label style={labelStyle}>Giacenza attuale</label>
                 {editProd ? (
-                  <div style={{ ...inputStyle, color: '#71717a', userSelect: 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ ...inputStyle, color: 'var(--muted)', userSelect: 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <span>{products.find(p => p.id === editProd.id)?.stock ?? editProd.stock} {form.unit}</span>
                     <span style={{ fontSize: '11px', opacity: 0.7 }}>modifica tramite movimenti</span>
                   </div>
@@ -300,18 +304,18 @@ export default function InventoryView({ newTrigger }: { newTrigger?: number }) {
               <div><label style={labelStyle}>Prezzo acquisto (€)</label><input type="number" min={0} step={0.01} value={form.purchasePrice} onChange={e => setForm(p => ({ ...p, purchasePrice: Number(e.target.value) }))} style={inputStyle} /></div>
               <div><label style={labelStyle}>Prezzo vendita (€)</label><input type="number" min={0} step={0.01} value={form.salePrice} onChange={e => setForm(p => ({ ...p, salePrice: Number(e.target.value) }))} style={inputStyle} /></div>
               <div className="col-span-2 flex gap-4">
-                <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: '#d4d4d8' }}>
+                <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: 'var(--text-2)' }}>
                   <input type="checkbox" checked={form.isForSale} onChange={e => setForm(p => ({ ...p, isForSale: e.target.checked }))} />
                   In vendita al cliente
                 </label>
-                <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: '#d4d4d8' }}>
+                <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: 'var(--text-2)' }}>
                   <input type="checkbox" checked={form.active} onChange={e => setForm(p => ({ ...p, active: e.target.checked }))} />
                   Prodotto attivo
                 </label>
               </div>
             </div>
             <div className="flex justify-end gap-2 mt-4">
-              <button onClick={() => setShowProdForm(false)} style={{ background: '#12121a', border: '1px solid #2e2e40', color: '#71717a', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', cursor: 'pointer' }}>Annulla</button>
+              <button onClick={() => setShowProdForm(false)} style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--muted)', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', cursor: 'pointer' }}>Annulla</button>
               <button onClick={handleSave} style={btnPrimary}>Salva</button>
             </div>
           </div>
@@ -321,10 +325,10 @@ export default function InventoryView({ newTrigger }: { newTrigger?: number }) {
       {/* ── Modal: Movement Form ── */}
       {showMoveForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
-          <div className="w-full max-w-sm rounded-2xl p-6" style={{ background: '#18181f', border: '1px solid #2e2e40' }}>
+          <div className="w-full max-w-sm rounded-2xl p-6" style={{ background: '#18181f', border: '1px solid var(--border)' }}>
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-semibold text-white">Registra Movimento</h3>
-              <button onClick={() => setShowMoveForm(false)} style={{ background: 'none', border: 'none', color: '#71717a', cursor: 'pointer' }}><X size={18} /></button>
+              <button onClick={() => setShowMoveForm(false)} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}><X size={18} /></button>
             </div>
             <div className="space-y-3">
               <div>
@@ -345,7 +349,7 @@ export default function InventoryView({ newTrigger }: { newTrigger?: number }) {
               <div><label style={labelStyle}>Note</label><input value={moveForm.notes} onChange={e => setMoveForm(p => ({ ...p, notes: e.target.value }))} style={inputStyle} /></div>
             </div>
             <div className="flex justify-end gap-2 mt-4">
-              <button onClick={() => setShowMoveForm(false)} style={{ background: '#12121a', border: '1px solid #2e2e40', color: '#71717a', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', cursor: 'pointer' }}>Annulla</button>
+              <button onClick={() => setShowMoveForm(false)} style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--muted)', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', cursor: 'pointer' }}>Annulla</button>
               <button onClick={handleAddMovement} style={btnPrimary}>Salva</button>
             </div>
           </div>

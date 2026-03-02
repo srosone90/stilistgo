@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
@@ -20,11 +20,11 @@ const today = format(new Date(), 'yyyy-MM-dd');
 
 const inputStyle: React.CSSProperties = {
   width: '100%',
-  background: '#12121a',
-  border: '1px solid #2e2e40',
+  background: 'var(--bg-input)',
+  border: '1px solid var(--border)',
   borderRadius: '10px',
   padding: '10px 14px',
-  color: '#f4f4f5',
+  color: 'var(--text)',
   fontSize: '14px',
   outline: 'none',
 };
@@ -33,7 +33,7 @@ const labelStyle: React.CSSProperties = {
   display: 'block',
   fontSize: '12px',
   fontWeight: 500,
-  color: '#71717a',
+  color: 'var(--muted)',
   marginBottom: '6px',
 };
 
@@ -95,9 +95,9 @@ export default function EntryForm({ onClose, defaultType = 'income' }: EntryForm
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}>
-      <div className="w-full max-w-lg rounded-2xl shadow-2xl" style={{ background: '#1c1c27', border: '1px solid #2e2e40' }}>
+      <div className="w-full max-w-lg rounded-2xl shadow-2xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid #2e2e40' }}>
+        <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid var(--border)' }}>
           <h2 className="font-bold text-white text-lg">Nuova Voce</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors p-1 rounded-lg hover:bg-white/10">
             <X size={20} />
@@ -106,12 +106,12 @@ export default function EntryForm({ onClose, defaultType = 'income' }: EntryForm
 
         {/* Type toggle */}
         <div className="px-6 pt-5">
-          <div className="flex rounded-xl overflow-hidden" style={{ background: '#12121a', border: '1px solid #2e2e40' }}>
+          <div className="flex rounded-xl overflow-hidden" style={{ background: 'var(--bg-input)', border: '1px solid var(--border)' }}>
             <button
               type="button"
               onClick={() => setType('income')}
               className="flex-1 py-2 text-sm font-semibold transition-all"
-              style={type === 'income' ? { background: 'rgba(34,197,94,0.2)', color: '#22c55e', border: 'none' } : { background: 'transparent', color: '#71717a', border: 'none' }}
+              style={type === 'income' ? { background: 'rgba(34,197,94,0.2)', color: '#22c55e', border: 'none' } : { background: 'transparent', color: 'var(--muted)', border: 'none' }}
             >
               💰 Entrata
             </button>
@@ -119,7 +119,7 @@ export default function EntryForm({ onClose, defaultType = 'income' }: EntryForm
               type="button"
               onClick={() => setType('expense')}
               className="flex-1 py-2 text-sm font-semibold transition-all"
-              style={type === 'expense' ? { background: 'rgba(239,68,68,0.2)', color: '#ef4444', border: 'none' } : { background: 'transparent', color: '#71717a', border: 'none' }}
+              style={type === 'expense' ? { background: 'rgba(239,68,68,0.2)', color: '#ef4444', border: 'none' } : { background: 'transparent', color: 'var(--muted)', border: 'none' }}
             >
               💸 Uscita
             </button>
@@ -214,7 +214,7 @@ export default function EntryForm({ onClose, defaultType = 'income' }: EntryForm
 
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-xl text-sm font-medium transition-all"
-              style={{ background: '#12121a', color: '#71717a', border: '1px solid #2e2e40' }}>
+              style={{ background: 'var(--bg-input)', color: 'var(--muted)', border: '1px solid var(--border)' }}>
               Annulla
             </button>
             <button type="submit" disabled={saving} className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white transition-all disabled:opacity-60"

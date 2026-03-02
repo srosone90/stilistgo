@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useSalon } from '@/context/SalonContext';
@@ -7,10 +7,10 @@ import { salonGenerateId } from '@/lib/salonStorage';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { UserPlus, Search, Trash2, ChevronDown, ChevronUp, X, Star, AlertTriangle, FlaskConical, Clock } from 'lucide-react';
 
-const card: React.CSSProperties = { background: '#1c1c27', border: '1px solid #2e2e40', borderRadius: '16px', padding: '20px' };
-const inputStyle: React.CSSProperties = { background: '#12121a', border: '1px solid #2e2e40', borderRadius: '10px', padding: '9px 13px', color: '#f4f4f5', fontSize: '13px', outline: 'none', width: '100%' };
-const labelStyle: React.CSSProperties = { fontSize: '12px', color: '#71717a', marginBottom: '4px', display: 'block' };
-const btnPrimary: React.CSSProperties = { background: 'rgba(99,102,241,0.2)', border: '1px solid rgba(99,102,241,0.4)', color: '#818cf8', borderRadius: '10px', padding: '8px 16px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' };
+const card: React.CSSProperties = { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '16px', padding: '20px' };
+const inputStyle: React.CSSProperties = { background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '10px', padding: '9px 13px', color: 'var(--text)', fontSize: '13px', outline: 'none', width: '100%' };
+const labelStyle: React.CSSProperties = { fontSize: '12px', color: 'var(--muted)', marginBottom: '4px', display: 'block' };
+const btnPrimary: React.CSSProperties = { background: 'rgba(99,102,241,0.2)', border: '1px solid rgba(99,102,241,0.4)', color: 'var(--accent-light)', borderRadius: '10px', padding: '8px 16px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' };
 const btnDanger: React.CSSProperties = { background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: '#f87171', borderRadius: '8px', padding: '6px 12px', fontSize: '12px', cursor: 'pointer' };
 
 const EMPTY_CLIENT: Omit<Client, 'id' | 'createdAt'> = {
@@ -98,35 +98,35 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
       <div className={`flex flex-col gap-4 md:w-80 md:shrink-0${selectedId ? ' hidden md:flex' : ''}`}>
         <div>
           <h1 className="text-2xl font-bold text-white">Clienti</h1>
-          <p className="text-xs mt-1" style={{ color: '#71717a' }}>{clients.length} clienti registrati</p>
+          <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>{clients.length} clienti registrati</p>
         </div>
 
         <div className="flex gap-2">
           <div className="relative flex-1">
-            <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#71717a' }} />
+            <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)' }} />
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Cerca nome, tel, email…" style={{ ...inputStyle, paddingLeft: '32px' }} />
           </div>
           <button onClick={openNew} style={btnPrimary} title="Nuovo cliente"><UserPlus size={15} /></button>
         </div>
 
         <div className="flex flex-col gap-2 overflow-y-auto" style={{ flex: 1 }}>
-          {filtered.length === 0 && <p style={{ color: '#3f3f5a', fontSize: '13px' }}>Nessun cliente trovato.</p>}
+          {filtered.length === 0 && <p style={{ color: 'var(--border-light)', fontSize: '13px' }}>Nessun cliente trovato.</p>}
           {filtered.map(c => (
             <button key={c.id} onClick={() => { setSelectedId(c.id); setActiveTab('info'); }}
               className="text-left rounded-xl px-4 py-3 transition-all"
-              style={{ background: selectedId === c.id ? 'rgba(99,102,241,0.15)' : '#1c1c27', border: `1px solid ${selectedId === c.id ? 'rgba(99,102,241,0.5)' : '#2e2e40'}` }}>
+              style={{ background: selectedId === c.id ? 'rgba(99,102,241,0.15)' : 'var(--bg-card)', border: `1px solid ${selectedId === c.id ? 'rgba(99,102,241,0.5)' : 'var(--border)'}` }}>
               <div className="flex items-center justify-between">
                 <span className="font-medium text-white text-sm">{c.firstName} {c.lastName}</span>
                 <div className="flex items-center gap-1">
                   {c.allergies && <AlertTriangle size={12} style={{ color: '#f59e0b' }} />}
-                  {isDormant(c) && <Clock size={12} style={{ color: '#71717a' }} />}
+                  {isDormant(c) && <Clock size={12} style={{ color: 'var(--muted)' }} />}
                 </div>
               </div>
-              <p style={{ fontSize: '12px', color: '#71717a' }}>{c.phone || c.email || '—'}</p>
+              <p style={{ fontSize: '12px', color: 'var(--muted)' }}>{c.phone || c.email || '—'}</p>
               {c.tags.length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-1">
                   {c.tags.slice(0, 3).map(t => (
-                    <span key={t} className="text-xs px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(99,102,241,0.1)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.2)' }}>{t}</span>
+                    <span key={t} className="text-xs px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(99,102,241,0.1)', color: 'var(--accent-light)', border: '1px solid rgba(99,102,241,0.2)' }}>{t}</span>
                   ))}
                 </div>
               )}
@@ -138,20 +138,20 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
       {/* ── RIGHT: detail ── */}
       <div className="flex-1 overflow-y-auto">
         {!selected ? (
-          <div className="hidden md:flex items-center justify-center h-full" style={{ color: '#3f3f5a' }}>
+          <div className="hidden md:flex items-center justify-center h-full" style={{ color: 'var(--border-light)' }}>
             <p>Seleziona un cliente dalla lista</p>
           </div>
         ) : (
           <div className="space-y-4">
             {/* Back button — mobile only */}
-            <button className="md:hidden flex items-center gap-1 text-sm mb-1" style={{ color: '#818cf8', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }} onClick={() => setSelectedId(null)}>
+            <button className="md:hidden flex items-center gap-1 text-sm mb-1" style={{ color: 'var(--accent-light)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }} onClick={() => setSelectedId(null)}>
               ← Torna alla lista
             </button>
             {/* Header */}
             <div className="flex items-start justify-between">
               <div>
                 <h2 className="text-xl font-bold text-white">{selected.firstName} {selected.lastName}</h2>
-                <p style={{ fontSize: '13px', color: '#71717a' }}>Cliente dal {format(parseISO(selected.createdAt), 'dd/MM/yyyy')}</p>
+                <p style={{ fontSize: '13px', color: 'var(--muted)' }}>Cliente dal {format(parseISO(selected.createdAt), 'dd/MM/yyyy')}</p>
               </div>
               <div className="flex gap-2">
                 <button onClick={() => openEdit(selected)} style={btnPrimary}>Modifica</button>
@@ -160,11 +160,11 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
             </div>
 
             {/* Tabs */}
-            <div className="flex gap-1 p-1 rounded-xl" style={{ background: '#12121a', border: '1px solid #2e2e40', width: 'fit-content' }}>
+            <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', width: 'fit-content' }}>
               {(['info', 'cards', 'history'] as const).map(tab => (
                 <button key={tab} onClick={() => setActiveTab(tab)}
                   className="px-4 py-1.5 rounded-lg text-sm font-medium transition-all"
-                  style={{ background: activeTab === tab ? 'rgba(99,102,241,0.2)' : 'transparent', color: activeTab === tab ? '#818cf8' : '#71717a' }}>
+                  style={{ background: activeTab === tab ? 'rgba(99,102,241,0.2)' : 'transparent', color: activeTab === tab ? 'var(--accent-light)' : 'var(--muted)' }}>
                   {tab === 'info' ? 'Anagrafica' : tab === 'cards' ? 'Schede Tecniche' : 'Storico'}
                 </button>
               ))}
@@ -195,7 +195,7 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
                     <AlertTriangle size={16} style={{ color: '#f59e0b', marginTop: 2, flexShrink: 0 }} />
                     <div>
                       <p className="text-sm font-semibold" style={{ color: '#f59e0b' }}>Allergie / Controindicazioni</p>
-                      <p className="text-sm mt-1" style={{ color: '#d4d4d8' }}>{selected.allergies}</p>
+                      <p className="text-sm mt-1" style={{ color: 'var(--text-2)' }}>{selected.allergies}</p>
                     </div>
                   </div>
                 )}
@@ -203,7 +203,7 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
                 {selected.notes && (
                   <div className="col-span-2" style={card}>
                     <h3 className="text-sm font-semibold text-white mb-2">Note generali</h3>
-                    <p className="text-sm" style={{ color: '#d4d4d8' }}>{selected.notes}</p>
+                    <p className="text-sm" style={{ color: 'var(--text-2)' }}>{selected.notes}</p>
                   </div>
                 )}
 
@@ -212,7 +212,7 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
                     <h3 className="text-sm font-semibold text-white mb-2">Tag</h3>
                     <div className="flex flex-wrap gap-2">
                       {selected.tags.map(t => (
-                        <span key={t} className="text-xs px-2 py-1 rounded-full" style={{ background: 'rgba(99,102,241,0.15)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.3)' }}>{t}</span>
+                        <span key={t} className="text-xs px-2 py-1 rounded-full" style={{ background: 'rgba(99,102,241,0.15)', color: 'var(--accent-light)', border: '1px solid rgba(99,102,241,0.3)' }}>{t}</span>
                       ))}
                     </div>
                   </div>
@@ -226,13 +226,13 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
                 <button onClick={() => { setShowCardForm(true); setCardForm({ ...EMPTY_CARD, clientId: selected.id }); }} style={btnPrimary}>
                   <FlaskConical size={14} /> Nuova Scheda Tecnica
                 </button>
-                {clientCards.length === 0 && <p style={{ color: '#3f3f5a', fontSize: '13px' }}>Nessuna scheda tecnica registrata.</p>}
+                {clientCards.length === 0 && <p style={{ color: 'var(--border-light)', fontSize: '13px' }}>Nessuna scheda tecnica registrata.</p>}
                 {clientCards.map(tc => (
                   <div key={tc.id} style={card}>
                     <div className="flex justify-between items-start mb-2">
                       <div>
                         <p className="font-semibold text-white text-sm">{tc.serviceDescription}</p>
-                        <p style={{ fontSize: '12px', color: '#71717a' }}>{format(parseISO(tc.date), 'dd/MM/yyyy')} · {operators.find(o => o.id === tc.operatorId)?.name || '—'}</p>
+                        <p style={{ fontSize: '12px', color: 'var(--muted)' }}>{format(parseISO(tc.date), 'dd/MM/yyyy')} · {operators.find(o => o.id === tc.operatorId)?.name || '—'}</p>
                       </div>
                       <button onClick={() => deleteTechnicalCard(tc.id)} style={{ ...btnDanger, padding: '4px 8px' }}>×</button>
                     </div>
@@ -243,7 +243,7 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
                       {tc.posaDuration > 0 && <Row label="Tempo posa" value={`${tc.posaDuration} min`} />}
                       {tc.result && <Row label="Risultato" value={tc.result} />}
                     </div>
-                    {tc.notes && <p className="text-xs mt-2" style={{ color: '#71717a' }}>{tc.notes}</p>}
+                    {tc.notes && <p className="text-xs mt-2" style={{ color: 'var(--muted)' }}>{tc.notes}</p>}
                   </div>
                 ))}
               </div>
@@ -277,8 +277,8 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
                 </div>
                 <div className="flex flex-wrap gap-1.5 mt-2">
                   {form.tags.map(t => (
-                    <span key={t} className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(99,102,241,0.15)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.3)' }}>
-                      {t}<button type="button" onClick={() => setForm(p => ({ ...p, tags: p.tags.filter(x => x !== t) }))} style={{ background: 'none', border: 'none', color: '#818cf8', cursor: 'pointer', padding: 0 }}>×</button>
+                    <span key={t} className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(99,102,241,0.15)', color: 'var(--accent-light)', border: '1px solid rgba(99,102,241,0.3)' }}>
+                      {t}<button type="button" onClick={() => setForm(p => ({ ...p, tags: p.tags.filter(x => x !== t) }))} style={{ background: 'none', border: 'none', color: 'var(--accent-light)', cursor: 'pointer', padding: 0 }}>×</button>
                     </span>
                   ))}
                 </div>
@@ -286,7 +286,7 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
             </div>
             <div className="col-span-2 flex items-center gap-2">
               <input type="checkbox" id="gdpr" checked={form.gdprConsent} onChange={e => setForm(p => ({ ...p, gdprConsent: e.target.checked }))} />
-              <label htmlFor="gdpr" className="text-sm" style={{ color: '#d4d4d8' }}>Consenso GDPR ottenuto</label>
+              <label htmlFor="gdpr" className="text-sm" style={{ color: 'var(--text-2)' }}>Consenso GDPR ottenuto</label>
             </div>
           </div>
           <div className="flex justify-end gap-2 mt-4">
@@ -332,7 +332,7 @@ function AppointmentHistory({ clientId }: { clientId: string }) {
     .filter(a => a.clientId === clientId)
     .sort((a, b) => b.date.localeCompare(a.date));
 
-  if (clientAppts.length === 0) return <p style={{ color: '#3f3f5a', fontSize: '13px' }}>Nessun appuntamento registrato per questo cliente.</p>;
+  if (clientAppts.length === 0) return <p style={{ color: 'var(--border-light)', fontSize: '13px' }}>Nessun appuntamento registrato per questo cliente.</p>;
 
   return (
     <div className="space-y-2">
@@ -340,10 +340,10 @@ function AppointmentHistory({ clientId }: { clientId: string }) {
         const op = operators.find(o => o.id === a.operatorId);
         const svcs = a.serviceIds.map(sid => services.find(s => s.id === sid)?.name).filter(Boolean).join(', ');
         return (
-          <div key={a.id} className="rounded-xl px-4 py-3 flex items-center justify-between" style={{ background: '#1c1c27', border: '1px solid #2e2e40' }}>
+          <div key={a.id} className="rounded-xl px-4 py-3 flex items-center justify-between" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
             <div>
               <p className="text-sm text-white font-medium">{format(parseISO(a.date), 'dd/MM/yyyy')} {a.startTime}–{a.endTime}</p>
-              <p style={{ fontSize: '12px', color: '#71717a' }}>{svcs || (a.isBlock ? a.blockReason : '—')} · {op?.name || '—'}</p>
+              <p style={{ fontSize: '12px', color: 'var(--muted)' }}>{svcs || (a.isBlock ? a.blockReason : '—')} · {op?.name || '—'}</p>
             </div>
             <StatusBadge status={a.status} />
           </div>
@@ -355,10 +355,10 @@ function AppointmentHistory({ clientId }: { clientId: string }) {
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { bg: string; color: string; label: string }> = {
-    scheduled: { bg: 'rgba(99,102,241,0.15)', color: '#818cf8', label: 'Prenotato' },
+    scheduled: { bg: 'rgba(99,102,241,0.15)', color: 'var(--accent-light)', label: 'Prenotato' },
     confirmed: { bg: 'rgba(34,197,94,0.15)', color: '#22c55e', label: 'Confermato' },
     completed: { bg: 'rgba(168,85,247,0.15)', color: '#c084fc', label: 'Completato' },
-    cancelled: { bg: 'rgba(113,113,122,0.15)', color: '#71717a', label: 'Cancellato' },
+    cancelled: { bg: 'rgba(113,113,122,0.15)', color: 'var(--muted)', label: 'Cancellato' },
     'no-show': { bg: 'rgba(239,68,68,0.15)', color: '#f87171', label: 'No-show' },
   };
   const s = map[status] || map.scheduled;
@@ -368,8 +368,8 @@ function StatusBadge({ status }: { status: string }) {
 function Row({ label, value, highlight }: { label: string; value: string; highlight?: string }) {
   return (
     <div>
-      <span style={{ color: '#71717a', marginRight: 6 }}>{label}:</span>
-      <span style={{ color: highlight || '#d4d4d8' }}>{value}</span>
+      <span style={{ color: 'var(--muted)', marginRight: 6 }}>{label}:</span>
+      <span style={{ color: highlight || 'var(--text-2)' }}>{value}</span>
     </div>
   );
 }
@@ -386,10 +386,10 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
-      <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl p-6" style={{ background: '#18181f', border: '1px solid #2e2e40' }}>
+      <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl p-6" style={{ background: '#18181f', border: '1px solid var(--border)' }}>
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-semibold text-white">{title}</h3>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#71717a', cursor: 'pointer' }}><X size={18} /></button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}><X size={18} /></button>
         </div>
         {children}
       </div>

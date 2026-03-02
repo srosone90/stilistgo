@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useRef, useState } from 'react';
 import { useApp } from '@/context/AppContext';
@@ -12,12 +12,12 @@ import { resetSupabaseAvailability } from '@/lib/db';
 import { exportTransactionsPDF } from '@/lib/pdf';
 
 const inputStyle: React.CSSProperties = {
-  background: '#12121a', border: '1px solid #2e2e40', borderRadius: '10px',
-  padding: '10px 14px', color: '#f4f4f5', fontSize: '14px', outline: 'none', width: '100%',
+  background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '10px',
+  padding: '10px 14px', color: 'var(--text)', fontSize: '14px', outline: 'none', width: '100%',
 };
 
 const cardStyle: React.CSSProperties = {
-  background: '#1c1c27', border: '1px solid #2e2e40', borderRadius: '16px', padding: '20px',
+  background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '16px', padding: '20px',
 };
 
 const DAYS: { label: string; value: DayOfWeek }[] = [
@@ -37,7 +37,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="mb-3">
-      <label className="block text-xs mb-1" style={{ color: '#71717a' }}>{label}</label>
+      <label className="block text-xs mb-1" style={{ color: 'var(--muted)' }}>{label}</label>
       {children}
     </div>
   );
@@ -266,7 +266,7 @@ export default function SettingsView() {
     <div className="space-y-6 max-w-2xl">
       <div>
         <h1 className="text-2xl font-bold text-white">Impostazioni</h1>
-        <p className="text-sm mt-1" style={{ color: '#71717a' }}>Configurazione completa del salone</p>
+        <p className="text-sm mt-1" style={{ color: 'var(--muted)' }}>Configurazione completa del salone</p>
       </div>
 
       {/* ─── 1. Info Salone ─────────────────────────────────── */}
@@ -319,7 +319,7 @@ export default function SettingsView() {
                 className="px-4 py-2 rounded-xl text-sm font-medium"
                 style={schedule.slotMinutes === m
                   ? { background: 'rgba(99,102,241,0.8)', color: '#fff' }
-                  : { background: '#12121a', border: '1px solid #2e2e40', color: '#71717a' }}>
+                  : { background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--muted)' }}>
                 {m} min
               </button>
             ))}
@@ -332,7 +332,7 @@ export default function SettingsView() {
                 className="px-3 py-1.5 rounded-lg text-sm font-medium"
                 style={schedule.workDays.includes(value)
                   ? { background: 'rgba(99,102,241,0.7)', color: '#fff' }
-                  : { background: '#12121a', border: '1px solid #2e2e40', color: '#71717a' }}>
+                  : { background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--muted)' }}>
                 {label}
               </button>
             ))}
@@ -343,7 +343,7 @@ export default function SettingsView() {
 
       {/* ─── 3. Programma Fedeltà ───────────────────────────── */}
       <Section title="⭐ Programma Fedeltà">
-        <p className="text-xs mb-4" style={{ color: '#71717a' }}>
+        <p className="text-xs mb-4" style={{ color: 'var(--muted)' }}>
           I clienti accumulano punti fedeltà su ogni acquisto. I clienti &quot;dormienti&quot; vengono evidenziati automaticamente.
         </p>
         <div className="grid grid-cols-2 gap-3">
@@ -363,15 +363,15 @@ export default function SettingsView() {
       <Section title="🎟️ Gift Card">
         <div className="space-y-2 mb-4">
           {giftCards.length === 0 && (
-            <p className="text-sm" style={{ color: '#71717a' }}>Nessuna gift card creata.</p>
+            <p className="text-sm" style={{ color: 'var(--muted)' }}>Nessuna gift card creata.</p>
           )}
           {giftCards.map(gc => (
             <div key={gc.id} className="flex items-center justify-between rounded-xl px-4 py-3"
-              style={{ background: '#12121a', border: `1px solid ${gc.isActive ? 'rgba(99,102,241,0.3)' : '#2e2e40'}` }}>
+              style={{ background: 'var(--bg-input)', border: `1px solid ${gc.isActive ? 'rgba(99,102,241,0.3)' : 'var(--border)'}` }}>
               <div>
-                <p className="text-sm font-mono font-semibold" style={{ color: gc.isActive ? '#818cf8' : '#71717a' }}>{gc.code}</p>
-                <p className="text-xs" style={{ color: '#71717a' }}>
-                  {gc.clientName} · Rimanente: <strong style={{ color: '#f4f4f5' }}>€{gc.remainingValue.toFixed(2)}</strong>
+                <p className="text-sm font-mono font-semibold" style={{ color: gc.isActive ? 'var(--accent-light)' : 'var(--muted)' }}>{gc.code}</p>
+                <p className="text-xs" style={{ color: 'var(--muted)' }}>
+                  {gc.clientName} · Rimanente: <strong style={{ color: 'var(--text)' }}>€{gc.remainingValue.toFixed(2)}</strong>
                   {gc.expiryDate ? ` · Scad: ${gc.expiryDate}` : ''}
                 </p>
               </div>
@@ -387,7 +387,7 @@ export default function SettingsView() {
         </div>
 
         {gcOpen ? (
-          <div className="rounded-xl p-4 space-y-3" style={{ background: '#12121a', border: '1px solid #2e2e40' }}>
+          <div className="rounded-xl p-4 space-y-3" style={{ background: 'var(--bg-input)', border: '1px solid var(--border)' }}>
             <p className="text-sm font-semibold text-white">Nuova Gift Card</p>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Valore (€)">
@@ -405,7 +405,7 @@ export default function SettingsView() {
                 </Field>
               </div>
               <div className="col-span-2">
-                <label className="block text-xs mb-1" style={{ color: '#71717a' }}>Oppure scegli dal registro</label>
+                <label className="block text-xs mb-1" style={{ color: 'var(--muted)' }}>Oppure scegli dal registro</label>
                 <select value={gcForm.clientId}
                   onChange={e => {
                     const c = clients.find(x => x.id === e.target.value);
@@ -424,7 +424,7 @@ export default function SettingsView() {
               </button>
               <button onClick={() => setGcOpen(false)}
                 className="px-4 py-2 rounded-xl text-sm"
-                style={{ background: '#1c1c27', border: '1px solid #2e2e40', color: '#71717a' }}>
+                style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--muted)' }}>
                 Annulla
               </button>
             </div>
@@ -432,7 +432,7 @@ export default function SettingsView() {
         ) : (
           <button onClick={() => setGcOpen(true)}
             className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium"
-            style={{ background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', color: '#818cf8' }}>
+            style={{ background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', color: 'var(--accent-light)' }}>
             <Plus size={15} /> Crea nuova Gift Card
           </button>
         )}
@@ -440,28 +440,28 @@ export default function SettingsView() {
 
       {/* ─── 5. Fondo Tasse ─────────────────────────────────── */}
       <Section title="🏦 Fondo Tasse">
-        <p className="text-xs mb-4" style={{ color: '#71717a' }}>
+        <p className="text-xs mb-4" style={{ color: 'var(--muted)' }}>
           Percentuale detratta virtualmente da ogni entrata per stimare l&apos;utile reale post-tasse.
         </p>
         <div className="flex gap-3 items-center">
           <input type="number" min="0" max="100" step="0.5" value={taxInput}
             onChange={e => setTaxInput(e.target.value)}
             style={{ ...inputStyle, width: '120px' }} />
-          <span style={{ color: '#71717a' }}>%</span>
+          <span style={{ color: 'var(--muted)' }}>%</span>
           <button onClick={saveTax}
             className="px-4 py-2 rounded-xl text-sm font-semibold text-white"
             style={{ background: 'rgba(99,102,241,0.8)' }}>
             Salva
           </button>
         </div>
-        <p className="text-xs mt-2" style={{ color: '#71717a' }}>
-          Aliquota attuale: <strong style={{ color: '#818cf8' }}>{settings.taxRate}%</strong>
+        <p className="text-xs mt-2" style={{ color: 'var(--muted)' }}>
+          Aliquota attuale: <strong style={{ color: 'var(--accent-light)' }}>{settings.taxRate}%</strong>
         </p>
       </Section>
 
       {/* ─── 6. Backup Completo ─────────────────────────────── */}
       <Section title="💾 Backup Completo">
-        <p className="text-xs mb-4" style={{ color: '#71717a' }}>
+        <p className="text-xs mb-4" style={{ color: 'var(--muted)' }}>
           Esporta tutti i dati del salone (clienti, operatori, appuntamenti, pagamenti, prodotti, gift card, contabilità, config) in un unico file JSON.
         </p>
         <div className="flex flex-col gap-2">
@@ -492,13 +492,13 @@ export default function SettingsView() {
 
       {/* ─── 7. Dati Contabilità ────────────────────────────── */}
       <Section title="📊 Dati Contabilità">
-        <p className="text-xs mb-4" style={{ color: '#71717a' }}>
+        <p className="text-xs mb-4" style={{ color: 'var(--muted)' }}>
           Esporta i movimenti contabili (solo entrate/uscite manuali + cassa salone) oppure importa da CSV/JSON.
         </p>
         <div className="flex flex-col gap-2 mb-4">
           <button onClick={handleExportTransactions}
             className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium"
-            style={{ background: '#12121a', border: '1px solid #2e2e40', color: '#d4d4d8' }}>
+            style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text-2)' }}>
             <Download size={16} /> Esporta JSON ({transactions.length} voci)
           </button>
           <button onClick={handleExportPDF}
@@ -509,14 +509,14 @@ export default function SettingsView() {
         </div>
 
         <div>
-          <p className="text-xs mb-2" style={{ color: '#71717a' }}>
-            <strong style={{ color: '#d4d4d8' }}>CSV entrata:</strong> type, date, amount, category, source, method, notes<br />
-            <strong style={{ color: '#d4d4d8' }}>CSV uscita:</strong> type (expense), date, amount, supplier, expenseType, dueDate, status, notes
+          <p className="text-xs mb-2" style={{ color: 'var(--muted)' }}>
+            <strong style={{ color: 'var(--text-2)' }}>CSV entrata:</strong> type, date, amount, category, source, method, notes<br />
+            <strong style={{ color: 'var(--text-2)' }}>CSV uscita:</strong> type (expense), date, amount, supplier, expenseType, dueDate, status, notes
           </p>
           <input ref={fileRef} type="file" accept=".csv,.json" onChange={handleImportCSV} style={{ display: 'none' }} />
           <button onClick={() => fileRef.current?.click()}
             className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium"
-            style={{ background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', color: '#818cf8' }}>
+            style={{ background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', color: 'var(--accent-light)' }}>
             <Upload size={16} /> Importa CSV o JSON (contabilità)
           </button>
           {importStatus && (
@@ -547,7 +547,7 @@ export default function SettingsView() {
           {dataSource === 'local' && (
             <button onClick={handleReconnect} disabled={reconnecting}
               className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-medium"
-              style={{ background: 'rgba(99,102,241,0.2)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.4)' }}>
+              style={{ background: 'rgba(99,102,241,0.2)', color: 'var(--accent-light)', border: '1px solid rgba(99,102,241,0.4)' }}>
               <RefreshCw size={12} className={reconnecting ? 'animate-spin' : ''} />
               Riconnetti
             </button>
@@ -556,20 +556,20 @@ export default function SettingsView() {
 
         <div className="grid grid-cols-4 gap-4 text-center">
           <div>
-            <p className="text-2xl font-bold" style={{ color: '#818cf8' }}>{transactions.length}</p>
-            <p className="text-xs" style={{ color: '#71717a' }}>Movimenti</p>
+            <p className="text-2xl font-bold" style={{ color: 'var(--accent-light)' }}>{transactions.length}</p>
+            <p className="text-xs" style={{ color: 'var(--muted)' }}>Movimenti</p>
           </div>
           <div>
             <p className="text-2xl font-bold" style={{ color: '#22c55e' }}>{clients.length}</p>
-            <p className="text-xs" style={{ color: '#71717a' }}>Clienti</p>
+            <p className="text-xs" style={{ color: 'var(--muted)' }}>Clienti</p>
           </div>
           <div>
             <p className="text-2xl font-bold" style={{ color: '#f59e0b' }}>{appointments.length}</p>
-            <p className="text-xs" style={{ color: '#71717a' }}>Appuntamenti</p>
+            <p className="text-xs" style={{ color: 'var(--muted)' }}>Appuntamenti</p>
           </div>
           <div>
             <p className="text-2xl font-bold" style={{ color: '#ec4899' }}>{operators.length}</p>
-            <p className="text-xs" style={{ color: '#71717a' }}>Operatori</p>
+            <p className="text-xs" style={{ color: 'var(--muted)' }}>Operatori</p>
           </div>
         </div>
       </Section>

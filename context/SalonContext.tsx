@@ -80,7 +80,7 @@ interface SalonContextValue {
   deleteWaitingEntry: (id: string) => void;
 
   // Products
-  addProduct: (p: Omit<Product, 'id' | 'createdAt'>) => void;
+  addProduct: (p: Omit<Product, 'id' | 'createdAt'>) => string; // returns new product id
   updateProduct: (p: Product) => void;
   deleteProduct: (id: string) => void;
 
@@ -401,9 +401,10 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
 
   // ─── Products ─────────────────────────────────────────────────────────────
 
-  const addProduct = useCallback((p: Omit<Product, 'id' | 'createdAt'>) => {
+  const addProduct = useCallback((p: Omit<Product, 'id' | 'createdAt'>): string => {
     const full: Product = { ...p, id: salonGenerateId(), createdAt: new Date().toISOString() };
     setProducts(prev => { const n = [...prev, full]; storageSaveProducts(n); return n; });
+    return full.id;
   }, []);
 
   const updateProduct = useCallback((p: Product) => {

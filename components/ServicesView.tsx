@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useSalon } from '@/context/SalonContext';
@@ -6,10 +6,10 @@ import { Service, ServiceCategory, SERVICE_CATEGORIES } from '@/types/salon';
 import { formatCurrency } from '@/lib/calculations';
 import { Plus, X, Pencil, Trash2 } from 'lucide-react';
 
-const card: React.CSSProperties = { background: '#1c1c27', border: '1px solid #2e2e40', borderRadius: '16px', padding: '20px' };
-const inputStyle: React.CSSProperties = { background: '#12121a', border: '1px solid #2e2e40', borderRadius: '10px', padding: '9px 13px', color: '#f4f4f5', fontSize: '13px', outline: 'none', width: '100%' };
-const labelStyle: React.CSSProperties = { fontSize: '12px', color: '#71717a', marginBottom: '4px', display: 'block' };
-const btnPrimary: React.CSSProperties = { background: 'rgba(99,102,241,0.2)', border: '1px solid rgba(99,102,241,0.4)', color: '#818cf8', borderRadius: '10px', padding: '8px 16px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' };
+const card: React.CSSProperties = { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '16px', padding: '20px' };
+const inputStyle: React.CSSProperties = { background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '10px', padding: '9px 13px', color: 'var(--text)', fontSize: '13px', outline: 'none', width: '100%' };
+const labelStyle: React.CSSProperties = { fontSize: '12px', color: 'var(--muted)', marginBottom: '4px', display: 'block' };
+const btnPrimary: React.CSSProperties = { background: 'rgba(99,102,241,0.2)', border: '1px solid rgba(99,102,241,0.4)', color: 'var(--accent-light)', borderRadius: '10px', padding: '8px 16px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' };
 
 const EMPTY_SERVICE: Omit<Service, 'id' | 'createdAt'> = {
   name: '', category: 'Taglio', duration: 30, price: 0,
@@ -19,7 +19,7 @@ const EMPTY_SERVICE: Omit<Service, 'id' | 'createdAt'> = {
 const CAT_COLORS: Record<ServiceCategory, string> = {
   Taglio: '#6366f1', Colore: '#f59e0b', Trattamento: '#22c55e',
   Piega: '#06b6d4', Estetica: '#ec4899', Nail: '#a855f7',
-  Sposa: '#ef4444', Altro: '#71717a',
+  Sposa: '#ef4444', Altro: 'var(--muted)',
 };
 
 export default function ServicesView({ newTrigger }: { newTrigger?: number }) {
@@ -70,7 +70,7 @@ export default function ServicesView({ newTrigger }: { newTrigger?: number }) {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">Listino Servizi</h1>
-          <p className="text-xs mt-1" style={{ color: '#71717a' }}>{services.filter(s => s.active).length} servizi attivi</p>
+          <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>{services.filter(s => s.active).length} servizi attivi</p>
         </div>
         <button onClick={openNew} style={btnPrimary}><Plus size={14} /> Nuovo servizio</button>
       </div>
@@ -79,28 +79,28 @@ export default function ServicesView({ newTrigger }: { newTrigger?: number }) {
       <div className="flex gap-2 flex-wrap">
         <button onClick={() => setFilterCat('all')}
           className="text-xs px-3 py-1.5 rounded-lg"
-          style={{ background: filterCat === 'all' ? 'rgba(99,102,241,0.2)' : '#12121a', border: `1px solid ${filterCat === 'all' ? 'rgba(99,102,241,0.5)' : '#2e2e40'}`, color: filterCat === 'all' ? '#818cf8' : '#71717a', cursor: 'pointer' }}>
+          style={{ background: filterCat === 'all' ? 'rgba(99,102,241,0.2)' : 'var(--bg-input)', border: `1px solid ${filterCat === 'all' ? 'rgba(99,102,241,0.5)' : 'var(--border)'}`, color: filterCat === 'all' ? 'var(--accent-light)' : 'var(--muted)', cursor: 'pointer' }}>
           Tutte
         </button>
         {SERVICE_CATEGORIES.map(cat => (
           <button key={cat} onClick={() => setFilterCat(cat)}
             className="text-xs px-3 py-1.5 rounded-lg"
-            style={{ background: filterCat === cat ? `${CAT_COLORS[cat]}20` : '#12121a', border: `1px solid ${filterCat === cat ? CAT_COLORS[cat] + '60' : '#2e2e40'}`, color: filterCat === cat ? CAT_COLORS[cat] : '#71717a', cursor: 'pointer' }}>
+            style={{ background: filterCat === cat ? `${CAT_COLORS[cat]}20` : 'var(--bg-input)', border: `1px solid ${filterCat === cat ? CAT_COLORS[cat] + '60' : 'var(--border)'}`, color: filterCat === cat ? CAT_COLORS[cat] : 'var(--muted)', cursor: 'pointer' }}>
             {cat}
           </button>
         ))}
       </div>
 
       {/* Services table */}
-      {grouped.length === 0 && <p style={{ color: '#3f3f5a', fontSize: '13px' }}>Nessun servizio trovato. Aggiungine uno.</p>}
+      {grouped.length === 0 && <p style={{ color: 'var(--border-light)', fontSize: '13px' }}>Nessun servizio trovato. Aggiungine uno.</p>}
       {grouped.map(({ cat, items }) => (
         <div key={cat} style={card}>
           <h3 className="font-semibold text-sm mb-3" style={{ color: CAT_COLORS[cat] }}>{cat}</h3>
           <table className="w-full text-sm">
             <thead>
-              <tr style={{ borderBottom: '1px solid #2e2e40' }}>
+              <tr style={{ borderBottom: '1px solid var(--border)' }}>
                 {['Servizio', 'Durata', 'Prezzo', 'Operatori', 'Attivo', ''].map(h => (
-                  <th key={h} className="text-left pb-2 pr-4" style={{ color: '#71717a', fontWeight: 500, fontSize: '12px' }}>{h}</th>
+                  <th key={h} className="text-left pb-2 pr-4" style={{ color: 'var(--muted)', fontWeight: 500, fontSize: '12px' }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -109,11 +109,11 @@ export default function ServicesView({ newTrigger }: { newTrigger?: number }) {
                 <tr key={s.id} style={{ borderBottom: '1px solid #1e1e2e' }}>
                   <td className="py-2.5 pr-4">
                     <p className="text-white font-medium">{s.name}</p>
-                    {s.description && <p className="text-xs mt-0.5" style={{ color: '#71717a' }}>{s.description}</p>}
+                    {s.description && <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>{s.description}</p>}
                   </td>
-                  <td className="py-2.5 pr-4" style={{ color: '#d4d4d8' }}>{s.duration} min</td>
+                  <td className="py-2.5 pr-4" style={{ color: 'var(--text-2)' }}>{s.duration} min</td>
                   <td className="py-2.5 pr-4 font-semibold" style={{ color: '#22c55e' }}>{formatCurrency(s.price)}</td>
-                  <td className="py-2.5 pr-4" style={{ color: '#71717a', fontSize: '12px' }}>
+                  <td className="py-2.5 pr-4" style={{ color: 'var(--muted)', fontSize: '12px' }}>
                     {s.operatorIds.length === 0 ? 'Tutti' : s.operatorIds.map(id => operators.find(o => o.id === id)?.name).filter(Boolean).join(', ')}
                   </td>
                   <td className="py-2.5 pr-4">
@@ -123,7 +123,7 @@ export default function ServicesView({ newTrigger }: { newTrigger?: number }) {
                   </td>
                   <td className="py-2.5">
                     <div className="flex gap-1 justify-end">
-                      <button onClick={() => openEdit(s)} style={{ background: 'none', border: 'none', color: '#71717a', cursor: 'pointer', padding: '4px' }} title="Modifica"><Pencil size={14} /></button>
+                      <button onClick={() => openEdit(s)} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', padding: '4px' }} title="Modifica"><Pencil size={14} /></button>
                       <button onClick={() => deleteService(s.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }} title="Elimina"><Trash2 size={14} /></button>
                     </div>
                   </td>
@@ -143,7 +143,7 @@ export default function ServicesView({ newTrigger }: { newTrigger?: number }) {
         ].map(k => (
           <div key={k.label} style={card} className="text-center">
             <p className="text-2xl font-bold text-white">{k.value}</p>
-            <p className="text-xs mt-1" style={{ color: '#71717a' }}>{k.label}</p>
+            <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>{k.label}</p>
           </div>
         ))}
       </div>
@@ -151,10 +151,10 @@ export default function ServicesView({ newTrigger }: { newTrigger?: number }) {
       {/* Modal */}
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
-          <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl p-6" style={{ background: '#18181f', border: '1px solid #2e2e40' }}>
+          <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl p-6" style={{ background: '#18181f', border: '1px solid var(--border)' }}>
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-semibold text-white">{editSvc ? 'Modifica Servizio' : 'Nuovo Servizio'}</h3>
-              <button onClick={() => setShowForm(false)} style={{ background: 'none', border: 'none', color: '#71717a', cursor: 'pointer' }}><X size={18} /></button>
+              <button onClick={() => setShowForm(false)} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}><X size={18} /></button>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2"><label style={labelStyle}>Nome servizio *</label><input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} style={inputStyle} /></div>
@@ -168,7 +168,7 @@ export default function ServicesView({ newTrigger }: { newTrigger?: number }) {
               <div><label style={labelStyle}>Prezzo (€)</label><input type="number" min={0} step={0.5} value={form.price} onChange={e => setForm(p => ({ ...p, price: Number(e.target.value) }))} style={inputStyle} /></div>
               <div className="flex items-center gap-2 pt-6">
                 <input type="checkbox" id="active" checked={form.active} onChange={e => setForm(p => ({ ...p, active: e.target.checked }))} />
-                <label htmlFor="active" style={{ fontSize: '13px', color: '#d4d4d8' }}>Servizio attivo</label>
+                <label htmlFor="active" style={{ fontSize: '13px', color: 'var(--text-2)' }}>Servizio attivo</label>
               </div>
               <div className="col-span-2"><label style={labelStyle}>Descrizione</label><textarea rows={2} value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} style={{ ...inputStyle, resize: 'vertical' }} /></div>
               <div className="col-span-2">
@@ -177,7 +177,7 @@ export default function ServicesView({ newTrigger }: { newTrigger?: number }) {
                   {operators.filter(o => o.active).map(o => (
                     <button key={o.id} type="button" onClick={() => toggleOperator(o.id)}
                       className="text-xs px-2.5 py-1 rounded-lg transition-all"
-                      style={{ background: form.operatorIds.includes(o.id) ? 'rgba(99,102,241,0.25)' : '#12121a', border: `1px solid ${form.operatorIds.includes(o.id) ? 'rgba(99,102,241,0.5)' : '#2e2e40'}`, color: form.operatorIds.includes(o.id) ? '#818cf8' : '#71717a', cursor: 'pointer' }}>
+                      style={{ background: form.operatorIds.includes(o.id) ? 'rgba(99,102,241,0.25)' : 'var(--bg-input)', border: `1px solid ${form.operatorIds.includes(o.id) ? 'rgba(99,102,241,0.5)' : 'var(--border)'}`, color: form.operatorIds.includes(o.id) ? 'var(--accent-light)' : 'var(--muted)', cursor: 'pointer' }}>
                       {o.name}
                     </button>
                   ))}
@@ -185,7 +185,7 @@ export default function ServicesView({ newTrigger }: { newTrigger?: number }) {
               </div>
             </div>
             <div className="flex justify-end gap-2 mt-4">
-              <button onClick={() => setShowForm(false)} style={{ background: '#12121a', border: '1px solid #2e2e40', color: '#71717a', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', cursor: 'pointer' }}>Annulla</button>
+              <button onClick={() => setShowForm(false)} style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--muted)', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', cursor: 'pointer' }}>Annulla</button>
               <button onClick={handleSave} style={btnPrimary}>Salva</button>
             </div>
           </div>

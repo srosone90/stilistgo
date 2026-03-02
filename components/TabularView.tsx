@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useMemo } from 'react';
 import { useApp } from '@/context/AppContext';
@@ -70,24 +70,24 @@ export default function TabularView() {
   };
 
   const SortIcon = ({ field }: { field: 'date' | 'amount' }) => {
-    if (sortField !== field) return <ChevronUp size={13} style={{ color: '#3f3f5a' }} />;
+    if (sortField !== field) return <ChevronUp size={13} style={{ color: 'var(--border-light)' }} />;
     return sortDir === 'asc' ? <ChevronUp size={13} style={{ color: '#6366f1' }} /> : <ChevronDown size={13} style={{ color: '#6366f1' }} />;
   };
 
   const selectStyle: React.CSSProperties = {
-    background: '#12121a', border: '1px solid #2e2e40', borderRadius: '8px',
-    padding: '6px 10px', color: '#d4d4d8', fontSize: '13px', outline: 'none',
+    background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px',
+    padding: '6px 10px', color: 'var(--text-2)', fontSize: '13px', outline: 'none',
   };
 
   return (
     <div className="space-y-5">
       <div>
         <h1 className="text-2xl font-bold text-white">Tabella Movimenti</h1>
-        <p className="text-sm mt-1" style={{ color: '#71717a' }}>Storico completo di entrate e uscite con filtri avanzati</p>
+        <p className="text-sm mt-1" style={{ color: 'var(--muted)' }}>Storico completo di entrate e uscite con filtri avanzati</p>
       </div>
 
       {/* Filters */}
-      <div className="rounded-2xl p-4 flex flex-wrap gap-3" style={{ background: '#1c1c27', border: '1px solid #2e2e40' }}>
+      <div className="rounded-2xl p-4 flex flex-wrap gap-3" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
         <select value={filterType} onChange={e => setFilterType(e.target.value as any)} style={selectStyle}>
           <option value="all">Tutti</option>
           <option value="income">Entrate</option>
@@ -102,7 +102,7 @@ export default function TabularView() {
           {months.map(m => <option key={m} value={m}>{m}</option>)}
         </select>
         <button onClick={() => { setFilterType('all'); setFilterMonth(''); setFilterYear(''); setFilterCategory(''); }}
-          className="text-xs px-3 py-1.5 rounded-lg" style={{ background: 'rgba(99,102,241,0.15)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.3)' }}>
+          className="text-xs px-3 py-1.5 rounded-lg" style={{ background: 'rgba(99,102,241,0.15)', color: 'var(--accent-light)', border: '1px solid rgba(99,102,241,0.3)' }}>
           Reset filtri
         </button>
         <button
@@ -119,21 +119,21 @@ export default function TabularView() {
         <span style={{ color: '#22c55e' }}>↑ Entrate: <strong>{formatCurrency(totalIncome)}</strong></span>
         <span style={{ color: '#ef4444' }}>↓ Uscite: <strong>{formatCurrency(totalExpense)}</strong></span>
         <span style={{ color: '#6366f1' }}>= Saldo: <strong style={{ color: totalIncome - totalExpense >= 0 ? '#22c55e' : '#ef4444' }}>{formatCurrency(totalIncome - totalExpense)}</strong></span>
-        <span style={{ color: '#71717a' }}>{filtered.length} voci</span>
+        <span style={{ color: 'var(--muted)' }}>{filtered.length} voci</span>
       </div>
 
       {/* Table */}
-      <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid #2e2e40' }}>
+      <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid var(--border)' }}>
         <table className="w-full text-sm">
           <thead>
-            <tr style={{ background: '#12121a' }}>
-              <th className="text-left px-4 py-3 font-medium cursor-pointer select-none" style={{ color: '#71717a' }} onClick={() => toggleSort('date')}>
+            <tr style={{ background: 'var(--bg-input)' }}>
+              <th className="text-left px-4 py-3 font-medium cursor-pointer select-none" style={{ color: 'var(--muted)' }} onClick={() => toggleSort('date')}>
                 <span className="flex items-center gap-1">Data <SortIcon field="date" /></span>
               </th>
-              <th className="text-left px-4 py-3 font-medium" style={{ color: '#71717a' }}>Tipo</th>
-              <th className="text-left px-4 py-3 font-medium" style={{ color: '#71717a' }}>Dettaglio</th>
-              <th className="text-left px-4 py-3 font-medium" style={{ color: '#71717a' }}>Metodo / Stato</th>
-              <th className="text-right px-4 py-3 font-medium cursor-pointer select-none" style={{ color: '#71717a' }} onClick={() => toggleSort('amount')}>
+              <th className="text-left px-4 py-3 font-medium" style={{ color: 'var(--muted)' }}>Tipo</th>
+              <th className="text-left px-4 py-3 font-medium" style={{ color: 'var(--muted)' }}>Dettaglio</th>
+              <th className="text-left px-4 py-3 font-medium" style={{ color: 'var(--muted)' }}>Metodo / Stato</th>
+              <th className="text-right px-4 py-3 font-medium cursor-pointer select-none" style={{ color: 'var(--muted)' }} onClick={() => toggleSort('amount')}>
                 <span className="flex items-center justify-end gap-1">Importo <SortIcon field="amount" /></span>
               </th>
               <th className="px-4 py-3" />
@@ -142,14 +142,14 @@ export default function TabularView() {
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={6} className="text-center py-12" style={{ color: '#3f3f5a' }}>
+                <td colSpan={6} className="text-center py-12" style={{ color: 'var(--border-light)' }}>
                   Nessun movimento trovato
                 </td>
               </tr>
             ) : (
               filtered.map((t, idx) => (
                 <tr key={t.id}
-                  style={{ background: idx % 2 === 0 ? '#1c1c27' : '#18181f', borderBottom: '1px solid #2e2e40' }}>
+                  style={{ background: idx % 2 === 0 ? 'var(--bg-card)' : '#18181f', borderBottom: '1px solid var(--border)' }}>
                   <td className="px-4 py-3 text-white">{format(parseISO(t.date), 'dd/MM/yyyy')}</td>
                   <td className="px-4 py-3">
                     <span className="text-xs px-2 py-0.5 rounded-full font-medium"
@@ -159,30 +159,30 @@ export default function TabularView() {
                       {isCashIn(t) ? '▲ Entrata' : '▼ Uscita'}
                     </span>
                   </td>
-                  <td className="px-4 py-3" style={{ color: '#d4d4d8' }}>
+                  <td className="px-4 py-3" style={{ color: 'var(--text-2)' }}>
                     {isCashIn(t) ? (
                       <span>{CATEGORY_ICONS[t.category as EntryCategory]} {t.category}
-                        {t.notes && <span className="ml-2 text-xs" style={{ color: '#71717a' }}>— {t.notes}</span>}
+                        {t.notes && <span className="ml-2 text-xs" style={{ color: 'var(--muted)' }}>— {t.notes}</span>}
                       </span>
                     ) : (
                       <span>{EXPENSE_TYPE_ICONS[(t as any).expenseType as ExpenseType]} {(t as any).supplier}
-                        <span className="ml-2 text-xs" style={{ color: '#71717a' }}>{(t as any).expenseType}</span>
+                        <span className="ml-2 text-xs" style={{ color: 'var(--muted)' }}>{(t as any).expenseType}</span>
                       </span>
                     )}
                   </td>
                   <td className="px-4 py-3">
                     {isCashIn(t)
-                      ? <span className="text-xs" style={{ color: '#71717a' }}>{t.method} · {t.source}</span>
+                      ? <span className="text-xs" style={{ color: 'var(--muted)' }}>{t.method} · {t.source}</span>
                       : <StatusBadge status={(t as any).status} />
                     }
                     {t.id.startsWith('salon-pay-') && (
-                      <span className="ml-2 text-xs px-1.5 py-0.5 rounded" style={{ background: 'rgba(99,102,241,0.15)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.2)' }}>Cassa</span>
+                      <span className="ml-2 text-xs px-1.5 py-0.5 rounded" style={{ background: 'rgba(99,102,241,0.15)', color: 'var(--accent-light)', border: '1px solid rgba(99,102,241,0.2)' }}>Cassa</span>
                     )}
                     {isCashIn(t) ? '+' : '-'}{formatCurrency(t.amount)}
                   </td>
                   <td className="px-4 py-3 text-right">
                     {t.id.startsWith('salon-pay-') ? (
-                      <span className="text-xs" style={{ color: '#3f3f5a' }} title="Voce automatica da Cassa">🔒</span>
+                      <span className="text-xs" style={{ color: 'var(--border-light)' }} title="Voce automatica da Cassa">🔒</span>
                     ) : confirmDelete === t.id ? (
                       <div className="flex items-center gap-2 justify-end">
                         <button onClick={async () => { await deleteEntry(t.id); setConfirmDelete(null); }}
@@ -190,7 +190,7 @@ export default function TabularView() {
                           Conferma
                         </button>
                         <button onClick={() => setConfirmDelete(null)}
-                          className="text-xs px-2 py-1 rounded" style={{ background: '#2e2e40', color: '#71717a' }}>
+                          className="text-xs px-2 py-1 rounded" style={{ background: 'var(--border)', color: 'var(--muted)' }}>
                           No
                         </button>
                       </div>

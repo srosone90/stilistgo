@@ -23,7 +23,7 @@ import {
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
-      <div className="rounded-xl p-3 text-xs" style={{ background: '#1c1c27', border: '1px solid #2e2e40', color: '#f4f4f5' }}>
+      <div className="rounded-xl p-3 text-xs" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text)' }}>
         <p className="font-semibold mb-1">{label}</p>
         {payload.map((p: any) => (
           <p key={p.name} style={{ color: p.color }}>{p.name}: {formatCurrency(p.value)}</p>
@@ -88,7 +88,7 @@ export default function Dashboard({ showAccounting = true }: { showAccounting?: 
       <div className="flex items-start justify-between flex-wrap gap-2">
         <div>
           <h1 className="text-2xl font-bold text-white">Dashboard</h1>
-          <p className="text-sm mt-1" style={{ color: '#71717a' }}>
+          <p className="text-sm mt-1" style={{ color: 'var(--muted)' }}>
             {format(new Date(), 'EEEE dd MMMM yyyy', { locale: it })}
           </p>
         </div>
@@ -105,36 +105,36 @@ export default function Dashboard({ showAccounting = true }: { showAccounting?: 
 
       {/* ─── Salon KPIs ─── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="rounded-2xl p-4" style={{ background: '#1c1c27', border: '1px solid #2e2e40' }}>
+        <div className="rounded-2xl p-4" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
           <div className="flex items-center gap-2 mb-2">
             <div className="p-1.5 rounded-lg" style={{ background: 'rgba(99,102,241,0.15)' }}>
-              <CalendarDays size={14} style={{ color: '#818cf8' }} />
+              <CalendarDays size={14} style={{ color: 'var(--accent-light)' }} />
             </div>
-            <span className="text-xs font-medium" style={{ color: '#71717a' }}>Oggi</span>
+            <span className="text-xs font-medium" style={{ color: 'var(--muted)' }}>Oggi</span>
           </div>
           <p className="text-2xl font-bold text-white">{todayAppts.length}</p>
-          <p className="text-xs mt-1" style={{ color: '#71717a' }}>
+          <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>
             {completedToday} completati · {scheduledToday} da fare
           </p>
         </div>
-        <div className="rounded-2xl p-4" style={{ background: '#1c1c27', border: '1px solid #2e2e40' }}>
+        <div className="rounded-2xl p-4" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
           <div className="flex items-center gap-2 mb-2">
             <div className="p-1.5 rounded-lg" style={{ background: 'rgba(34,197,94,0.15)' }}>
               <Users size={14} style={{ color: '#22c55e' }} />
             </div>
-            <span className="text-xs font-medium" style={{ color: '#71717a' }}>Clienti totali</span>
+            <span className="text-xs font-medium" style={{ color: 'var(--muted)' }}>Clienti totali</span>
           </div>
           <p className="text-2xl font-bold text-white">{clients.length}</p>
-          <p className="text-xs mt-1" style={{ color: '#71717a' }}>
+          <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>
             {clients.filter(c => c.loyaltyPoints > 0).length} con punti fedeltà
           </p>
         </div>
-        <div className="rounded-2xl p-4" style={{ background: '#1c1c27', border: '1px solid #2e2e40' }}>
+        <div className="rounded-2xl p-4" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
           <div className="flex items-center gap-2 mb-2">
             <div className="p-1.5 rounded-lg" style={{ background: 'rgba(245,158,11,0.15)' }}>
               <Package size={14} style={{ color: '#f59e0b' }} />
             </div>
-            <span className="text-xs font-medium" style={{ color: '#71717a' }}>Magazzino</span>
+            <span className="text-xs font-medium" style={{ color: 'var(--muted)' }}>Magazzino</span>
           </div>
           <p className="text-2xl font-bold text-white">{products.filter(p => p.active).length}</p>
           {lowStockProducts.length > 0 ? (
@@ -145,15 +145,15 @@ export default function Dashboard({ showAccounting = true }: { showAccounting?: 
             <p className="text-xs mt-1" style={{ color: '#22c55e' }}>Scorte OK</p>
           )}
         </div>
-        <div className="rounded-2xl p-4" style={{ background: '#1c1c27', border: isToday(new Date()) && openCashSession ? '1px solid rgba(34,197,94,0.4)' : '1px solid #2e2e40' }}>
+        <div className="rounded-2xl p-4" style={{ background: 'var(--bg-card)', border: isToday(new Date()) && openCashSession ? '1px solid rgba(34,197,94,0.4)' : '1px solid var(--border)' }}>
           <div className="flex items-center gap-2 mb-2">
             <div className="p-1.5 rounded-lg" style={{ background: 'rgba(99,102,241,0.15)' }}>
-              <Clock size={14} style={{ color: '#818cf8' }} />
+              <Clock size={14} style={{ color: 'var(--accent-light)' }} />
             </div>
-            <span className="text-xs font-medium" style={{ color: '#71717a' }}>Incasso oggi</span>
+            <span className="text-xs font-medium" style={{ color: 'var(--muted)' }}>Incasso oggi</span>
           </div>
           <p className="text-2xl font-bold text-white">{formatCurrency(todayRevenue)}</p>
-          <p className="text-xs mt-1" style={{ color: openCashSession ? '#22c55e' : '#71717a' }}>
+          <p className="text-xs mt-1" style={{ color: openCashSession ? '#22c55e' : 'var(--muted)' }}>
             {openCashSession ? '● Cassa aperta' : 'Cassa chiusa'}
           </p>
         </div>
@@ -161,19 +161,19 @@ export default function Dashboard({ showAccounting = true }: { showAccounting?: 
 
       {/* Prossimi appuntamenti */}
       {upcomingAppts.length > 0 && (
-        <div className="rounded-2xl p-4" style={{ background: '#1c1c27', border: '1px solid #2e2e40' }}>
+        <div className="rounded-2xl p-4" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
           <h3 className="font-semibold text-white mb-3 text-sm">Prossimi appuntamenti</h3>
           <div className="space-y-2">
             {upcomingAppts.map(a => {
               const client = clients.find(c => c.id === a.clientId);
               const op = operators.find(o => o.id === a.operatorId);
               return (
-                <div key={a.id} className="flex items-center gap-3 py-1.5 px-2 rounded-lg" style={{ background: '#12121a' }}>
+                <div key={a.id} className="flex items-center gap-3 py-1.5 px-2 rounded-lg" style={{ background: 'var(--bg-input)' }}>
                   <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: op?.color || '#6366f1' }} />
                   <span className="text-xs font-medium text-white flex-1 truncate">
                     {client ? `${client.firstName} ${client.lastName}` : '—'}
                   </span>
-                  <span className="text-xs" style={{ color: '#71717a' }}>
+                  <span className="text-xs" style={{ color: 'var(--muted)' }}>
                     {format(parseISO(a.date), 'dd/MM', { locale: it })} {a.startTime}
                   </span>
                   {op && <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: `${op.color}25`, color: op.color }}>{op.name}</span>}
@@ -222,13 +222,13 @@ export default function Dashboard({ showAccounting = true }: { showAccounting?: 
 
           {/* Chart + Categories */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="lg:col-span-2 rounded-2xl p-5" style={{ background: '#1c1c27', border: '1px solid #2e2e40' }}>
+            <div className="lg:col-span-2 rounded-2xl p-5" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
               <h3 className="font-semibold text-white mb-4">Andamento Ultimi 6 Mesi</h3>
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={chartData} barGap={4} barCategoryGap="30%">
-                  <CartesianGrid strokeDasharray="3 3" stroke="#2e2e40" vertical={false} />
-                  <XAxis dataKey="month" tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `€${(v/1000).toFixed(0)}k`} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                  <XAxis dataKey="month" tick={{ fill: 'var(--muted)', fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fill: 'var(--muted)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `€${(v/1000).toFixed(0)}k`} />
                   <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(99,102,241,0.08)' }} />
                   <Bar dataKey="Entrate" fill="#22c55e" radius={[4,4,0,0]} />
                   <Bar dataKey="Uscite" fill="#ef4444" radius={[4,4,0,0]} />
@@ -236,10 +236,10 @@ export default function Dashboard({ showAccounting = true }: { showAccounting?: 
                 </BarChart>
               </ResponsiveContainer>
             </div>
-            <div className="rounded-2xl p-5" style={{ background: '#1c1c27', border: '1px solid #2e2e40' }}>
+            <div className="rounded-2xl p-5" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
               <h3 className="font-semibold text-white mb-4">Top Categorie (mese)</h3>
               {topCategories.length === 0 ? (
-                <p className="text-sm" style={{ color: '#71717a' }}>Nessun dato questo mese</p>
+                <p className="text-sm" style={{ color: 'var(--muted)' }}>Nessun dato questo mese</p>
               ) : (
                 <div className="space-y-3">
                   {topCategories.map(([cat, val]) => {
@@ -247,13 +247,13 @@ export default function Dashboard({ showAccounting = true }: { showAccounting?: 
                     return (
                       <div key={cat}>
                         <div className="flex justify-between text-xs mb-1">
-                          <span style={{ color: '#d4d4d8' }}>{CATEGORY_ICONS[cat as EntryCategory]} {cat}</span>
+                          <span style={{ color: 'var(--text-2)' }}>{CATEGORY_ICONS[cat as EntryCategory]} {cat}</span>
                           <span className="font-semibold text-white">{pct.toFixed(1)}%</span>
                         </div>
-                        <div className="w-full h-1.5 rounded-full" style={{ background: '#2e2e40' }}>
+                        <div className="w-full h-1.5 rounded-full" style={{ background: 'var(--border)' }}>
                           <div className="h-1.5 rounded-full" style={{ width: `${pct}%`, background: 'linear-gradient(90deg,#6366f1,#a855f7)' }} />
                         </div>
-                        <p className="text-xs mt-0.5" style={{ color: '#71717a' }}>{formatCurrency(val)}</p>
+                        <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>{formatCurrency(val)}</p>
                       </div>
                     );
                   })}

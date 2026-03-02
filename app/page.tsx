@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -97,7 +97,7 @@ export default function Home() {
     <div className="flex flex-col items-center justify-center h-full gap-3 py-20">
       <div className="text-5xl">🔒</div>
       <p className="text-white font-semibold text-lg">Accesso non consentito</p>
-      <p className="text-sm" style={{ color: '#71717a' }}>Contatta il titolare per richiedere l&apos;accesso a questa sezione.</p>
+      <p className="text-sm" style={{ color: 'var(--muted)' }}>Contatta il titolare per richiedere l&apos;accesso a questa sezione.</p>
     </div>
   );
 
@@ -107,15 +107,15 @@ export default function Home() {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4 py-20 px-6">
         <div style={{ background: 'rgba(99,102,241,0.1)', borderRadius: '50%', padding: '20px' }}>
-          <Lock size={36} style={{ color: '#818cf8' }} />
+          <Lock size={36} style={{ color: 'var(--accent-light)' }} />
         </div>
         <div className="text-center">
           <p className="text-white font-bold text-xl mb-2">Funzione non disponibile</p>
-          <p className="text-sm mb-1" style={{ color: '#a1a1aa' }}>{info.description}</p>
-          <p className="text-sm" style={{ color: '#71717a' }}>Piano attuale: <span style={{ color: '#fbbf24', fontWeight: 600 }}>{currentPlan.charAt(0).toUpperCase() + currentPlan.slice(1)}</span></p>
+          <p className="text-sm mb-1" style={{ color: 'var(--text-3)' }}>{info.description}</p>
+          <p className="text-sm" style={{ color: 'var(--muted)' }}>Piano attuale: <span style={{ color: '#fbbf24', fontWeight: 600 }}>{currentPlan.charAt(0).toUpperCase() + currentPlan.slice(1)}</span></p>
         </div>
         <div style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: '12px', padding: '12px 24px', textAlign: 'center' }}>
-          <p style={{ color: '#818cf8', fontSize: '13px', margin: 0 }}>Richiedi l&apos;upgrade al piano <strong>{info.plan.charAt(0).toUpperCase() + info.plan.slice(1)}</strong> per sbloccare questa funzione.</p>
+          <p style={{ color: 'var(--accent-light)', fontSize: '13px', margin: 0 }}>Richiedi l&apos;upgrade al piano <strong>{info.plan.charAt(0).toUpperCase() + info.plan.slice(1)}</strong> per sbloccare questa funzione.</p>
         </div>
       </div>
     );
@@ -162,12 +162,12 @@ export default function Home() {
 
   if (!authChecked || loading) {
     return (
-      <div className="flex h-screen items-center justify-center" style={{ background: '#0f0f13' }}>
+      <div className="flex h-screen items-center justify-center" style={{ background: 'var(--bg-page)' }}>
         <div className="flex flex-col items-center gap-4 text-center px-6">
           <Loader2 size={36} className="animate-spin" style={{ color: '#6366f1' }} />
           <div>
             <p className="text-white font-medium">Collegamento in corso...</p>
-            <p className="text-xs mt-1" style={{ color: '#71717a' }}>
+            <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>
               Verifica autenticazione · caricamento dati
             </p>
           </div>
@@ -177,7 +177,7 @@ export default function Home() {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: '#0f0f13' }}>
+    <div className="flex h-screen overflow-hidden" style={{ background: 'var(--bg-page)' }}>
       {/* Desktop sidebar */}
       <div className="hidden md:block">
         <Sidebar activeView={view} onNavigate={(v) => setView(v as View)} onLock={() => setShowLockScreen(true)} permissions={effectivePerms} planFeatures={planFeatures} />
@@ -196,22 +196,22 @@ export default function Home() {
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Mobile top bar */}
-        <div className="md:hidden flex items-center justify-between px-4 py-3" style={{ background: '#16161f', borderBottom: '1px solid #2e2e40' }}>
-          <button onClick={() => setSidebarOpen(true)} className="p-2 rounded-lg" style={{ background: '#1c1c27' }}>
+        <div className="md:hidden flex items-center justify-between px-4 py-3" style={{ background: 'var(--bg-sidebar)', borderBottom: '1px solid var(--border)' }}>
+          <button onClick={() => setSidebarOpen(true)} className="p-2 rounded-lg" style={{ background: 'var(--bg-card)' }}>
             <div className="space-y-1">
-              <div className="w-5 h-0.5 rounded" style={{ background: '#d4d4d8' }} />
-              <div className="w-5 h-0.5 rounded" style={{ background: '#d4d4d8' }} />
-              <div className="w-5 h-0.5 rounded" style={{ background: '#d4d4d8' }} />
+              <div className="w-5 h-0.5 rounded" style={{ background: 'var(--text-2)' }} />
+              <div className="w-5 h-0.5 rounded" style={{ background: 'var(--text-2)' }} />
+              <div className="w-5 h-0.5 rounded" style={{ background: 'var(--text-2)' }} />
             </div>
           </button>
           <p className="font-bold text-white text-sm">Stylistgo</p>
           <button
             onClick={async () => { await signOut(); window.location.href = '/login'; }}
             className="p-2 rounded-lg"
-            style={{ background: '#1c1c27' }}
+            style={{ background: 'var(--bg-card)' }}
             title="Esci"
           >
-            <LogOut size={18} style={{ color: '#71717a' }} />
+            <LogOut size={18} style={{ color: 'var(--muted)' }} />
           </button>
         </div>
 

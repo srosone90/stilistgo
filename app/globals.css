@@ -1,6 +1,8 @@
 @import "tailwindcss";
 
-:root {
+/* ── Dark theme (default) ─────────────────────────────────────────────────── */
+:root,
+[data-theme="dark"] {
   --background: #0f0f13;
   --foreground: #f4f4f5;
   --card: #1c1c27;
@@ -11,6 +13,45 @@
   --danger: #ef4444;
   --warning: #f59e0b;
   --muted: #71717a;
+
+  /* Extended palette used in inline styles */
+  --bg-page: #0f0f13;
+  --bg-sidebar: #16161f;
+  --bg-card: #1c1c27;
+  --bg-input: #12121a;
+  --border: #2e2e40;
+  --border-light: #3f3f5a;
+  --text: #f4f4f5;
+  --text-2: #d4d4d8;
+  --text-3: #a1a1aa;
+  --accent-light: #818cf8;
+  --gradient-bg: linear-gradient(135deg, #0f0f13, #13131e);
+}
+
+/* ── Light theme ─────────────────────────────────────────────────────────── */
+[data-theme="light"] {
+  --background: #f4f4f8;
+  --foreground: #09090b;
+  --card: #ffffff;
+  --card-border: #e4e4e7;
+  --accent: #6366f1;
+  --accent-hover: #4f46e5;
+  --success: #16a34a;
+  --danger: #dc2626;
+  --warning: #d97706;
+  --muted: #71717a;
+
+  --bg-page: #f4f4f8;
+  --bg-sidebar: #ffffff;
+  --bg-card: #ffffff;
+  --bg-input: #f1f1f5;
+  --border: #e4e4e7;
+  --border-light: #d4d4d8;
+  --text: #09090b;
+  --text-2: #3f3f46;
+  --text-3: #52525b;
+  --accent-light: #4f46e5;
+  --gradient-bg: linear-gradient(135deg, #f4f4f8, #ecedf5);
 }
 
 @theme inline {
@@ -35,10 +76,32 @@ body {
 }
 
 ::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: #1c1c24; }
-::-webkit-scrollbar-thumb { background: #3f3f5a; border-radius: 3px; }
+::-webkit-scrollbar-track { background: var(--bg-input); }
+::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #6366f1; }
 
 input, select, textarea {
   color-scheme: dark;
 }
+
+[data-theme="light"] input,
+[data-theme="light"] select,
+[data-theme="light"] textarea {
+  color-scheme: light;
+}
+
+/* In light mode make sure text colour propagates into components that set color: var(--text) */
+[data-theme="light"] {
+  color-scheme: light;
+}
+
+/* Override Tailwind text-white in light mode so text remains visible on light backgrounds */
+[data-theme="light"] .text-white {
+  color: var(--text) !important;
+}
+/* Keep white text on gradient/accent buttons */
+[data-theme="light"] button[style*="linear-gradient"] .text-white,
+[data-theme="light"] button[style*="linear-gradient"] {
+  color: #ffffff;
+}
+

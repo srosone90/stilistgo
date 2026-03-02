@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useSalon } from '@/context/SalonContext';
@@ -8,7 +8,7 @@ import { it } from 'date-fns/locale';
 import { RefreshCw, CheckCircle2, XCircle, Trash2, ExternalLink, Clock, Phone, Mail, Scissors, CalendarPlus } from 'lucide-react';
 import { getCurrentUser } from '@/lib/supabase';
 
-const card: React.CSSProperties = { background: '#1c1c27', border: '1px solid #2e2e40', borderRadius: '16px', padding: '20px' };
+const card: React.CSSProperties = { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '16px', padding: '20px' };
 
 const STATUS_STYLES: Record<string, React.CSSProperties> = {
   pending:   { background: 'rgba(245,158,11,0.15)', color: '#fbbf24', border: '1px solid rgba(245,158,11,0.3)' },
@@ -155,13 +155,13 @@ export default function OnlineBookingsView() {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">Prenotazioni Online</h1>
-          <p className="text-sm mt-1" style={{ color: '#71717a' }}>
+          <p className="text-sm mt-1" style={{ color: 'var(--muted)' }}>
             Gestisci le richieste ricevute tramite il link pubblico
           </p>
         </div>
         <button onClick={load} disabled={loading}
           className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm"
-          style={{ background: '#1c1c27', border: '1px solid #2e2e40', color: '#71717a', cursor: 'pointer' }}>
+          style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--muted)', cursor: 'pointer' }}>
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Aggiorna
         </button>
       </div>
@@ -169,16 +169,16 @@ export default function OnlineBookingsView() {
       {/* Link pubblico */}
       <div style={{ ...card, background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.25)' }}>
         <p className="text-sm font-semibold text-white mb-1">🔗 Link prenotazione da condividere</p>
-        <p className="text-xs mb-3" style={{ color: '#71717a' }}>
+        <p className="text-xs mb-3" style={{ color: 'var(--muted)' }}>
           Invia questo link ai tuoi clienti (WhatsApp, Instagram, sito web…)
         </p>
         <div className="flex items-center gap-2">
-          <code className="flex-1 text-xs px-3 py-2 rounded-lg truncate" style={{ background: '#12121a', color: '#818cf8', border: '1px solid #2e2e40' }}>
+          <code className="flex-1 text-xs px-3 py-2 rounded-lg truncate" style={{ background: 'var(--bg-input)', color: 'var(--accent-light)', border: '1px solid var(--border)' }}>
             {bookingUrl}
           </code>
           <button onClick={() => navigator.clipboard.writeText(bookingUrl)}
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium"
-            style={{ background: 'rgba(99,102,241,0.2)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.3)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            style={{ background: 'rgba(99,102,241,0.2)', color: 'var(--accent-light)', border: '1px solid rgba(99,102,241,0.3)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
             <ExternalLink size={12} /> Copia link
           </button>
         </div>
@@ -193,7 +193,7 @@ export default function OnlineBookingsView() {
         ].map(s => (
           <div key={s.label} style={card} className="text-center">
             <p className="text-2xl font-bold" style={{ color: s.color }}>{s.value}</p>
-            <p className="text-xs mt-1" style={{ color: '#71717a' }}>{s.label}</p>
+            <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>{s.label}</p>
           </div>
         ))}
       </div>
@@ -204,8 +204,8 @@ export default function OnlineBookingsView() {
           <button key={f} onClick={() => setFilter(f)}
             className="px-3 py-1.5 rounded-lg text-xs font-medium"
             style={filter === f
-              ? { background: 'rgba(99,102,241,0.2)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.4)' }
-              : { background: '#12121a', color: '#71717a', border: '1px solid #2e2e40', cursor: 'pointer' }}>
+              ? { background: 'rgba(99,102,241,0.2)', color: 'var(--accent-light)', border: '1px solid rgba(99,102,241,0.4)' }
+              : { background: 'var(--bg-input)', color: 'var(--muted)', border: '1px solid var(--border)', cursor: 'pointer' }}>
             {f === 'all' ? `Tutte (${bookings.length})` : f === 'pending' ? `In attesa${pendingCount > 0 ? ` (${pendingCount})` : ''}` : f === 'confirmed' ? 'Confermate' : 'Annullate'}
           </button>
         ))}
@@ -213,9 +213,9 @@ export default function OnlineBookingsView() {
 
       {/* List */}
       {loading ? (
-        <p className="text-center py-12 text-sm" style={{ color: '#71717a' }}>Caricamento...</p>
+        <p className="text-center py-12 text-sm" style={{ color: 'var(--muted)' }}>Caricamento...</p>
       ) : visible.length === 0 ? (
-        <p className="text-center py-12 text-sm" style={{ color: '#71717a' }}>
+        <p className="text-center py-12 text-sm" style={{ color: 'var(--muted)' }}>
           {filter === 'all' ? 'Nessuna prenotazione ricevuta ancora.' : 'Nessuna prenotazione in questa categoria.'}
         </p>
       ) : (
@@ -230,7 +230,7 @@ export default function OnlineBookingsView() {
                       {STATUS_LABELS[b.status]}
                     </span>
                   </div>
-                  <div className="flex flex-wrap gap-3 text-xs" style={{ color: '#71717a' }}>
+                  <div className="flex flex-wrap gap-3 text-xs" style={{ color: 'var(--muted)' }}>
                     <span className="flex items-center gap-1"><Phone size={10} /> {b.client_phone}</span>
                     {b.client_email && <span className="flex items-center gap-1"><Mail size={10} /> {b.client_email}</span>}
                     <span className="flex items-center gap-1">
@@ -245,22 +245,22 @@ export default function OnlineBookingsView() {
               </div>
 
               <div className="grid grid-cols-3 gap-3 mb-3">
-                <div className="rounded-lg px-3 py-2" style={{ background: '#12121a', border: '1px solid #2e2e40' }}>
-                  <p className="text-xs mb-0.5" style={{ color: '#71717a' }}>Servizio</p>
-                  <p className="text-sm font-medium text-white flex items-center gap-1"><Scissors size={11} style={{ color: '#818cf8' }} />{b.service}</p>
+                <div className="rounded-lg px-3 py-2" style={{ background: 'var(--bg-input)', border: '1px solid var(--border)' }}>
+                  <p className="text-xs mb-0.5" style={{ color: 'var(--muted)' }}>Servizio</p>
+                  <p className="text-sm font-medium text-white flex items-center gap-1"><Scissors size={11} style={{ color: 'var(--accent-light)' }} />{b.service}</p>
                 </div>
-                <div className="rounded-lg px-3 py-2" style={{ background: '#12121a', border: '1px solid #2e2e40' }}>
-                  <p className="text-xs mb-0.5" style={{ color: '#71717a' }}>Data</p>
+                <div className="rounded-lg px-3 py-2" style={{ background: 'var(--bg-input)', border: '1px solid var(--border)' }}>
+                  <p className="text-xs mb-0.5" style={{ color: 'var(--muted)' }}>Data</p>
                   <p className="text-sm font-medium text-white">{b.preferred_date}</p>
                 </div>
-                <div className="rounded-lg px-3 py-2" style={{ background: '#12121a', border: '1px solid #2e2e40' }}>
-                  <p className="text-xs mb-0.5" style={{ color: '#71717a' }}>Ora</p>
+                <div className="rounded-lg px-3 py-2" style={{ background: 'var(--bg-input)', border: '1px solid var(--border)' }}>
+                  <p className="text-xs mb-0.5" style={{ color: 'var(--muted)' }}>Ora</p>
                   <p className="text-sm font-medium text-white">{b.preferred_time}</p>
                 </div>
               </div>
 
               {b.notes && (
-                <p className="text-xs mb-3 px-3 py-2 rounded-lg" style={{ background: '#12121a', border: '1px solid #2e2e40', color: '#a1a1aa' }}>
+                <p className="text-xs mb-3 px-3 py-2 rounded-lg" style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text-3)' }}>
                   📝 {b.notes}
                 </p>
               )}
@@ -269,7 +269,7 @@ export default function OnlineBookingsView() {
                 <div className="flex gap-2">
                   <button onClick={() => handleConvertToAppointment(b)} disabled={converting === b.id}
                     className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium"
-                    style={{ background: 'rgba(99,102,241,0.2)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.3)', cursor: 'pointer' }}>
+                    style={{ background: 'rgba(99,102,241,0.2)', color: 'var(--accent-light)', border: '1px solid rgba(99,102,241,0.3)', cursor: 'pointer' }}>
                     <CalendarPlus size={12} /> {converting === b.id ? 'Conversione...' : 'Converti in appuntamento'}
                   </button>
                   <button onClick={() => handleConfirm(b.id)}

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useMemo } from 'react';
 import { useSalon } from '@/context/SalonContext';
@@ -6,7 +6,7 @@ import { format, parseISO } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { Trophy, Star, Award, Crown, Plus, Minus, Search } from 'lucide-react';
 
-const card: React.CSSProperties = { background: '#1c1c27', border: '1px solid #2e2e40', borderRadius: '16px', padding: '20px' };
+const card: React.CSSProperties = { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '16px', padding: '20px' };
 
 type Tier = 'bronze' | 'silver' | 'gold' | 'platinum';
 
@@ -21,7 +21,7 @@ const TIER_CONFIG: Record<Tier, { label: string; color: string; bg: string; icon
   bronze:   { label: 'Bronzo',   color: '#cd7f32', bg: 'rgba(205,127,50,0.15)',  icon: <Award size={14} />,  min: 0,    next: 100  },
   silver:   { label: 'Argento',  color: '#94a3b8', bg: 'rgba(148,163,184,0.15)', icon: <Star size={14} />,   min: 100,  next: 500  },
   gold:     { label: 'Oro',      color: '#f59e0b', bg: 'rgba(245,158,11,0.15)',  icon: <Trophy size={14} />, min: 500,  next: 1000 },
-  platinum: { label: 'Platino',  color: '#818cf8', bg: 'rgba(129,140,248,0.15)', icon: <Crown size={14} />,  min: 1000 },
+  platinum: { label: 'Platino',  color: 'var(--accent-light)', bg: 'rgba(129,140,248,0.15)', icon: <Crown size={14} />,  min: 1000 },
 };
 
 export default function LoyaltyView() {
@@ -74,7 +74,7 @@ export default function LoyaltyView() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-white">Programma Fedeltà</h1>
-        <p className="text-sm mt-1" style={{ color: '#71717a' }}>
+        <p className="text-sm mt-1" style={{ color: 'var(--muted)' }}>
           {pointsPerEuro} punto ogni €1 speso · Gestisci i punti dei tuoi clienti
         </p>
       </div>
@@ -82,17 +82,17 @@ export default function LoyaltyView() {
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div style={card} className="text-center">
-          <p className="text-2xl font-bold" style={{ color: '#818cf8' }}>{stats.total.toLocaleString()}</p>
-          <p className="text-xs mt-1" style={{ color: '#71717a' }}>Punti totali emessi</p>
+          <p className="text-2xl font-bold" style={{ color: 'var(--accent-light)' }}>{stats.total.toLocaleString()}</p>
+          <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>Punti totali emessi</p>
         </div>
         <div style={card} className="text-center">
           <p className="text-2xl font-bold" style={{ color: '#22c55e' }}>{stats.avg}</p>
-          <p className="text-xs mt-1" style={{ color: '#71717a' }}>Media per cliente</p>
+          <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>Media per cliente</p>
         </div>
         {(['platinum', 'gold'] as Tier[]).map(t => (
           <div key={t} style={{ ...card, borderColor: TIER_CONFIG[t].color + '50' }} className="text-center">
             <p className="text-2xl font-bold" style={{ color: TIER_CONFIG[t].color }}>{stats.tiers[t]}</p>
-            <p className="text-xs mt-1" style={{ color: '#71717a' }}>Clienti {TIER_CONFIG[t].label}</p>
+            <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>Clienti {TIER_CONFIG[t].label}</p>
           </div>
         ))}
       </div>
@@ -107,7 +107,7 @@ export default function LoyaltyView() {
               <span style={{ color: t.color }}>{t.icon}</span>
               <div>
                 <p className="text-xs font-semibold" style={{ color: t.color }}>{t.label}</p>
-                <p className="text-xs" style={{ color: '#71717a' }}>
+                <p className="text-xs" style={{ color: 'var(--muted)' }}>
                   {t.min}+ pt{t.next ? ` / ${t.next} per salire` : ''}
                 </p>
               </div>
@@ -123,12 +123,12 @@ export default function LoyaltyView() {
           <div className="flex items-center gap-2">
             <button onClick={() => setSortBy('points')}
               className="text-xs px-2.5 py-1 rounded-lg"
-              style={sortBy === 'points' ? { background: 'rgba(99,102,241,0.2)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.4)' } : { background: '#12121a', color: '#71717a', border: '1px solid #2e2e40', cursor: 'pointer' }}>
+              style={sortBy === 'points' ? { background: 'rgba(99,102,241,0.2)', color: 'var(--accent-light)', border: '1px solid rgba(99,102,241,0.4)' } : { background: 'var(--bg-input)', color: 'var(--muted)', border: '1px solid var(--border)', cursor: 'pointer' }}>
               Per punti
             </button>
             <button onClick={() => setSortBy('name')}
               className="text-xs px-2.5 py-1 rounded-lg"
-              style={sortBy === 'name' ? { background: 'rgba(99,102,241,0.2)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.4)' } : { background: '#12121a', color: '#71717a', border: '1px solid #2e2e40', cursor: 'pointer' }}>
+              style={sortBy === 'name' ? { background: 'rgba(99,102,241,0.2)', color: 'var(--accent-light)', border: '1px solid rgba(99,102,241,0.4)' } : { background: 'var(--bg-input)', color: 'var(--muted)', border: '1px solid var(--border)', cursor: 'pointer' }}>
               Per nome
             </button>
           </div>
@@ -136,13 +136,13 @@ export default function LoyaltyView() {
 
         {/* Search */}
         <div className="relative mb-4">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: '#71717a' }} />
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--muted)' }} />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Cerca cliente..."
-            style={{ background: '#12121a', border: '1px solid #2e2e40', borderRadius: '10px', padding: '8px 12px 8px 32px', color: '#f4f4f5', fontSize: '13px', outline: 'none', width: '100%' }} />
+            style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '10px', padding: '8px 12px 8px 32px', color: 'var(--text)', fontSize: '13px', outline: 'none', width: '100%' }} />
         </div>
 
         {ranked.length === 0 ? (
-          <p className="text-center py-6 text-sm" style={{ color: '#71717a' }}>Nessun cliente trovato.</p>
+          <p className="text-center py-6 text-sm" style={{ color: 'var(--muted)' }}>Nessun cliente trovato.</p>
         ) : (
           <div className="space-y-2">
             {ranked.map((c, idx) => {
@@ -151,10 +151,10 @@ export default function LoyaltyView() {
               const visit = lastVisit(c.id);
               return (
                 <div key={c.id} className="flex items-center gap-3 rounded-xl px-3 py-3"
-                  style={{ background: '#12121a', border: '1px solid #2e2e40' }}>
+                  style={{ background: 'var(--bg-input)', border: '1px solid var(--border)' }}>
                   {/* Rank */}
                   {sortBy === 'points' && (
-                    <span className="text-xs font-bold w-5 text-center" style={{ color: idx < 3 ? '#f59e0b' : '#3f3f5a' }}>
+                    <span className="text-xs font-bold w-5 text-center" style={{ color: idx < 3 ? '#f59e0b' : 'var(--border-light)' }}>
                       {idx + 1}
                     </span>
                   )}
@@ -172,13 +172,13 @@ export default function LoyaltyView() {
                         {tc.icon}{tc.label}
                       </span>
                     </div>
-                    {visit && <p className="text-xs" style={{ color: '#71717a' }}>Ultima visita: {visit}</p>}
+                    {visit && <p className="text-xs" style={{ color: 'var(--muted)' }}>Ultima visita: {visit}</p>}
                   </div>
                   {/* Points */}
                   <div className="text-right flex-shrink-0">
                     <p className="font-bold text-sm" style={{ color: tc.color }}>{c.loyaltyPoints.toLocaleString()} pt</p>
                     {tc.next && (
-                      <p className="text-xs" style={{ color: '#71717a' }}>
+                      <p className="text-xs" style={{ color: 'var(--muted)' }}>
                         {Math.max(0, tc.next - c.loyaltyPoints)} per {['silver','gold','platinum'].find(t => TIER_CONFIG[t as Tier].min === tc.next) ? TIER_CONFIG[['silver','gold','platinum'].find(t => TIER_CONFIG[t as Tier].min === tc.next) as Tier].label : ''}
                       </p>
                     )}
@@ -187,7 +187,7 @@ export default function LoyaltyView() {
                   <div className="flex items-center gap-1 flex-shrink-0">
                     <button onClick={() => { setAdjustClientId(c.id); setAdjustAmount('10'); }}
                       className="w-7 h-7 rounded-lg flex items-center justify-center"
-                      style={{ background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', color: '#818cf8', cursor: 'pointer' }}>
+                      style={{ background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', color: 'var(--accent-light)', cursor: 'pointer' }}>
                       <Plus size={12} />
                     </button>
                     <button onClick={() => { setAdjustClientId(c.id + '_minus'); setAdjustAmount('10'); }}
@@ -206,7 +206,7 @@ export default function LoyaltyView() {
       {/* Adjust modal */}
       {adjustClientId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
-          <div className="w-full max-w-xs rounded-2xl p-6" style={{ background: '#18181f', border: '1px solid #2e2e40' }}>
+          <div className="w-full max-w-xs rounded-2xl p-6" style={{ background: '#18181f', border: '1px solid var(--border)' }}>
             {(() => {
               const isDeduct = adjustClientId.endsWith('_minus');
               const realId = isDeduct ? adjustClientId.replace('_minus', '') : adjustClientId;
@@ -216,16 +216,16 @@ export default function LoyaltyView() {
                   <h3 className="font-semibold text-white mb-1">
                     {isDeduct ? '➖ Deduci punti' : '➕ Aggiungi punti'}
                   </h3>
-                  <p className="text-sm mb-4" style={{ color: '#71717a' }}>{client?.firstName} {client?.lastName}</p>
+                  <p className="text-sm mb-4" style={{ color: 'var(--muted)' }}>{client?.firstName} {client?.lastName}</p>
                   <input
                     type="number" min={1} value={adjustAmount}
                     onChange={e => setAdjustAmount(e.target.value)}
                     autoFocus
-                    style={{ background: '#12121a', border: '1px solid #2e2e40', borderRadius: '10px', padding: '10px 13px', color: '#f4f4f5', fontSize: '16px', outline: 'none', width: '100%', textAlign: 'center' }}
+                    style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '10px', padding: '10px 13px', color: 'var(--text)', fontSize: '16px', outline: 'none', width: '100%', textAlign: 'center' }}
                   />
                   <div className="flex gap-2 mt-4">
                     <button onClick={() => setAdjustClientId(null)}
-                      style={{ flex: 1, background: '#12121a', border: '1px solid #2e2e40', color: '#71717a', borderRadius: '8px', padding: '9px', fontSize: '13px', cursor: 'pointer' }}>
+                      style={{ flex: 1, background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--muted)', borderRadius: '8px', padding: '9px', fontSize: '13px', cursor: 'pointer' }}>
                       Annulla
                     </button>
                     <button onClick={() => {
@@ -235,7 +235,7 @@ export default function LoyaltyView() {
                       }
                       setAdjustClientId(null); setAdjustAmount('');
                     }}
-                    style={{ flex: 1, background: isDeduct ? 'rgba(239,68,68,0.15)' : 'rgba(99,102,241,0.2)', border: `1px solid ${isDeduct ? 'rgba(239,68,68,0.3)' : 'rgba(99,102,241,0.4)'}`, color: isDeduct ? '#f87171' : '#818cf8', borderRadius: '8px', padding: '9px', fontSize: '13px', cursor: 'pointer', fontWeight: 600 }}>
+                    style={{ flex: 1, background: isDeduct ? 'rgba(239,68,68,0.15)' : 'rgba(99,102,241,0.2)', border: `1px solid ${isDeduct ? 'rgba(239,68,68,0.3)' : 'rgba(99,102,241,0.4)'}`, color: isDeduct ? '#f87171' : 'var(--accent-light)', borderRadius: '8px', padding: '9px', fontSize: '13px', cursor: 'pointer', fontWeight: 600 }}>
                       Conferma
                     </button>
                   </div>

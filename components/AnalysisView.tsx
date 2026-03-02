@@ -22,7 +22,7 @@ const COLORS = ['#6366f1', '#a855f7', '#22c55e', '#f59e0b', '#ef4444', '#06b6d4'
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
-      <div className="rounded-xl p-3 text-xs" style={{ background: '#1c1c27', border: '1px solid #2e2e40', color: '#f4f4f5' }}>
+      <div className="rounded-xl p-3 text-xs" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text)' }}>
         <p className="font-semibold mb-1">{label}</p>
         {payload.map((p: any) => (
           <p key={p.name} style={{ color: p.color || p.fill }}>{p.name}: {formatCurrency(p.value)}</p>
@@ -81,8 +81,8 @@ export default function AnalysisView() {
   const totalExp = getTotalExpense(filtered);
 
   const selectStyle: React.CSSProperties = {
-    background: '#12121a', border: '1px solid #2e2e40', borderRadius: '8px',
-    padding: '6px 10px', color: '#d4d4d8', fontSize: '13px', outline: 'none',
+    background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '8px',
+    padding: '6px 10px', color: 'var(--text-2)', fontSize: '13px', outline: 'none',
   };
 
   return (
@@ -90,7 +90,7 @@ export default function AnalysisView() {
       <div className="flex flex-wrap items-end gap-4 justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">Analisi</h1>
-          <p className="text-sm mt-1" style={{ color: '#71717a' }}>Grafici e indicatori finanziari</p>
+          <p className="text-sm mt-1" style={{ color: 'var(--muted)' }}>Grafici e indicatori finanziari</p>
         </div>
         <div className="flex gap-2 flex-wrap">
           <select value={period} onChange={e => setPeriod(e.target.value as any)} style={selectStyle}>
@@ -118,15 +118,15 @@ export default function AnalysisView() {
       </div>
 
       {/* 6-month bar chart */}
-      <div className="rounded-2xl p-5" style={{ background: '#1c1c27', border: '1px solid #2e2e40' }}>
+      <div className="rounded-2xl p-5" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
         <h3 className="font-semibold text-white mb-4">Entrate vs Uscite vs Utile Netto — Ultimi 6 Mesi</h3>
         <ResponsiveContainer width="100%" height={240}>
           <BarChart data={chartData} barGap={4} barCategoryGap="30%">
-            <CartesianGrid strokeDasharray="3 3" stroke="#2e2e40" vertical={false} />
-            <XAxis dataKey="month" tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `€${(v / 1000).toFixed(0)}k`} />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+            <XAxis dataKey="month" tick={{ fill: 'var(--muted)', fontSize: 11 }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fill: 'var(--muted)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `€${(v / 1000).toFixed(0)}k`} />
             <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(99,102,241,0.08)' }} />
-            <Legend wrapperStyle={{ fontSize: 12, color: '#71717a' }} />
+            <Legend wrapperStyle={{ fontSize: 12, color: 'var(--muted)' }} />
             <Bar dataKey="Entrate" fill="#22c55e" radius={[4,4,0,0]} />
             <Bar dataKey="Uscite" fill="#ef4444" radius={[4,4,0,0]} />
             <Bar dataKey="Utile Netto" fill="#6366f1" radius={[4,4,0,0]} />
@@ -137,11 +137,11 @@ export default function AnalysisView() {
       {/* Pie charts grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Income by category */}
-        <div className="rounded-2xl p-5" style={{ background: '#1c1c27', border: '1px solid #2e2e40' }}>
+        <div className="rounded-2xl p-5" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
           <h3 className="font-semibold text-white mb-1">Entrate per Categoria</h3>
-          <p className="text-xs mb-4" style={{ color: '#71717a' }}>Totale: {formatCurrency(totalInc)}</p>
+          <p className="text-xs mb-4" style={{ color: 'var(--muted)' }}>Totale: {formatCurrency(totalInc)}</p>
           {catPieData.length === 0 ? (
-            <p className="text-sm text-center py-8" style={{ color: '#3f3f5a' }}>Nessun dato</p>
+            <p className="text-sm text-center py-8" style={{ color: 'var(--border-light)' }}>Nessun dato</p>
           ) : (
             <ResponsiveContainer width="100%" height={220}>
               <PieChart>
@@ -149,18 +149,18 @@ export default function AnalysisView() {
                   {catPieData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                 </Pie>
                 <Tooltip content={<CustomTooltip />} />
-                <Legend wrapperStyle={{ fontSize: 11, color: '#71717a' }} />
+                <Legend wrapperStyle={{ fontSize: 11, color: 'var(--muted)' }} />
               </PieChart>
             </ResponsiveContainer>
           )}
         </div>
 
         {/* Expense by type */}
-        <div className="rounded-2xl p-5" style={{ background: '#1c1c27', border: '1px solid #2e2e40' }}>
+        <div className="rounded-2xl p-5" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
           <h3 className="font-semibold text-white mb-1">Uscite per Tipologia</h3>
-          <p className="text-xs mb-4" style={{ color: '#71717a' }}>Totale: {formatCurrency(totalExp)}</p>
+          <p className="text-xs mb-4" style={{ color: 'var(--muted)' }}>Totale: {formatCurrency(totalExp)}</p>
           {expPieData.length === 0 ? (
-            <p className="text-sm text-center py-8" style={{ color: '#3f3f5a' }}>Nessun dato</p>
+            <p className="text-sm text-center py-8" style={{ color: 'var(--border-light)' }}>Nessun dato</p>
           ) : (
             <ResponsiveContainer width="100%" height={220}>
               <PieChart>
@@ -168,17 +168,17 @@ export default function AnalysisView() {
                   {expPieData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                 </Pie>
                 <Tooltip content={<CustomTooltip />} />
-                <Legend wrapperStyle={{ fontSize: 11, color: '#71717a' }} />
+                <Legend wrapperStyle={{ fontSize: 11, color: 'var(--muted)' }} />
               </PieChart>
             </ResponsiveContainer>
           )}
         </div>
 
         {/* Income by source */}
-        <div className="rounded-2xl p-5" style={{ background: '#1c1c27', border: '1px solid #2e2e40' }}>
+        <div className="rounded-2xl p-5" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
           <h3 className="font-semibold text-white mb-4">Entrate per Sorgente</h3>
           {sourcePieData.length === 0 ? (
-            <p className="text-sm text-center py-8" style={{ color: '#3f3f5a' }}>Nessun dato</p>
+            <p className="text-sm text-center py-8" style={{ color: 'var(--border-light)' }}>Nessun dato</p>
           ) : (
             <ResponsiveContainer width="100%" height={200}>
               <PieChart>
@@ -186,17 +186,17 @@ export default function AnalysisView() {
                   {sourcePieData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                 </Pie>
                 <Tooltip content={<CustomTooltip />} />
-                <Legend wrapperStyle={{ fontSize: 11, color: '#71717a' }} />
+                <Legend wrapperStyle={{ fontSize: 11, color: 'var(--muted)' }} />
               </PieChart>
             </ResponsiveContainer>
           )}
         </div>
 
         {/* Income by method */}
-        <div className="rounded-2xl p-5" style={{ background: '#1c1c27', border: '1px solid #2e2e40' }}>
+        <div className="rounded-2xl p-5" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
           <h3 className="font-semibold text-white mb-4">Entrate per Metodo Pagamento</h3>
           {methodPieData.length === 0 ? (
-            <p className="text-sm text-center py-8" style={{ color: '#3f3f5a' }}>Nessun dato</p>
+            <p className="text-sm text-center py-8" style={{ color: 'var(--border-light)' }}>Nessun dato</p>
           ) : (
             <ResponsiveContainer width="100%" height={200}>
               <PieChart>
@@ -204,7 +204,7 @@ export default function AnalysisView() {
                   {methodPieData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                 </Pie>
                 <Tooltip content={<CustomTooltip />} />
-                <Legend wrapperStyle={{ fontSize: 11, color: '#71717a' }} />
+                <Legend wrapperStyle={{ fontSize: 11, color: 'var(--muted)' }} />
               </PieChart>
             </ResponsiveContainer>
           )}
