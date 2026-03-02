@@ -160,6 +160,7 @@ export default function AdminPage() {
   const [waSaving, setWaSaving] = useState(false);
   const [waSaved, setWaSaved] = useState(false);
   const [waStatuses, setWaStatuses] = useState<Record<string, 'connected' | 'disconnected' | 'none'>>({});
+  const [waQrCodes, setWaQrCodes] = useState<Record<string, string | null>>({});
 
   function getToken() { return sessionStorage.getItem('stylistgo_admin_token') ?? ''; }
 
@@ -886,7 +887,13 @@ export default function AdminPage() {
       const res = await af(`/api/admin/whatsapp?user_id=${tenant.user_id}`);
       if (res.ok) {
         const d = await res.json();
-        setWaForm({ ultraMsgInstanceId: d.ultraMsgInstanceId ?? '', ultraMsgToken: d.ultraMsgToken ?? '' });
+        const instanceId = d.ultraMsgInstanceId ?? '';
+        const token = d.ultraMsgToken ?? '';
+        setWaForm({ ultraMsgInstanceId: instanceId, ultraMsgToken: token });
+        // Auto-check status when opening modal if credentials exist
+        if (instanceId && token) {
+          checkWaStatus(tenant, instanceId, token);
+        }
       }
     } catch { /* ignore */ }
   };
@@ -897,6 +904,7 @@ export default function AdminPage() {
       const res = await fetch(`/api/ultramsg/status?instanceId=${instanceId}&token=${token}`);
       const d = await res.json();
       setWaStatuses(p => ({ ...p, [tenant.user_id]: d.connected ? 'connected' : 'disconnected' }));
+      setWaQrCodes(p => ({ ...p, [tenant.user_id]: d.qrCode ?? null }));
     } catch {
       setWaStatuses(p => ({ ...p, [tenant.user_id]: 'disconnected' }));
     }
@@ -924,6 +932,7 @@ export default function AdminPage() {
     });
     setWaForm({ ultraMsgInstanceId: '', ultraMsgToken: '' });
     setWaStatuses(p => ({ ...p, [waModal.user_id]: 'none' }));
+    setWaQrCodes(p => ({ ...p, [waModal.user_id]: null }));
     setWaSaving(false);
   };
 
@@ -966,7 +975,7 @@ export default function AdminPage() {
                     </td>
                     <td style={{ padding: '12px 14px' }}>
                       {status === 'connected'    && <span style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#4ade80', fontSize: '12px' }}><Wifi size={13} /> Connesso</span>}
-                      {status === 'disconnected' && <span style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#f87171', fontSize: '12px' }}><WifiOff size={13} /> Disconnesso</span>}
+                      {status === 'disconnected' && <span style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#fbbf24', fontSize: '12px' }}><WifiOff size={13} /> Attesa QR</span>}
                       {status === 'none'         && <span style={{ color: '#3f3f5a', fontSize: '12px' }}>—</span>}
                     </td>
                     <td style={{ padding: '12px 14px' }}>
@@ -1001,8 +1010,45 @@ export default function AdminPage() {
                 <button onClick={() => setWaModal(null)} style={{ background: 'none', border: 'none', color: '#71717a', cursor: 'pointer' }}><X size={18} /></button>
               </div>
 
+              {/* Stato connessione nel modal */}
+              {waModal && waStatuses[waModal.user_id] && waStatuses[waModal.user_id] !== 'none' && (
+                <div style={{ background: waStatuses[waModal.user_id] === 'connected' ? 'rgba(74,222,128,0.08)' : 'rgba(251,191,36,0.08)', border: `1px solid ${waStatuses[waModal.user_id] === 'connected' ? 'rgba(74,222,128,0.25)' : 'rgba(251,191,36,0.25)'}`, borderRadius: '12px', padding: '12px 14px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {waStatuses[waModal.user_id] === 'connected'
+                        ? <><Wifi size={14} style={{ color: '#4ade80' }} /><span style={{ color: '#4ade80', fontWeight: 600, fontSize: '13px' }}>WhatsApp connesso ✓</span></>
+                        : <><WifiOff size={14} style={{ color: '#fbbf24' }} /><span style={{ color: '#fbbf24', fontWeight: 600, fontSize: '13px' }}>In attesa del QR scan</span></>
+                      }
+                    </div>
+                    <button
+                      onClick={() => waModal && checkWaStatus(waModal, waForm.ultraMsgInstanceId, waForm.ultraMsgToken)}
+                      style={{ background: 'none', border: '1px solid #2e2e40', borderRadius: '6px', padding: '3px 8px', color: '#71717a', fontSize: '11px', cursor: 'pointer' }}
+                    >
+                      ↻ Aggiorna
+                    </button>
+                  </div>
+                  {/* QR code se disponibile e non ancora connesso */}
+                  {waStatuses[waModal.user_id] === 'disconnected' && waQrCodes[waModal.user_id] && (
+                    <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                      <p style={{ color: '#71717a', fontSize: '11px', textAlign: 'center' }}>
+                        Scansiona con WhatsApp del salone →<br/>
+                        <em style={{ fontSize: '10px' }}>Impostazioni → Dispositivi collegati → Collega dispositivo</em>
+                      </p>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={waQrCodes[waModal.user_id]!} alt="QR WhatsApp" style={{ width: '180px', height: '180px', borderRadius: '8px', background: 'white', padding: '8px' }} />
+                      <p style={{ color: '#52525b', fontSize: '10px' }}>Il QR scade dopo 45 secondi — clicca ↻ Aggiorna per rigenerarlo</p>
+                    </div>
+                  )}
+                  {waStatuses[waModal.user_id] === 'disconnected' && !waQrCodes[waModal.user_id] && (
+                    <p style={{ color: '#71717a', fontSize: '11px', marginTop: '6px' }}>
+                      Clicca ↻ Aggiorna per caricare il QR code da scansionare con il telefono del salone.
+                    </p>
+                  )}
+                </div>
+              )}
+
               <div style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '10px', padding: '12px', fontSize: '12px', color: '#a1a1aa' }}>
-                💡 Crea l&apos;istanza su <a href="https://ultramsg.com" target="_blank" rel="noreferrer" style={{ color: '#818cf8' }}>ultramsg.com</a>, connetti il numero WhatsApp del salone tramite QR, poi incolla qui Instance ID e Token.
+                💡 Crea l&apos;istanza su <a href="https://ultramsg.com" target="_blank" rel="noreferrer" style={{ color: '#818cf8' }}>ultramsg.com</a>, copia Instance ID e Token, incollali qui sotto e salva. Poi scansiona il QR che apparirà sopra.
               </div>
 
               <div>
