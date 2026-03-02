@@ -209,17 +209,28 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
           const pendingBookings = await dbGetOnlineBookings(user.id as string);
           const pending = pendingBookings.filter(b => b.status === 'pending');
           if (pending.length > 0) {
-            const loadedClients: Client[] = arr<Client>(cloudState.clients) ? (cloudState.clients as Client[]) : [];
-            const loadedServices: Service[] = arr<Service>(cloudState.services) ? (cloudState.services as Service[]) : [];
-            const loadedApts: Appointment[] = arr<Appointment>(cloudState.appointments) ? (cloudState.appointments as Appointment[]) : [];
-            const mergedClients = [...loadedClients];
-            const newApts: Appointment[] = [];
+            // Use localStorage as safe base (already updated by cloud load above)
+            const baseApts = storageGetAppointments();
+            const baseClients = storageGetClients();
+            const baseServices = storageGetServices();
+            const mergedApts = [...baseApts];
+            const mergedClients = [...baseClients];
 
             for (const b of pending) {
-              const existingClient = mergedClients.find(c =>
-                c.phone === b.client_phone || (b.client_email && c.email === b.client_email)
+              // Skip if already imported (check by booking id in notes)
+              const alreadyIn = mergedApts.some(a =>
+                a.notes?.includes(b.id) ||
+                (a.date === b.preferred_date && a.startTime === b.preferred_time &&
+                 mergedClients.find(c => c.id === a.clientId)?.phone === b.client_phone)
               );
-              let clientId = existingClient?.id;
+              if (alreadyIn) {
+                dbUpdateBookingStatus(b.id, 'confirmed').catch(() => {});
+                continue;
+              }
+
+              let clientId = mergedClients.find(c =>
+                c.phone === b.client_phone || (b.client_email && c.email === b.client_email)
+              )?.id;
               if (!clientId) {
                 const [firstName, ...rest] = (b.client_name || '').trim().split(' ');
                 const nc: Client = {
@@ -232,19 +243,20 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
                 mergedClients.push(nc);
                 clientId = nc.id;
               }
-              const matchedService = loadedServices.find(s =>
-                s.name.toLowerCase().includes(b.service.toLowerCase()) ||
-                b.service.toLowerCase().includes(s.name.toLowerCase())
+              const matchedService = baseServices.find(s =>
+                s.name.toLowerCase().includes((b.service || '').toLowerCase()) ||
+                (b.service || '').toLowerCase().includes(s.name.toLowerCase())
               );
               const dur = matchedService?.duration ?? 60;
               const [hh, mm] = (b.preferred_time || '10:00').split(':').map(Number);
               const endMin = (hh || 10) * 60 + (mm || 0) + dur;
               const endTime = `${String(Math.floor(endMin / 60) % 24).padStart(2, '0')}:${String(endMin % 60).padStart(2, '0')}`;
-              newApts.push({
+              mergedApts.push({
                 id: salonGenerateId(), clientId, operatorId: '',
                 serviceIds: matchedService ? [matchedService.id] : [],
                 date: b.preferred_date, startTime: b.preferred_time, endTime,
-                status: 'scheduled', notes: `📱 Prenotazione online: ${b.service}${b.notes ? ` — ${b.notes}` : ''}`,
+                status: 'scheduled',
+                notes: `📱 Prenotazione online [${b.id}]: ${b.service}${b.notes ? ` — ${b.notes}` : ''}`,
                 isBlock: false, blockReason: '', recurringGroupId: '', feedbackScore: 0,
                 createdAt: new Date().toISOString(),
                 history: [{ timestamp: new Date().toISOString(), action: 'Importato da prenotazione online' }],
@@ -252,10 +264,11 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
               dbUpdateBookingStatus(b.id, 'confirmed').catch(() => {});
             }
 
-            if (newApts.length > 0) {
-              const merged = [...loadedApts, ...newApts];
-              setAppointments(merged); storageSaveAppointments(merged);
-              if (mergedClients.length > loadedClients.length) { setClients(mergedClients); storageSaveClients(mergedClients); }
+            if (mergedApts.length > baseApts.length) {
+              setAppointments(mergedApts); storageSaveAppointments(mergedApts);
+            }
+            if (mergedClients.length > baseClients.length) {
+              setClients(mergedClients); storageSaveClients(mergedClients);
             }
           }
         } catch { /* ignore — online bookings are optional */ }

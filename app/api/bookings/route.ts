@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
       preferred_date: preferredDate,
       preferred_time: preferredTime,
       notes: notes || '',
-      status: 'confirmed',
+      status: 'pending',
     });
 
     if (onlineErr) {
