@@ -4,8 +4,8 @@ import { NextRequest, NextResponse } from 'next/server';
 export const maxDuration = 60;
 
 const GEMINI_KEY = process.env.GEMINI_API_KEY;
-// Use gemini-2.0-flash — faster and more available than 1.5-flash
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+// Use gemini-1.5-flash — confirmed free tier, supports inline image/pdf data
+const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
 
 const MAX_FILE_BYTES = 4 * 1024 * 1024; // 4MB limit to stay within Gemini inline data limits
 
@@ -89,11 +89,13 @@ export async function POST(req: NextRequest) {
       try {
         const errJson = JSON.parse(errText);
         const geminiMsg: string = errJson?.error?.message ?? '';
-        if (geminiMsg.includes('API_KEY')) userMsg = 'Chiave API Gemini non valida o non autorizzata.';
-        else if (geminiMsg.includes('quota') || geminiMsg.includes('QUOTA')) userMsg = 'Quota API Gemini esaurita. Riprova più tardi.';
+        const geminiStatus: string = errJson?.error?.status ?? '';
+        if (geminiMsg.includes('API_KEY') || geminiStatus === 'PERMISSION_DENIED') userMsg = 'Chiave API Gemini non valida o non autorizzata.';
+        else if (geminiStatus === 'RESOURCE_EXHAUSTED' || geminiMsg.toLowerCase().includes('quota')) userMsg = 'Quota API Gemini esaurita. Attiva la fatturazione su Google AI Studio o attendi il reset.';
         else if (geminiMsg.includes('size') || geminiMsg.includes('large')) userMsg = 'File troppo grande. Usa un\'immagine più piccola (max 4MB).';
-        else if (geminiMsg) userMsg = `Gemini: ${geminiMsg}`;
-      } catch { /* keep default */ }
+        else if (geminiMsg) userMsg = `Errore Gemini (${resp.status}): ${geminiMsg}`;
+        else userMsg = `Errore Gemini HTTP ${resp.status}`;
+      } catch { userMsg = `Errore Gemini HTTP ${resp.status}`; }
       return NextResponse.json({ error: userMsg }, { status: 502 });
     }
 
