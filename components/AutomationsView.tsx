@@ -86,19 +86,48 @@ export default function AutomationsView() {
   const [cfg, setCfg] = useState<WhatsAppConfig>(
     () => salonConfig.whatsapp ?? { ...DEFAULT_WHATSAPP_CONFIG }
   );
-  const [saved, setSaved] = useState(false);
+
+  // Credentials are edited locally and only saved on explicit button press
+  const [localPhoneId, setLocalPhoneId] = useState(cfg.phoneNumberId);
+  const [localToken, setLocalToken]     = useState(cfg.accessToken);
+  const [credSaved, setCredSaved]       = useState(false);
+
+  const [saved, setSaved]         = useState(false);
   const [showToken, setShowToken] = useState(false);
   const [testPhone, setTestPhone] = useState('');
   const [testStatus, setTestStatus] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle');
-  const [testError, setTestError] = useState('');
+  const [testError, setTestError]   = useState('');
   const [wizardOpen, setWizardOpen] = useState(!cfg.phoneNumberId);
+  const [editCreds, setEditCreds]   = useState(false);
 
-  function patch(updates: Partial<WhatsAppConfig>) {
+  // Save toggles/settings immediately (NOT credentials)
+  function patch(updates: Partial<Omit<WhatsAppConfig, 'phoneNumberId' | 'accessToken'>>) {
     const next = { ...cfg, ...updates };
     setCfg(next);
     updateSalonConfig({ whatsapp: next });
     setSaved(true);
     setTimeout(() => setSaved(false), 1500);
+  }
+
+  // Save credentials explicitly
+  function saveCredentials() {
+    const next = { ...cfg, phoneNumberId: localPhoneId.trim(), accessToken: localToken.trim() };
+    setCfg(next);
+    updateSalonConfig({ whatsapp: next });
+    setCredSaved(true);
+    setEditCreds(false);
+    setWizardOpen(false);
+    setTimeout(() => setCredSaved(false), 2000);
+  }
+
+  function clearCredentials() {
+    const next = { ...cfg, phoneNumberId: '', accessToken: '', enabled: false };
+    setCfg(next);
+    setLocalPhoneId('');
+    setLocalToken('');
+    updateSalonConfig({ whatsapp: next });
+    setWizardOpen(true);
+    setEditCreds(false);
   }
 
   async function handleTest() {
@@ -107,8 +136,10 @@ export default function AutomationsView() {
       setTestStatus('error');
       return;
     }
-    if (!cfg.phoneNumberId || !cfg.accessToken) {
-      setTestError('Completa prima la configurazione (Phone Number ID e Token).');
+    const phoneId = localPhoneId.trim() || cfg.phoneNumberId;
+    const token   = localToken.trim()   || cfg.accessToken;
+    if (!phoneId || !token) {
+      setTestError('Inserisci Phone Number ID e Token prima di testare.');
       setTestStatus('error');
       return;
     }
@@ -119,8 +150,8 @@ export default function AutomationsView() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          phoneNumberId: cfg.phoneNumberId,
-          accessToken: cfg.accessToken,
+          phoneNumberId: phoneId,
+          accessToken: token,
           to: testPhone.replace(/\s/g, ''),
           templateName: 'hello_world',
           language: 'en_US',
@@ -165,20 +196,55 @@ export default function AutomationsView() {
 
       {/* connection status */}
       {isConnected ? (
-        <div className="bg-green-50 border border-green-200 rounded-2xl px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-green-700">
-            <CheckCircle size={18} />
-            <div>
-              <p className="font-semibold text-sm">WhatsApp Business connesso</p>
-              <p className="text-xs text-green-600 font-mono mt-0.5">ID: {cfg.phoneNumberId}</p>
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-6 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-2 text-green-700">
+              <CheckCircle size={18} />
+              <div>
+                <p className="font-semibold text-sm">WhatsApp Business connesso</p>
+                <p className="text-xs text-green-600 font-mono mt-0.5">ID: {cfg.phoneNumberId}</p>
+              </div>
             </div>
+            <button
+              onClick={() => setEditCreds(v => !v)}
+              className="text-xs text-indigo-600 font-semibold hover:text-indigo-800 border border-indigo-200 rounded-lg px-3 py-1.5"
+            >
+              {editCreds ? 'Chiudi' : 'Modifica credenziali'}
+            </button>
           </div>
-          <button
-            onClick={() => { patch({ phoneNumberId: '', accessToken: '', enabled: false }); setWizardOpen(true); }}
-            className="text-xs text-red-400 hover:text-red-600 underline"
-          >
-            Riconfigura
-          </button>
+          {editCreds && (
+            <div className="px-6 pb-5 border-t border-gray-100 space-y-3 pt-4">
+              <div>
+                <label className="text-xs text-gray-500">Phone Number ID</label>
+                <input type="text" value={localPhoneId}
+                  onChange={e => setLocalPhoneId(e.target.value)}
+                  className="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500">Token di accesso</label>
+                <div className="relative mt-1">
+                  <input type={showToken ? 'text' : 'password'} value={localToken}
+                    onChange={e => setLocalToken(e.target.value)}
+                    className="block w-full rounded-lg border border-gray-200 px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                  <button onClick={() => setShowToken(s => !s)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                    {showToken ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </button>
+                </div>
+              </div>
+              <div className="flex items-center justify-between pt-1">
+                <button onClick={clearCredentials}
+                  className="text-xs text-red-500 hover:text-red-700 underline">
+                  Cancella credenziali
+                </button>
+                <button onClick={saveCredentials}
+                  className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700">
+                  Salva credenziali
+                </button>
+              </div>
+              {credSaved && <p className="text-xs text-green-600 flex items-center gap-1"><CheckCircle size={12}/> Salvato</p>}
+            </div>
+          )}
         </div>
       ) : (
         <div className="bg-amber-50 border border-amber-200 rounded-2xl px-6 py-4 flex items-center justify-between">
@@ -232,8 +298,8 @@ export default function AutomationsView() {
                 <label className="text-xs text-gray-500">Phone Number ID</label>
                 <input
                   type="text"
-                  value={cfg.phoneNumberId}
-                  onChange={e => patch({ phoneNumberId: e.target.value })}
+                  value={localPhoneId}
+                  onChange={e => setLocalPhoneId(e.target.value)}
                   placeholder="123456789012345"
                   className="mt-1 block w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
                 />
@@ -243,8 +309,8 @@ export default function AutomationsView() {
                 <div className="relative mt-1">
                   <input
                     type={showToken ? 'text' : 'password'}
-                    value={cfg.accessToken}
-                    onChange={e => patch({ accessToken: e.target.value })}
+                    value={localToken}
+                    onChange={e => setLocalToken(e.target.value)}
                     placeholder="EAAxxxxxxx..."
                     className="block w-full rounded-lg border border-gray-200 px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
                   />
@@ -287,12 +353,12 @@ export default function AutomationsView() {
                 )}
               </div>
 
-              {cfg.phoneNumberId && cfg.accessToken && (
+              {localPhoneId.trim() && localToken.trim() && (
                 <button
-                  onClick={() => { patch({ enabled: true }); setWizardOpen(false); }}
+                  onClick={saveCredentials}
                   className="w-full py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition-colors"
                 >
-                  Configurazione completata — Attiva automazioni
+                  Salva e attiva automazioni
                 </button>
               )}
             </div>
