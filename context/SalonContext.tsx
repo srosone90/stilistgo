@@ -233,13 +233,23 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
               const bookingOperatorId = opMatch?.[1] || '';
               const cleanNotes = (b.notes || '').replace(/^\[op:[^\]]+\]\s*/, '');
 
-              let clientId = mergedClients.find(c =>
+              const [firstName, ...rest] = (b.client_name || '').trim().split(' ');
+              const bookingFirstName = firstName || b.client_name;
+              const bookingLastName = rest.join(' ') || '';
+
+              const existingClient = mergedClients.find(c =>
                 c.phone === b.client_phone || (b.client_email && c.email === b.client_email)
-              )?.id;
-              if (!clientId) {
-                const [firstName, ...rest] = (b.client_name || '').trim().split(' ');
+              );
+              let clientId: string;
+              if (existingClient) {
+                // Always update name from booking (fixes corrupted names from old imports)
+                existingClient.firstName = bookingFirstName;
+                existingClient.lastName = bookingLastName;
+                if (b.client_email) existingClient.email = b.client_email;
+                clientId = existingClient.id;
+              } else {
                 const nc: Client = {
-                  id: salonGenerateId(), firstName: firstName || b.client_name, lastName: rest.join(' ') || '',
+                  id: salonGenerateId(), firstName: bookingFirstName, lastName: bookingLastName,
                   phone: b.client_phone, email: b.client_email || '', birthDate: '',
                   notes: `Prenotato online il ${b.created_at?.slice(0, 10) ?? ''}`,
                   allergies: '', tags: [], gdprConsent: false, gdprDate: '', loyaltyPoints: 0,
@@ -272,7 +282,14 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
             if (mergedApts.length > baseApts.length) {
               setAppointments(mergedApts); storageSaveAppointments(mergedApts);
             }
-            if (mergedClients.length > baseClients.length) {
+            // Save clients if any were added OR a name/email was updated from booking data
+            const baseClientMap = new Map(baseClients.map(c => [c.id, c]));
+            const clientsChanged = mergedClients.length !== baseClients.length ||
+              mergedClients.some(c => {
+                const orig = baseClientMap.get(c.id);
+                return orig && (orig.firstName !== c.firstName || orig.lastName !== c.lastName || orig.email !== c.email);
+              });
+            if (clientsChanged) {
               setClients(mergedClients); storageSaveClients(mergedClients);
             }
           }
