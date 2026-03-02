@@ -54,6 +54,12 @@ export default function AutomationsView() {
   );
   const [saved, setSaved] = useState(false);
   const [instanceStatus, setInstanceStatus] = useState<'idle' | 'loading' | 'connected' | 'disconnected'>('idle');
+  const [qrCode, setQrCode] = useState<string | null>(null);
+
+  // Sync cfg when salonConfig changes (e.g. credentials arrive from cloud after login)
+  useEffect(() => {
+    if (salonConfig.whatsapp) setCfg(salonConfig.whatsapp);
+  }, [salonConfig.whatsapp]);
 
   const isConfigured = Boolean(cfg.ultraMsgInstanceId && cfg.ultraMsgToken);
 
@@ -72,8 +78,10 @@ export default function AutomationsView() {
       const res = await fetch(`/api/ultramsg/status?instanceId=${cfg.ultraMsgInstanceId}&token=${cfg.ultraMsgToken}`);
       const data = await res.json();
       setInstanceStatus(data.connected ? 'connected' : 'disconnected');
+      setQrCode(data.qrCode ?? null);
     } catch {
       setInstanceStatus('disconnected');
+      setQrCode(null);
     }
   }
 
@@ -126,8 +134,8 @@ export default function AutomationsView() {
         </div>
       ) : (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3 flex-1 min-w-0">
               {instanceStatus === 'connected' && (
                 <><Wifi size={18} className="text-green-600" />
                 <div>
@@ -136,11 +144,24 @@ export default function AutomationsView() {
                 </div></>
               )}
               {instanceStatus === 'disconnected' && (
-                <><WifiOff size={18} className="text-orange-500" />
-                <div>
-                  <p className="font-semibold text-sm text-orange-600">In attesa di connessione</p>
-                  <p className="text-xs text-gray-400 mt-0.5">L&apos;istanza è configurata — apri UltraMsg e scansiona il QR con WhatsApp per attivarla.</p>
-                </div></>
+                <div style={{ width: '100%' }}>
+                  <div className="flex items-center gap-2 mb-3">
+                    <WifiOff size={18} className="text-orange-500" />
+                    <div>
+                      <p className="font-semibold text-sm text-orange-600">Scansiona il QR per attivare WhatsApp</p>
+                      <p className="text-xs text-gray-400 mt-0.5">Apri WhatsApp → Impostazioni → Dispositivi collegati → Collega dispositivo</p>
+                    </div>
+                  </div>
+                  {qrCode ? (
+                    <div className="flex flex-col items-center gap-2 py-2">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={qrCode} alt="QR WhatsApp" className="rounded-xl border border-gray-100" style={{ width: 200, height: 200, background: 'white', padding: 8 }} />
+                      <p className="text-xs text-gray-400">Il QR scade ogni 45 secondi — clicca &quot;Aggiorna&quot; per rigenerarlo</p>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-400 mb-1">Clicca &quot;Aggiorna&quot; per caricare il QR da scansionare.</p>
+                  )}
+                </div>
               )}
               {(instanceStatus === 'idle' || instanceStatus === 'loading') && (
                 <><RefreshCw size={18} className={`text-gray-400 ${instanceStatus === 'loading' ? 'animate-spin' : ''}`} />
