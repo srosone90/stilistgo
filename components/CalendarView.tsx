@@ -66,8 +66,9 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
   const dragRef = useRef<{ apptId: string; origDate: string; origStartMin: number; durationMin: number; startY: number; startX: number; dayIndex: number } | null>(null);
   const wasDraggedRef = useRef(false);
   const daysRef = useRef<Date[]>([]); // inizializzato vuoto, aggiornato via useEffect
+  const activeOpColsRef = useRef<{ id: string }[]>([]); // operator columns for day view
   const [draggingId, setDraggingId] = useState<string | null>(null);
-  const [draggingPos, setDraggingPos] = useState<{ date: string; startTime: string; endTime: string } | null>(null);
+  const [draggingPos, setDraggingPos] = useState<{ date: string; startTime: string; endTime: string; operatorId?: string } | null>(null);
 
   const openHour = parseInt(salonConfig.openTime.split(':')[0], 10);
   const closeHour = parseInt(salonConfig.closeTime.split(':')[0], 10);
@@ -83,6 +84,9 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
   const activeOperators = useMemo(() =>
     operators.filter(o => o.active && (!filterOperator || o.id === filterOperator)),
     [operators, filterOperator]);
+
+  // Mantieni activeOpColsRef aggiornato per drag handler in day view
+  useEffect(() => { activeOpColsRef.current = activeOperators; }, [activeOperators]);
 
   const filteredAppts = useMemo(() =>
     appointments.filter(a => {
@@ -206,14 +210,22 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
         const newStartMin = Math.max(openHour * 60, dragRef.current.origStartMin + deltaMin);
         const newEndMin = newStartMin + dragRef.current.durationMin;
         let newDayIdx = dragRef.current.dayIndex;
+        let newOperatorId: string | undefined;
         if (gridRef.current) {
           const rect = gridRef.current.getBoundingClientRect();
-          const colW = (rect.width - 56) / daysRef.current.length;
           const relX = e.clientX - rect.left - 56;
-          newDayIdx = Math.max(0, Math.min(daysRef.current.length - 1, Math.floor(relX / colW)));
+          // Day view: X maps to operator column; week view: X maps to day column
+          if (daysRef.current.length === 1 && activeOpColsRef.current.length > 0) {
+            const colW = (rect.width - 56) / activeOpColsRef.current.length;
+            const opIdx = Math.max(0, Math.min(activeOpColsRef.current.length - 1, Math.floor(relX / colW)));
+            newOperatorId = activeOpColsRef.current[opIdx].id;
+          } else {
+            const colW = (rect.width - 56) / daysRef.current.length;
+            newDayIdx = Math.max(0, Math.min(daysRef.current.length - 1, Math.floor(relX / colW)));
+          }
         }
-        const newDate = format(daysRef.current[newDayIdx], 'yyyy-MM-dd');
-        setDraggingPos({ date: newDate, startTime: minutesToTime(newStartMin), endTime: minutesToTime(newEndMin) });
+        const newDate = format(daysRef.current[Math.max(0, Math.min(daysRef.current.length - 1, newDayIdx))], 'yyyy-MM-dd');
+        setDraggingPos({ date: newDate, startTime: minutesToTime(newStartMin), endTime: minutesToTime(newEndMin), operatorId: newOperatorId });
       }
     }
     function onUp() {
@@ -239,8 +251,18 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
         setDraggingPos(prev => {
           if (!wasDraggedRef.current || !prev) return null;
           const appt = appointments.find(a => a.id === apptId);
-          if (appt && (prev.date !== appt.date || prev.startTime !== appt.startTime)) {
-            updateAppointment({ ...appt, date: prev.date, startTime: prev.startTime, endTime: prev.endTime }, 'Spostato');
+          if (appt) {
+            const opChanged = prev.operatorId && prev.operatorId !== appt.operatorId;
+            const timeChanged = prev.date !== appt.date || prev.startTime !== appt.startTime;
+            if (timeChanged || opChanged) {
+              updateAppointment({
+                ...appt,
+                date: prev.date,
+                startTime: prev.startTime,
+                endTime: prev.endTime,
+                operatorId: prev.operatorId ?? appt.operatorId,
+              }, 'Spostato');
+            }
           }
           return null;
         });
@@ -285,7 +307,8 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
         </div>
       </div>
 
-      {activeOperators.length > 1 && (
+      {/* Operator legend — only shown in week/month views */}
+      {view !== 'day' && activeOperators.length > 1 && (
         <div className="flex gap-3 flex-wrap">
           {activeOperators.map(o => (
             <span key={o.id} className="flex items-center gap-1.5 text-xs" style={{ color: '#d4d4d8' }}>
@@ -356,8 +379,92 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
         );
       })()}
 
-      {/* Calendar Grid (day/week) */}
-      {view !== 'month' && (
+      {/* ─── DAY VIEW: one column per operator ───────────────────────────── */}
+      {view === 'day' && (
+      <div className="flex-1 overflow-auto rounded-2xl" style={{ border: '1px solid #2e2e40', background: '#1c1c27' }}>
+        {/* Sticky header: date on left, operator columns */}
+        <div className="flex sticky top-0 z-10" style={{ background: '#18181f', borderBottom: '1px solid #2e2e40' }}>
+          <div style={{ width: 56, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span className="text-xs font-bold" style={{ color: isSameDay(currentDate, new Date()) ? '#818cf8' : '#71717a' }}>
+              {format(currentDate, 'dd')}
+            </span>
+          </div>
+          {activeOperators.length === 0 ? (
+            <div className="flex-1 text-center py-3 text-xs" style={{ color: '#71717a', borderLeft: '1px solid #2e2e40' }}>Nessun operatore attivo</div>
+          ) : activeOperators.map(op => (
+            <div key={op.id} className="flex-1 py-2 px-2" style={{ borderLeft: '1px solid #2e2e40', minWidth: 0 }}>
+              <div className="flex items-center justify-center gap-1.5">
+                <span className="inline-block w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: op.color }} />
+                <span className="text-xs font-semibold truncate" style={{ color: op.color }}>{op.name}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+        {/* Time grid */}
+        <div ref={gridRef} className="flex" style={{ minHeight: hours.length * HOUR_PX }}>
+          {/* Hour labels */}
+          <div style={{ width: 56, flexShrink: 0 }}>
+            {hours.map(h => (
+              <div key={h} style={{ height: HOUR_PX, borderBottom: '1px solid #2e2e40', display: 'flex', alignItems: 'flex-start', paddingTop: 4, paddingLeft: 8 }}>
+                <span style={{ fontSize: 11, color: '#3f3f5a' }}>{String(h).padStart(2, '0')}:00</span>
+              </div>
+            ))}
+          </div>
+          {/* Operator columns */}
+          {activeOperators.map(op => {
+            const dayStr = format(currentDate, 'yyyy-MM-dd');
+            // Show appointment in this column based on its effective operatorId while dragging
+            const colAppts = filteredAppts.filter(a => {
+              const effectiveOp = draggingId === a.id && draggingPos?.operatorId ? draggingPos.operatorId : a.operatorId;
+              return a.date === dayStr && effectiveOp === op.id;
+            });
+            return (
+              <div key={op.id} className="flex-1 relative" style={{ borderLeft: '1px solid #2e2e40', minWidth: 0 }}>
+                {hours.map(h => (
+                  <div key={h} style={{ height: HOUR_PX, borderBottom: '1px solid #1e1e2e' }}
+                    onClick={() => openNew(dayStr, op.id, resolveStartTime(dayStr, op.id, h))}
+                    className="cursor-pointer hover:bg-white/[0.02] transition-colors" />
+                ))}
+                {colAppts.map(a => {
+                  const isDragging = draggingId === a.id;
+                  const effectiveStart = isDragging && draggingPos ? draggingPos.startTime : a.startTime;
+                  const effectiveEndDrag = isDragging && draggingPos ? draggingPos.endTime : a.endTime;
+                  const startMin = timeToMinutes(effectiveStart) - START_MIN;
+                  const effectiveEnd = resizingId === a.id ? resizingEndTime : effectiveEndDrag;
+                  const endMin = timeToMinutes(effectiveEnd) - START_MIN;
+                  const top = (startMin / 60) * HOUR_PX;
+                  const height = Math.max(((endMin - startMin) / 60) * HOUR_PX, 28);
+                  const color = op.color || '#6366f1';
+                  const client = clients.find(c => c.id === a.clientId);
+                  const svcNames = a.serviceIds.map(sid => services.find(s => s.id === sid)?.name).filter(Boolean).join(', ');
+                  return (
+                    <div key={a.id}
+                      onMouseDown={e => handleDragStart(e, a)}
+                      onClick={e => { if (wasDraggedRef.current || draggingId || resizingId) { e.stopPropagation(); return; } e.stopPropagation(); openEdit(a); }}
+                      className="absolute left-1 right-1 rounded-lg px-2 py-1 hover:brightness-110 transition-all overflow-hidden"
+                      style={{ top, height, background: `${color}22`, border: `1px solid ${color}55`, zIndex: isDragging ? 10 : 2, opacity: isDragging ? 0.7 : 1, cursor: isDragging ? 'grabbing' : 'grab', userSelect: 'none' }}>
+                      <p className="text-xs font-semibold truncate" style={{ color }}>
+                        {a.isBlock ? '🔒 ' + (a.blockReason || 'Blocco') : (client ? `${client.firstName} ${client.lastName}` : '—')}
+                      </p>
+                      <p className="text-xs" style={{ color: '#a1a1aa', fontSize: 10 }}>{effectiveStart}–{effectiveEnd}</p>
+                      {svcNames && <p className="truncate" style={{ color: '#71717a', fontSize: 10 }}>{svcNames}</p>}
+                      <div onMouseDown={e => handleResizeStart(e, a)}
+                        className="absolute bottom-0 left-0 right-0 flex items-center justify-center"
+                        style={{ height: 10, cursor: 'ns-resize', background: `${color}30` }}>
+                        <div style={{ width: 20, height: 2, borderRadius: 2, background: color, opacity: 0.8 }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      )}
+
+      {/* ─── WEEK VIEW: one column per day ───────────────────────────────── */}
+      {view === 'week' && (
       <div className="flex-1 overflow-auto rounded-2xl" style={{ border: '1px solid #2e2e40', background: '#1c1c27' }}>
         <div className="flex sticky top-0 z-10" style={{ background: '#18181f', borderBottom: '1px solid #2e2e40' }}>
           <div style={{ width: 56, flexShrink: 0 }} />
@@ -379,7 +486,6 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
           </div>
           {days.map((day, di) => {
             const dayStr = format(day, 'yyyy-MM-dd');
-            // Considera gli appuntamenti in drag nella colonna di destinazione
             const dayAppts = filteredAppts.filter(a =>
               draggingId === a.id && draggingPos ? draggingPos.date === dayStr : a.date === dayStr
             );
