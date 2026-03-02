@@ -70,7 +70,13 @@ export async function POST(req: NextRequest) {
         if (wa?.bookingConfirmEnabled && wa.enabled && wa.ultraMsgInstanceId && wa.ultraMsgToken && clientPhone) {
           const salonName = salonState?.salonConfig?.salonName ?? 'il salone';
           const phone = clientPhone.replace(/\D/g, '');
-          const msg = `Ciao ${clientName}! ✅ La tua prenotazione da *${salonName}* per il ${preferredDate} alle ${preferredTime} è confermata. A presto!`;
+          const DEFAULT_BOOKING_MSG = 'Ciao {nome}! ✅ La tua prenotazione da *{salone}* per il {data} alle {ora} è confermata. A presto!';
+          const template: string = wa.bookingConfirmMsg ?? DEFAULT_BOOKING_MSG;
+          const msg = template
+            .split('{nome}').join(clientName)
+            .split('{salone}').join(salonName)
+            .split('{data}').join(preferredDate)
+            .split('{ora}').join(preferredTime);
           await fetch(`https://api.ultramsg.com/${wa.ultraMsgInstanceId}/messages/chat`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },

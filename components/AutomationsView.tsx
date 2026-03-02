@@ -7,7 +7,7 @@ import type { WhatsAppConfig } from '@/types/salon';
 import { getCurrentUser } from '@/lib/supabase';
 import {
   MessageSquare, Wifi, WifiOff, RefreshCw,
-  CheckCircle2, XCircle, Bell, Cake, ThumbsUp, Star, CalendarCheck,
+  CheckCircle2, XCircle, Bell, Cake, ThumbsUp, Star, CalendarCheck, Pencil, ChevronUp,
 } from 'lucide-react';
 
 // ── Style helpers ──────────────────────────────────────────────────────────
@@ -64,7 +64,89 @@ function Toggle({
     </div>
   );
 }
-
+// ── AutomationRow — toggle + editable message template ─────────────────────
+function AutomationRow({
+  checked, onChange, label, description, disabled = false, icon,
+  templateValue, onTemplateChange, vars, last = false,
+}: {
+  checked: boolean; onChange: (v: boolean) => void;
+  label: string; description?: string; disabled?: boolean;
+  icon?: React.ReactNode;
+  templateValue: string;
+  onTemplateChange: (v: string) => void;
+  vars: string[];
+  last?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ borderBottom: last ? 'none' : '1px solid var(--border)' }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '12px 0', opacity: disabled ? 0.4 : 1,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {icon && (
+            <div style={{ width: 32, height: 32, borderRadius: 10, background: 'rgba(99,102,241,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              {icon}
+            </div>
+          )}
+          <div>
+            <p style={{ color: 'var(--text)', fontSize: 14, fontWeight: 500, margin: 0 }}>{label}</p>
+            {description && <p style={{ color: 'var(--muted)', fontSize: 12, margin: '2px 0 0' }}>{description}</p>}
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <button
+            onClick={() => setOpen(o => !o)}
+            title="Modifica testo messaggio"
+            style={{ background: open ? 'rgba(99,102,241,0.12)' : 'none', border: '1px solid var(--border)', borderRadius: 7, padding: '4px 8px', cursor: 'pointer', color: open ? '#818cf8' : 'var(--muted)', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4, transition: 'all 0.15s' }}
+          >
+            {open ? <ChevronUp size={11} /> : <Pencil size={11} />} Testo
+          </button>
+          <button
+            onClick={() => !disabled && onChange(!checked)}
+            disabled={disabled}
+            style={{
+              position: 'relative', flexShrink: 0, width: 44, height: 24,
+              borderRadius: 12, border: 'none',
+              cursor: disabled ? 'not-allowed' : 'pointer',
+              background: checked ? '#22c55e' : 'var(--border-light)',
+              transition: 'background 0.2s',
+            }}
+          >
+            <span style={{
+              position: 'absolute', top: 3, left: checked ? 23 : 3,
+              width: 18, height: 18, borderRadius: '50%', background: 'white',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.3)', transition: 'left 0.2s',
+            }} />
+          </button>
+        </div>
+      </div>
+      {open && (
+        <div style={{ paddingBottom: 14, paddingLeft: 44 }}>
+          <textarea
+            value={templateValue}
+            onChange={e => onTemplateChange(e.target.value)}
+            rows={3}
+            style={{ width: '100%', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 12px', color: 'var(--text)', fontSize: 13, resize: 'vertical', outline: 'none', fontFamily: 'inherit', lineHeight: 1.5, boxSizing: 'border-box' }}
+          />
+          <p style={{ color: 'var(--muted)', fontSize: 11, margin: '6px 0 5px' }}>Variabili disponibili — clicca per inserire:</p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+            {vars.map(v => (
+              <button
+                key={v}
+                onClick={() => onTemplateChange(templateValue + `{${v}}`)}
+                style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: 6, padding: '3px 9px', color: '#818cf8', fontSize: 11, cursor: 'pointer' }}
+              >
+                {`{${v}}`}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 // ── Main ───────────────────────────────────────────────────────────────────
 type ConnStatus = 'loading' | 'connected' | 'disconnected' | 'not-configured';
 
@@ -327,38 +409,55 @@ export default function AutomationsView() {
         <p style={{ color: 'var(--text-3)', fontWeight: 600, fontSize: 11, margin: '12px 0 4px', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
           Messaggi automatici
         </p>
-        <Toggle
+        <AutomationRow
           checked={cfg.reminderEnabled} onChange={v => patch({ reminderEnabled: v })}
           label="Promemoria appuntamento" description="Il giorno prima alle 9:00"
           disabled={!cfg.enabled} icon={<Bell size={15} style={{ color: '#818cf8' }} />}
+          templateValue={cfg.reminderMsg ?? ''}
+          onTemplateChange={v => patch({ reminderMsg: v })}
+          vars={['nome', 'servizio', 'ora', 'salone']}
         />
-        <Toggle
+        <AutomationRow
           checked={cfg.birthdayEnabled} onChange={v => patch({ birthdayEnabled: v })}
           label="Auguri di compleanno" description="La mattina del compleanno"
           disabled={!cfg.enabled} icon={<Cake size={15} style={{ color: '#f472b6' }} />}
+          templateValue={cfg.birthdayMsg ?? ''}
+          onTemplateChange={v => patch({ birthdayMsg: v })}
+          vars={['nome', 'salone']}
         />
-        <Toggle
+        <AutomationRow
           checked={cfg.postVisitEnabled} onChange={v => patch({ postVisitEnabled: v })}
           label="Follow-up post-visita" description="Il giorno dopo l'appuntamento"
           disabled={!cfg.enabled} icon={<ThumbsUp size={15} style={{ color: '#34d399' }} />}
+          templateValue={cfg.postVisitMsg ?? ''}
+          onTemplateChange={v => patch({ postVisitMsg: v })}
+          vars={['nome', 'salone']}
         />
-        <Toggle
+        <AutomationRow
           checked={cfg.bookingConfirmEnabled} onChange={v => patch({ bookingConfirmEnabled: v })}
           label="Conferma prenotazione online" description="Subito dopo la prenotazione dal sito"
           disabled={!cfg.enabled} icon={<CalendarCheck size={15} style={{ color: '#60a5fa' }} />}
+          templateValue={cfg.bookingConfirmMsg ?? ''}
+          onTemplateChange={v => patch({ bookingConfirmMsg: v })}
+          vars={['nome', 'data', 'ora', 'salone']}
         />
-        <Toggle
+        <AutomationRow
           checked={cfg.appointmentConfirmEnabled} onChange={v => patch({ appointmentConfirmEnabled: v })}
           label="Conferma appuntamento in agenda" description="Subito quando aggiungi l'appuntamento"
           disabled={!cfg.enabled} icon={<CalendarCheck size={15} style={{ color: '#a78bfa' }} />}
+          templateValue={cfg.appointmentConfirmMsg ?? ''}
+          onTemplateChange={v => patch({ appointmentConfirmMsg: v })}
+          vars={['nome', 'servizio', 'data', 'ora', 'salone']}
         />
-        <div style={{ borderBottom: 'none' }}>
-          <Toggle
-            checked={cfg.loyaltyEnabled} onChange={v => patch({ loyaltyEnabled: v })}
-            label="Traguardo fedeltà" description="Quando il cliente raggiunge la soglia punti"
-            disabled={!cfg.enabled} icon={<Star size={15} style={{ color: '#fbbf24' }} />}
-          />
-        </div>
+        <AutomationRow
+          checked={cfg.loyaltyEnabled} onChange={v => patch({ loyaltyEnabled: v })}
+          label="Traguardo fedeltà" description="Quando il cliente raggiunge la soglia punti"
+          disabled={!cfg.enabled} icon={<Star size={15} style={{ color: '#fbbf24' }} />}
+          templateValue={cfg.loyaltyMsg ?? ''}
+          onTemplateChange={v => patch({ loyaltyMsg: v })}
+          vars={['nome', 'punti', 'salone']}
+          last
+        />
         {cfg.loyaltyEnabled && cfg.enabled && (
           <div style={{ paddingLeft: 44, paddingBottom: 12 }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'var(--muted)', fontSize: 13 }}>

@@ -22,6 +22,12 @@ interface WhatsAppConfig {
   loyaltyEnabled: boolean;
   loyaltyMilestone: number;
   bookingConfirmEnabled: boolean;
+  appointmentConfirmEnabled?: boolean;
+  // Custom message templates
+  reminderMsg?: string;
+  birthdayMsg?: string;
+  postVisitMsg?: string;
+  loyaltyMsg?: string;
 }
 interface Client {
   id: string; firstName: string; lastName: string;
@@ -51,6 +57,16 @@ const todayStr = () => new Date().toISOString().slice(0, 10);
 const tomorrowStr = () => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().slice(0, 10); };
 const yesterdayStr = () => { const d = new Date(); d.setDate(d.getDate() - 1); return d.toISOString().slice(0, 10); };
 const todayMMDD = () => { const t = new Date(); return `${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`; };
+
+// ─── Template renderer ────────────────────────────────────────────────────────────────────
+function renderTemplate(template: string, vars: Record<string, string>): string {
+  return Object.entries(vars).reduce((msg, [k, v]) => msg.split(`{${k}}`).join(v), template);
+}
+
+const DEFAULT_REMINDER_MSG    = 'Ciao {nome}! 😊 Ti ricordiamo il tuo appuntamento di *{servizio}* domani alle {ora} da {salone}. A presto!';
+const DEFAULT_BIRTHDAY_MSG    = 'Tanti auguri {nome}! 🎂🎉 Tutto il team di {salone} ti augura una splendida giornata!';
+const DEFAULT_POSTVISIT_MSG   = 'Ciao {nome}! Speriamo tu sia soddisfatta della tua visita da {salone}. ⭐ Ci fa sempre piacere sapere come stai!';
+const DEFAULT_LOYALTY_MSG     = 'Complimenti {nome}! 🌟 Hai raggiunto {punti} punti fedeltà da {salone}. Contattaci per scoprire il tuo premio!';
 
 async function sendUltraMsg(instanceId: string, token: string, to: string, message: string): Promise<boolean> {
   const phone = to.replace(/\D/g, '');
@@ -119,7 +135,7 @@ export default async function handler() {
         const key = `reminder:${client.id}`;
         if (alreadySent.has(key)) continue;
         const svcNames = services.filter(s => apt.serviceIds.includes(s.id)).map(s => s.name).join(', ') || 'appuntamento';
-        const msg = `Ciao ${client.firstName}! 😊 Ti ricordiamo il tuo appuntamento di *${svcNames}* domani alle ${apt.startTime} da ${salonName}. A presto!`;
+        const msg = renderTemplate(wa.reminderMsg ?? DEFAULT_REMINDER_MSG, { nome: client.firstName, servizio: svcNames, ora: apt.startTime, salone: salonName });
         const sent = await sendUltraMsg(instanceId, token, client.phone, msg);
         log.push({ id: crypto.randomUUID(), type: 'reminder', clientId: client.id, clientName: `${client.firstName} ${client.lastName}`, phone: client.phone, templateName: 'reminder', status: sent ? 'sent' : 'failed', sentAt: new Date().toISOString() });
         alreadySent.add(key);
@@ -131,7 +147,7 @@ export default async function handler() {
       for (const client of clients.filter(c => c.birthDate?.slice(5) === mmdd && c.phone)) {
         const key = `birthday:${client.id}`;
         if (alreadySent.has(key)) continue;
-        const msg = `Tanti auguri ${client.firstName}! 🎂🎉 Tutto il team di ${salonName} ti augura una splendida giornata!`;
+        const msg = renderTemplate(wa.birthdayMsg ?? DEFAULT_BIRTHDAY_MSG, { nome: client.firstName, salone: salonName });
         const sent = await sendUltraMsg(instanceId, token, client.phone, msg);
         log.push({ id: crypto.randomUUID(), type: 'birthday', clientId: client.id, clientName: `${client.firstName} ${client.lastName}`, phone: client.phone, templateName: 'birthday', status: sent ? 'sent' : 'failed', sentAt: new Date().toISOString() });
         alreadySent.add(key);
@@ -145,7 +161,7 @@ export default async function handler() {
         if (!client?.phone) continue;
         const key = `post_visit:${client.id}`;
         if (alreadySent.has(key)) continue;
-        const msg = `Ciao ${client.firstName}! Speriamo tu sia soddisfatta della tua visita da ${salonName}. ⭐ Ci fa sempre piacere sapere come stai!`;
+        const msg = renderTemplate(wa.postVisitMsg ?? DEFAULT_POSTVISIT_MSG, { nome: client.firstName, salone: salonName });
         const sent = await sendUltraMsg(instanceId, token, client.phone, msg);
         log.push({ id: crypto.randomUUID(), type: 'post_visit', clientId: client.id, clientName: `${client.firstName} ${client.lastName}`, phone: client.phone, templateName: 'post_visit', status: sent ? 'sent' : 'failed', sentAt: new Date().toISOString() });
         alreadySent.add(key);
@@ -157,7 +173,7 @@ export default async function handler() {
       for (const client of clients.filter(c => c.loyaltyPoints >= wa.loyaltyMilestone && c.phone)) {
         const key = `loyalty:${client.id}`;
         if (alreadySent.has(key)) continue;
-        const msg = `Complimenti ${client.firstName}! 🌟 Hai raggiunto ${client.loyaltyPoints} punti fedeltà da ${salonName}. Contattaci per scoprire il tuo premio!`;
+        const msg = renderTemplate(wa.loyaltyMsg ?? DEFAULT_LOYALTY_MSG, { nome: client.firstName, punti: String(client.loyaltyPoints), salone: salonName });
         const sent = await sendUltraMsg(instanceId, token, client.phone, msg);
         log.push({ id: crypto.randomUUID(), type: 'loyalty', clientId: client.id, clientName: `${client.firstName} ${client.lastName}`, phone: client.phone, templateName: 'loyalty', status: sent ? 'sent' : 'failed', sentAt: new Date().toISOString() });
         alreadySent.add(key);

@@ -249,6 +249,13 @@ export interface WhatsAppConfig {
   bookingConfirmEnabled: boolean;
   appointmentConfirmEnabled: boolean;
   loyaltyMilestone: number;
+  // Message templates (optional — fallback to defaults if not set)
+  reminderMsg?: string;
+  birthdayMsg?: string;
+  postVisitMsg?: string;
+  bookingConfirmMsg?: string;
+  appointmentConfirmMsg?: string;
+  loyaltyMsg?: string;
 }
 
 export const DEFAULT_WHATSAPP_CONFIG: WhatsAppConfig = {
@@ -262,6 +269,12 @@ export const DEFAULT_WHATSAPP_CONFIG: WhatsAppConfig = {
   bookingConfirmEnabled: true,
   appointmentConfirmEnabled: true,
   loyaltyMilestone: 100,
+  reminderMsg: 'Ciao {nome}! 😊 Ti ricordiamo il tuo appuntamento di *{servizio}* domani alle {ora} da {salone}. A presto!',
+  birthdayMsg: 'Tanti auguri {nome}! 🎂🎉 Tutto il team di {salone} ti augura una splendida giornata!',
+  postVisitMsg: 'Ciao {nome}! Speriamo tu sia soddisfatta della tua visita da {salone}. ⭐ Ci fa sempre piacere sapere come stai!',
+  bookingConfirmMsg: 'Ciao {nome}! ✅ La tua prenotazione da *{salone}* per il {data} alle {ora} è confermata. A presto!',
+  appointmentConfirmMsg: 'Ciao {nome}! ✅ Il tuo appuntamento di *{servizio}* è confermato per il {data} alle {ora} da {salone}. A presto!',
+  loyaltyMsg: 'Complimenti {nome}! 🌟 Hai raggiunto {punti} punti fedeltà da {salone}. Contattaci per scoprire il tuo premio!',
 };
 
 export type WhatsAppMessageType = 'reminder' | 'birthday' | 'post_visit' | 'loyalty' | 'booking_confirm' | 'appointment_confirm' | 'manual';

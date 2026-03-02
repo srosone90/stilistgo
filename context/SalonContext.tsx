@@ -485,19 +485,24 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
     setAppointments(prev => { const n = [...prev, full]; storageSaveAppointments(n); return n; });
 
     // ── WhatsApp conferma appuntamento (fire-and-forget) ──
-    // Usa latestStateRef così legge sempre salonConfig/clients/services aggiornati
-    // senza dipendenze extra nel useCallback
     try {
       const snap = latestStateRef.current;
       const wa = (snap.salonConfig as SalonConfig | undefined)?.whatsapp;
       if (wa?.ultraMsgInstanceId && wa?.ultraMsgToken && (wa.appointmentConfirmEnabled ?? true)) {
-        const clients = (snap.clients as Client[]) ?? [];
-        const services = (snap.services as Service[]) ?? [];
-        const client = clients.find(c => c.id === a.clientId);
+        const clientsList = (snap.clients as Client[]) ?? [];
+        const servicesList = (snap.services as Service[]) ?? [];
+        const client = clientsList.find(c => c.id === a.clientId);
         if (client?.phone) {
-          const svcNames = services.filter(s => (a.serviceIds ?? []).includes(s.id)).map(s => s.name).join(', ') || 'appuntamento';
+          const svcNames = servicesList.filter(s => (a.serviceIds ?? []).includes(s.id)).map(s => s.name).join(', ') || 'appuntamento';
           const salonName = (snap.salonConfig as SalonConfig | undefined)?.salonName ?? 'il salone';
-          const msg = `Ciao ${client.firstName}! ✅ Il tuo appuntamento di *${svcNames}* è confermato per il ${a.date} alle ${a.startTime} da ${salonName}. A presto!`;
+          const DEFAULT_APPT_MSG = 'Ciao {nome}! ✅ Il tuo appuntamento di *{servizio}* è confermato per il {data} alle {ora} da {salone}. A presto!';
+          const template = wa.appointmentConfirmMsg ?? DEFAULT_APPT_MSG;
+          const msg = template
+            .split('{nome}').join(client.firstName)
+            .split('{servizio}').join(svcNames)
+            .split('{data}').join(a.date)
+            .split('{ora}').join(a.startTime)
+            .split('{salone}').join(salonName);
           fetch('/api/ultramsg/send', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
