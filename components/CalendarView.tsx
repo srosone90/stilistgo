@@ -3,9 +3,9 @@
 import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { useSalon } from '@/context/SalonContext';
 import { Appointment, AppointmentStatus, STATUS_LABELS } from '@/types/salon';
-import { format, parseISO, addDays, startOfWeek, isSameDay } from 'date-fns';
+import { format, parseISO, addDays, startOfWeek, isSameDay, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, addMonths } from 'date-fns';
 import { it } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Plus, X, UserPlus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, X, UserPlus, LayoutGrid } from 'lucide-react';
 
 const inputStyle: React.CSSProperties = { background: '#12121a', border: '1px solid #2e2e40', borderRadius: '10px', padding: '9px 13px', color: '#f4f4f5', fontSize: '13px', outline: 'none', width: '100%' };
 const labelStyle: React.CSSProperties = { fontSize: '12px', color: '#71717a', marginBottom: '4px', display: 'block' };
@@ -38,7 +38,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
     addClient,
   } = useSalon();
 
-  const [view, setView] = useState<'day' | 'week'>('week');
+  const [view, setView] = useState<'day' | 'week' | 'month'>('week');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [showForm, setShowForm] = useState(false);
   const [editAppt, setEditAppt] = useState<Appointment | null>(null);
@@ -92,7 +92,11 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
     }), [appointments, days, filterOperator]);
 
   function navigate(dir: number) {
-    setCurrentDate(prev => addDays(prev, view === 'week' ? dir * 7 : dir));
+    if (view === 'month') {
+      setCurrentDate(prev => addMonths(prev, dir));
+    } else {
+      setCurrentDate(prev => addDays(prev, view === 'week' ? dir * 7 : dir));
+    }
   }
 
   // If clicking under an appointment, start after it
@@ -256,15 +260,17 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
           <p className="text-xs mt-0.5" style={{ color: '#71717a' }}>
             {view === 'week'
               ? `Settimana del ${format(weekStart, 'dd MMM', { locale: it })} ${String.fromCharCode(8211)} ${format(addDays(weekStart, 6), 'dd MMM yyyy', { locale: it })}`
+              : view === 'month'
+              ? format(currentDate, 'MMMM yyyy', { locale: it })
               : format(currentDate, 'EEEE dd MMMM yyyy', { locale: it })}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <div className="flex rounded-lg overflow-hidden" style={{ border: '1px solid #2e2e40' }}>
-            {(['day', 'week'] as const).map(v => (
+            {(['day', 'week', 'month'] as const).map(v => (
               <button key={v} onClick={() => setView(v)} className="px-3 py-1.5 text-xs font-medium"
                 style={{ background: view === v ? 'rgba(99,102,241,0.2)' : '#12121a', color: view === v ? '#818cf8' : '#71717a', border: 'none', cursor: 'pointer' }}>
-                {v === 'day' ? 'Giornaliero' : 'Settimanale'}
+                {v === 'day' ? 'Giorno' : v === 'week' ? 'Settimana' : 'Mese'}
               </button>
             ))}
           </div>
@@ -290,7 +296,68 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
         </div>
       )}
 
-      {/* Calendar Grid */}
+      {/* Month view */}
+      {view === 'month' && (() => {
+        const monthStart = startOfMonth(currentDate);
+        const monthEnd = endOfMonth(currentDate);
+        const gridStart = startOfWeek(monthStart, { weekStartsOn: 1 });
+        const gridEnd = addDays(startOfWeek(monthEnd, { weekStartsOn: 1 }), 6);
+        const gridDays = eachDayOfInterval({ start: gridStart, end: addDays(gridEnd, 7) }).slice(0, 42);
+        const DAY_NAMES = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'];
+        return (
+          <div className="flex-1 overflow-auto rounded-2xl" style={{ border: '1px solid #2e2e40', background: '#1c1c27', minHeight: 0 }}>
+            {/* Day names header */}
+            <div className="grid grid-cols-7 sticky top-0 z-10" style={{ background: '#18181f', borderBottom: '1px solid #2e2e40' }}>
+              {DAY_NAMES.map(d => (
+                <div key={d} className="text-center py-2 text-xs font-medium" style={{ color: '#71717a' }}>{d}</div>
+              ))}
+            </div>
+            {/* Day cells */}
+            <div className="grid grid-cols-7" style={{ flex: 1 }}>
+              {gridDays.map((day, i) => {
+                const dayStr = format(day, 'yyyy-MM-dd');
+                const dayAppts = appointments.filter(a => a.date === dayStr && a.status !== 'cancelled' && (!filterOperator || a.operatorId === filterOperator));
+                const isThisMonth = isSameMonth(day, currentDate);
+                const isNow = isSameDay(day, new Date());
+                return (
+                  <div key={i}
+                    onClick={() => { setCurrentDate(day); setView('day'); }}
+                    className="min-h-[80px] p-2 cursor-pointer transition-colors"
+                    style={{ border: '1px solid #1e1e2e', background: isNow ? 'rgba(99,102,241,0.08)' : 'transparent', opacity: isThisMonth ? 1 : 0.35 }}>
+                    <span className="text-xs font-bold inline-flex items-center justify-center w-6 h-6 rounded-full"
+                      style={{
+                        background: isNow ? '#6366f1' : 'transparent',
+                        color: isNow ? '#fff' : isThisMonth ? '#d4d4d8' : '#3f3f5a',
+                      }}>
+                      {format(day, 'd')}
+                    </span>
+                    {dayAppts.length > 0 && (
+                      <div className="mt-1 space-y-0.5">
+                        {dayAppts.slice(0, 3).map(a => {
+                          const op = operators.find(o => o.id === a.operatorId);
+                          const client = clients.find(c => c.id === a.clientId);
+                          return (
+                            <div key={a.id} className="text-xs truncate rounded px-1 py-0.5"
+                              style={{ background: `${op?.color || '#6366f1'}25`, color: op?.color || '#818cf8', fontSize: 10 }}>
+                              {a.startTime} {client ? `${client.firstName}` : a.isBlock ? 'Blocco' : '—'}
+                            </div>
+                          );
+                        })}
+                        {dayAppts.length > 3 && (
+                          <div className="text-xs px-1" style={{ color: '#71717a', fontSize: 10 }}>+{dayAppts.length - 3} altri</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Calendar Grid (day/week) */}
+      {view !== 'month' && (
       <div className="flex-1 overflow-auto rounded-2xl" style={{ border: '1px solid #2e2e40', background: '#1c1c27' }}>
         <div className="flex sticky top-0 z-10" style={{ background: '#18181f', borderBottom: '1px solid #2e2e40' }}>
           <div style={{ width: 56, flexShrink: 0 }} />
@@ -360,6 +427,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
           })}
         </div>
       </div>
+      )}
 
       {/* Quick Client Modal */}
       {showQuickClient && (

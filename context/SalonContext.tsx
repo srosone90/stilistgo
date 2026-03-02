@@ -135,22 +135,42 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
   const cloudLoadAttempted = useRef(false);
 
   useEffect(() => {
-    setClients(storageGetClients());
-    setTechnicalCards(storageGetTechnicalCards());
-    setServices(storageGetServices());
-    setOperators(storageGetOperators());
-    setAbsences(storageGetAbsences());
-    setAppointments(storageGetAppointments());
-    setWaitingList(storageGetWaitingList());
-    setProducts(storageGetProducts());
-    setStockMovements(storageGetStockMovements());
-    setGiftCards(storageGetGiftCards());
-    setGamificationConfig(storageGetGamificationConfig());
-    setSalonConfig(storageGetSalonConfig());
-    setPayments(storageGetPayments());
-    setCashSessions(storageGetCashSessions());
-    setActiveOperatorIdState(storageGetActiveOperatorId());
-    setSalonLoading(false);
+    const init = async () => {
+      // ─── User isolation: clear localStorage if a different user logs in ──
+      try {
+        const user = await getCurrentUser();
+        if (user && typeof window !== 'undefined') {
+          const lastUid = localStorage.getItem('stylistgo_last_uid');
+          const currentUid = user.id as string;
+          if (lastUid && lastUid !== currentUid) {
+            // Different user on same device — wipe salon localStorage data
+            Object.keys(localStorage)
+              .filter(k => k.startsWith('stylistgo_') &&
+                !['stylistgo_last_uid', 'stylistgo_users', 'stylistgo_local_user'].includes(k))
+              .forEach(k => localStorage.removeItem(k));
+          }
+          localStorage.setItem('stylistgo_last_uid', currentUid);
+        }
+      } catch { /* ignore */ }
+
+      setClients(storageGetClients());
+      setTechnicalCards(storageGetTechnicalCards());
+      setServices(storageGetServices());
+      setOperators(storageGetOperators());
+      setAbsences(storageGetAbsences());
+      setAppointments(storageGetAppointments());
+      setWaitingList(storageGetWaitingList());
+      setProducts(storageGetProducts());
+      setStockMovements(storageGetStockMovements());
+      setGiftCards(storageGetGiftCards());
+      setGamificationConfig(storageGetGamificationConfig());
+      setSalonConfig(storageGetSalonConfig());
+      setPayments(storageGetPayments());
+      setCashSessions(storageGetCashSessions());
+      setActiveOperatorIdState(storageGetActiveOperatorId());
+      setSalonLoading(false);
+    };
+    init();
   }, []);
 
   // ─── Cloud sync: load from Supabase once after local load ─────────────────

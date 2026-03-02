@@ -1,10 +1,13 @@
 import { supabase } from './supabase';
 
-// ─── Availability cache (reuse from db.ts pattern) ────────────────────────────
+// ─── Availability cache ───────────────────────────────────────────────────────
 let _available: boolean | null = null;
+let _availableTs = 0;
 
 async function isAvailable(): Promise<boolean> {
-  if (_available !== null) return _available;
+  const now = Date.now();
+  // Re-check every 60s to handle reconnections
+  if (_available !== null && now - _availableTs < 60000) return _available;
   try {
     const res = await fetch(
       `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/health`,
@@ -14,35 +17,32 @@ async function isAvailable(): Promise<boolean> {
   } catch {
     _available = false;
   }
+  _availableTs = now;
   return _available;
 }
 
-// ─── Salon state (full snapshot per user) ────────────────────────────────────
+// ─── Salon state via server API route (Supabase Storage — no migration needed) ─
 
 export async function dbGetSalonState(userId: string): Promise<Record<string, unknown> | null> {
-  if (!await isAvailable()) return null;
   try {
-    const { data, error } = await supabase
-      .from('salon_state')
-      .select('state')
-      .eq('user_id', userId)
-      .maybeSingle();
-    if (error || !data) return null;
-    return data.state as Record<string, unknown>;
+    const res = await fetch(`/api/salon-state?userId=${encodeURIComponent(userId)}`, { cache: 'no-store' });
+    if (!res.ok) return null;
+    const json = await res.json();
+    return json.state ?? null;
   } catch {
     return null;
   }
 }
 
 export async function dbSaveSalonState(userId: string, state: Record<string, unknown>): Promise<void> {
-  if (!await isAvailable()) return;
   try {
-    await supabase.from('salon_state').upsert(
-      { user_id: userId, state, updated_at: new Date().toISOString() },
-      { onConflict: 'user_id' }
-    );
+    await fetch(`/api/salon-state?userId=${encodeURIComponent(userId)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(state),
+    });
   } catch {
-    // Ignore — Supabase unavailable or table doesn't exist yet (migration not run)
+    // ignore — offline
   }
 }
 

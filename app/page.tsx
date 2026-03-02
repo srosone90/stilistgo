@@ -107,7 +107,7 @@ export default function Home() {
 
   const renderView = () => {
     switch (view) {
-      case 'dashboard': return effectivePerms.accounting ? <Dashboard /> : AccessDenied;
+      case 'dashboard': return effectivePerms.accounting ? <Dashboard showAccounting={true} /> : <Dashboard showAccounting={false} />;
       case 'tabella':   return effectivePerms.accounting ? <TabularView /> : AccessDenied;
       case 'analisi':   return effectivePerms.accounting ? <AnalysisView /> : AccessDenied;
       case 'impostazioni': return effectivePerms.accounting ? <SettingsView /> : AccessDenied;
@@ -150,7 +150,7 @@ export default function Home() {
       {sidebarOpen && (
         <div className="fixed inset-0 z-40 md:hidden">
           <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.6)' }} onClick={() => setSidebarOpen(false)} />
-          <div className="relative z-50">
+          <div className="relative z-50" onClick={e => e.stopPropagation()}>
             <Sidebar activeView={view} onNavigate={(v) => { setView(v as View); setSidebarOpen(false); }} onLock={() => { setSidebarOpen(false); setShowLockScreen(true); }} permissions={effectivePerms} />
           </div>
         </div>
@@ -179,7 +179,7 @@ export default function Home() {
         </div>
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto px-6 py-6">
+        <main className="flex-1 overflow-y-auto px-3 py-3 md:px-6 md:py-6">
           {renderView()}
         </main>
       </div>
