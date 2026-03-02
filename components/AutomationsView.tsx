@@ -78,7 +78,6 @@ const STEPS = [
     note: 'Seleziona il tuo numero nel menu "Da": compare "ID numero di telefono" (15-16 cifre) e il "Token di accesso temporaneo". Copia entrambi e incollali nei campi qui sotto. NB: il token temporaneo scade ogni 24h — per un token permanente crea un utente di sistema in Impostazioni → Avanzate.',
   },
 ];
-];
 
 /* ─── main ─────────────────────────────────────────────────────────────────── */
 export default function AutomationsView() {
