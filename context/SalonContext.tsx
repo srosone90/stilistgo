@@ -483,6 +483,25 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
       history: [{ timestamp: new Date().toISOString(), action: 'Appuntamento creato' }],
     };
     setAppointments(prev => { const n = [...prev, full]; storageSaveAppointments(n); return n; });
+
+    // ── WhatsApp conferma appuntamento (fire-and-forget) ──
+    try {
+      const wa = storageGetSalonConfig()?.whatsapp;
+      if (wa?.appointmentConfirmEnabled && wa.enabled && wa.ultraMsgInstanceId && wa.ultraMsgToken) {
+        const client = storageGetClients().find(c => c.id === a.clientId);
+        if (client?.phone) {
+          const svcs = storageGetServices();
+          const svcNames = svcs.filter(s => (a.serviceIds ?? []).includes(s.id)).map(s => s.name).join(', ') || 'appuntamento';
+          const salonName = storageGetSalonConfig()?.salonName ?? 'il salone';
+          const msg = `Ciao ${client.firstName}! ✅ Il tuo appuntamento di *${svcNames}* è confermato per il ${a.date} alle ${a.startTime} da ${salonName}. A presto!`;
+          fetch('/api/ultramsg/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ instanceId: wa.ultraMsgInstanceId, token: wa.ultraMsgToken, to: client.phone, message: msg }),
+          }).catch(() => {});
+        }
+      }
+    } catch { /* non bloccare il salvataggio */ }
   }, []);
 
   const updateAppointment = useCallback((a: Appointment, historyNote?: string) => {

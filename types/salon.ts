@@ -247,6 +247,7 @@ export interface WhatsAppConfig {
   postVisitEnabled: boolean;
   loyaltyEnabled: boolean;
   bookingConfirmEnabled: boolean;
+  appointmentConfirmEnabled: boolean;
   loyaltyMilestone: number;
 }
 
@@ -259,10 +260,11 @@ export const DEFAULT_WHATSAPP_CONFIG: WhatsAppConfig = {
   postVisitEnabled: true,
   loyaltyEnabled: false,
   bookingConfirmEnabled: true,
+  appointmentConfirmEnabled: true,
   loyaltyMilestone: 100,
 };
 
-export type WhatsAppMessageType = 'reminder' | 'birthday' | 'post_visit' | 'loyalty' | 'booking_confirm' | 'manual';
+export type WhatsAppMessageType = 'reminder' | 'birthday' | 'post_visit' | 'loyalty' | 'booking_confirm' | 'appointment_confirm' | 'manual';
 
 export interface WhatsAppMessage {
   id: string;

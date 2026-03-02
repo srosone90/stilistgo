@@ -347,6 +347,11 @@ export default function AutomationsView() {
           label="Conferma prenotazione online" description="Subito dopo la prenotazione dal sito"
           disabled={!cfg.enabled} icon={<CalendarCheck size={15} style={{ color: '#60a5fa' }} />}
         />
+        <Toggle
+          checked={cfg.appointmentConfirmEnabled} onChange={v => patch({ appointmentConfirmEnabled: v })}
+          label="Conferma appuntamento in agenda" description="Subito quando aggiungi l'appuntamento"
+          disabled={!cfg.enabled} icon={<CalendarCheck size={15} style={{ color: '#a78bfa' }} />}
+        />
         <div style={{ borderBottom: 'none' }}>
           <Toggle
             checked={cfg.loyaltyEnabled} onChange={v => patch({ loyaltyEnabled: v })}
