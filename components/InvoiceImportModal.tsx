@@ -35,6 +35,34 @@ const lbl: React.CSSProperties = { fontSize: '12px', color: 'var(--muted)', marg
 
 type Step = 'upload' | 'parsing' | 'review' | 'importing' | 'done' | 'error';
 
+/** Compress image to max 1600px and JPEG 80% quality — keeps file under 1MB for fast API calls */
+async function compressImage(file: File): Promise<File> {
+  if (!file.type.startsWith('image/')) return file; // don't touch PDFs
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const MAX = 1600;
+      let { width, height } = img;
+      if (width > MAX || height > MAX) {
+        if (width > height) { height = Math.round((height * MAX) / width); width = MAX; }
+        else { width = Math.round((width * MAX) / height); height = MAX; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext('2d')!.drawImage(img, 0, 0, width, height);
+      canvas.toBlob(blob => {
+        if (!blob) { resolve(file); return; }
+        resolve(new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' }));
+      }, 'image/jpeg', 0.82);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+    img.src = url;
+  });
+}
+
 export default function InvoiceImportModal({ onClose, onImported }: Props) {
   const { products, addProduct, addStockMovement } = useSalon();
   const { addEntry } = useApp();
@@ -47,12 +75,18 @@ export default function InvoiceImportModal({ onClose, onImported }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ── Parse invoice via Gemini ───────────────────────────────────────────────
+  const [parseStatus, setParseStatus] = useState('');
   const parseFile = useCallback(async (file: File) => {
     setStep('parsing');
     setErrorMsg('');
     try {
+      // Compress images before sending (phone photos can be 8MB+)
+      setParseStatus('Compressione immagine…');
+      const compressed = await compressImage(file);
+      setParseStatus('Analisi AI in corso…');
+
       const fd = new FormData();
-      fd.append('file', file);
+      fd.append('file', compressed);
       const res = await fetch('/api/parse-invoice', { method: 'POST', body: fd });
       const json = await res.json();
       if (!res.ok || !json.success) {
@@ -256,7 +290,7 @@ export default function InvoiceImportModal({ onClose, onImported }: Props) {
             <div style={{ textAlign: 'center', padding: '60px 0' }}>
               <Loader2 size={40} style={{ color: 'var(--accent-light)', margin: '0 auto 16px', animation: 'spin 1s linear infinite' }} className="animate-spin" />
               <p style={{ color: 'var(--text)', fontWeight: 600, marginBottom: '6px' }}>Analisi in corso…</p>
-              <p style={{ color: 'var(--muted)', fontSize: '13px' }}>Gemini AI sta leggendo la fattura</p>
+              <p style={{ color: 'var(--muted)', fontSize: '13px' }}>{parseStatus || 'Gemini AI sta leggendo la fattura'}</p>
             </div>
           )}
 

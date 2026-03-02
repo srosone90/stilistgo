@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// Extend Netlify function timeout (seconds) — free plan max is 10s, paid is 26s
+export const maxDuration = 60;
+
 const GEMINI_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+// Use gemini-2.0-flash — faster and more available than 1.5-flash
+const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+
+const MAX_FILE_BYTES = 4 * 1024 * 1024; // 4MB limit to stay within Gemini inline data limits
 
 const PROMPT = `Analizza questa fattura/documento di acquisto e restituisci un JSON con la seguente struttura esatta (nient'altro, solo JSON valido, senza markdown):
 {
@@ -42,6 +48,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Nessun file ricevuto.' }, { status: 400 });
     }
 
+    if (file.size > MAX_FILE_BYTES) {
+      return NextResponse.json({ error: `File troppo grande (${(file.size / 1024 / 1024).toFixed(1)}MB). Massimo 4MB. Comprimi l\'immagine prima di caricarla.` }, { status: 400 });
+    }
+
     const bytes = await file.arrayBuffer();
     const base64 = Buffer.from(bytes).toString('base64');
     const mimeType = file.type || 'image/jpeg';
@@ -75,7 +85,16 @@ export async function POST(req: NextRequest) {
     if (!resp.ok) {
       const errText = await resp.text();
       console.error('Gemini API error:', errText);
-      return NextResponse.json({ error: 'Errore API Gemini. Riprova.' }, { status: 502 });
+      let userMsg = 'Errore API Gemini.';
+      try {
+        const errJson = JSON.parse(errText);
+        const geminiMsg: string = errJson?.error?.message ?? '';
+        if (geminiMsg.includes('API_KEY')) userMsg = 'Chiave API Gemini non valida o non autorizzata.';
+        else if (geminiMsg.includes('quota') || geminiMsg.includes('QUOTA')) userMsg = 'Quota API Gemini esaurita. Riprova più tardi.';
+        else if (geminiMsg.includes('size') || geminiMsg.includes('large')) userMsg = 'File troppo grande. Usa un\'immagine più piccola (max 4MB).';
+        else if (geminiMsg) userMsg = `Gemini: ${geminiMsg}`;
+      } catch { /* keep default */ }
+      return NextResponse.json({ error: userMsg }, { status: 502 });
     }
 
     const data = await resp.json();
