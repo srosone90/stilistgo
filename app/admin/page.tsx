@@ -265,6 +265,47 @@ export default function AdminPage() {
 
   const logout = () => { sessionStorage.removeItem('stylistgo_admin_token'); router.replace('/admin/login'); };
 
+  // ─── Analytics + impersonation + WA test ────────────────────────────────
+  const loadAnalytics = useCallback(async (userId: string) => {
+    setAnalyticsLoading(true);
+    setAnalyticsData(null);
+    const res = await af(`/api/admin/tenant-analytics?user_id=${userId}`);
+    const d = await res.json();
+    setAnalyticsData(d);
+    setAnalyticsLoading(false);
+  }, [af]);
+
+  const impersonateTenant = useCallback(async (tenant: Tenant) => {
+    setImpersonating(true);
+    const res = await af('/api/admin/impersonate', { method: 'POST', body: JSON.stringify({ user_id: tenant.user_id }) });
+    const d = await res.json();
+    setImpersonating(false);
+    if (d.url) {
+      window.open(d.url, '_blank');
+    } else {
+      alert(`Errore: ${d.error}`);
+    }
+  }, [af]);
+
+  const sendWaTest = useCallback(async () => {
+    if (!waModal || !testPhone || !waForm.ultraMsgInstanceId || !waForm.ultraMsgToken) return;
+    setTestSending(true);
+    setTestResult(null);
+    const res = await fetch('/api/ultramsg/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        instanceId: waForm.ultraMsgInstanceId,
+        token: waForm.ultraMsgToken,
+        to: testPhone,
+        message: `✅ Messaggio di test da Stylistgo Admin — ${waModal.salon_name}`,
+      }),
+    });
+    const d = await res.json();
+    setTestResult({ ok: d.success, msg: d.success ? 'Inviato! Verifica il telefono.' : (d.error ?? 'Errore invio') });
+    setTestSending(false);
+  }, [waModal, testPhone, waForm]);
+
   if (!authed) return null;
 
   // ─── Tenant save ──────────────────────────────────────────────────────────
@@ -318,47 +359,6 @@ export default function AdminPage() {
     setNewFlag(false); setFlagForm({ name: '', description: '', enabled_for: 'all' });
     loadSection('flags');
   };
-
-  // ─── Analytics + impersonation + WA test ────────────────────────────────
-  const loadAnalytics = useCallback(async (userId: string) => {
-    setAnalyticsLoading(true);
-    setAnalyticsData(null);
-    const res = await af(`/api/admin/tenant-analytics?user_id=${userId}`);
-    const d = await res.json();
-    setAnalyticsData(d);
-    setAnalyticsLoading(false);
-  }, [af]);
-
-  const impersonateTenant = useCallback(async (tenant: Tenant) => {
-    setImpersonating(true);
-    const res = await af('/api/admin/impersonate', { method: 'POST', body: JSON.stringify({ user_id: tenant.user_id }) });
-    const d = await res.json();
-    setImpersonating(false);
-    if (d.url) {
-      window.open(d.url, '_blank');
-    } else {
-      alert(`Errore: ${d.error}`);
-    }
-  }, [af]);
-
-  const sendWaTest = useCallback(async () => {
-    if (!waModal || !testPhone || !waForm.ultraMsgInstanceId || !waForm.ultraMsgToken) return;
-    setTestSending(true);
-    setTestResult(null);
-    const res = await fetch('/api/ultramsg/send', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        instanceId: waForm.ultraMsgInstanceId,
-        token: waForm.ultraMsgToken,
-        to: testPhone,
-        message: `✅ Messaggio di test da Stylistgo Admin — ${waModal.salon_name}`,
-      }),
-    });
-    const d = await res.json();
-    setTestResult({ ok: d.success, msg: d.success ? 'Inviato! Verifica il telefono.' : (d.error ?? 'Errore invio') });
-    setTestSending(false);
-  }, [waModal, testPhone, waForm]);
 
   // ─── Filtered lists ───────────────────────────────────────────────────────
   const filteredTenants = tenants.filter(t => {
