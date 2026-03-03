@@ -25,6 +25,7 @@ import GiftCardsView from '@/components/GiftCardsView';
 import ClientAppView from '@/components/ClientAppView';
 import GuideView from '@/components/GuideView';
 import OperatorLockScreen from '@/components/OperatorLockScreen';
+import BottomNav from '@/components/BottomNav';
 import { useApp } from '@/context/AppContext';
 import { useSalon } from '@/context/SalonContext';
 import { getCurrentUser, signOut } from '@/lib/supabase';
@@ -243,8 +244,8 @@ export default function Home() {
           </button>
         </div>
 
-        {/* Page content */}
-        <main className="flex-1 overflow-y-auto px-3 py-3 md:px-6 md:py-6">
+        {/* Page content — add bottom padding on mobile for the bottom nav bar */}
+        <main className="flex-1 overflow-y-auto px-3 py-3 md:px-6 md:py-6 pb-20 md:pb-6">
           {renderView()}
         </main>
       </div>
@@ -253,8 +254,8 @@ export default function Home() {
       {!NO_FAB_VIEWS.has(view) && (
         <button
           onClick={FAB_CONFIG[view].action}
-          className="fixed bottom-6 right-6 z-30 flex items-center gap-2 px-5 py-3 rounded-2xl font-semibold text-white shadow-2xl transition-all hover:scale-105 active:scale-95"
-          style={{ background: 'linear-gradient(135deg,#6366f1,#a855f7)', boxShadow: '0 0 30px rgba(99,102,241,0.4)' }}
+          className="fixed z-30 flex items-center gap-2 px-5 py-3 rounded-2xl font-semibold text-white shadow-2xl transition-all hover:scale-105 active:scale-95"
+          style={{ background: 'linear-gradient(135deg,#6366f1,#a855f7)', boxShadow: '0 0 30px rgba(99,102,241,0.4)', bottom: 'calc(70px + env(safe-area-inset-bottom, 0px))', right: '1.5rem' }}
           aria-label={FAB_CONFIG[view].label}
         >
           {FAB_CONFIG[view].icon}
@@ -264,6 +265,13 @@ export default function Home() {
 
       {/* Entry Form Modal */}
       {showForm && <EntryForm onClose={() => setShowForm(false)} />}
+
+      {/* Mobile bottom navigation bar */}
+      <BottomNav
+        activeView={view}
+        onNavigate={(v) => setView(v as View)}
+        onMore={() => setSidebarOpen(true)}
+      />
 
       {/* Operator Lock Screen */}
       {showLockScreen && (

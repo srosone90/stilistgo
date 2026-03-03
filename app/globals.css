@@ -104,11 +104,3 @@ input, select, textarea {
 [data-theme="light"] button[style*="linear-gradient"] {
   color: #ffffff;
 }
-
-/* ── Landscape Guard Overlay ──────────────────────────────────────────────── */
-/* Show the overlay on narrow screens in portrait orientation */
-@media screen and (max-width: 900px) and (orientation: portrait) {
-  .landscape-guard-overlay {
-    display: flex !important;
-  }
-}

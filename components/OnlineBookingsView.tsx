@@ -22,7 +22,7 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 export default function OnlineBookingsView() {
-  const { addAppointment, clients, addClient, services } = useSalon();
+  const { addAppointment, clients, addClient, services, importPendingBookings } = useSalon();
   const { realtimeBookingTick } = useNotifications();
   const [bookings, setBookings] = useState<OnlineBooking[]>([]);
   const [loading, setLoading] = useState(true);
@@ -64,7 +64,10 @@ export default function OnlineBookingsView() {
   }, [realtimeBookingTick]);
 
   const handleConfirm = async (id: string) => {
-    await dbUpdateBookingStatus(id, 'confirmed');
+    // importPendingBookings processes all still-pending rows, which includes this one.
+    // It creates the calendar appointment and sends the WhatsApp confirmation,
+    // then marks it confirmed in the DB. We do NOT call dbUpdateBookingStatus separately.
+    await importPendingBookings();
     setBookings(prev => prev.map(b => b.id === id ? { ...b, status: 'confirmed' } : b));
   };
 

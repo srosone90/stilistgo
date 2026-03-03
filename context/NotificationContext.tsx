@@ -203,18 +203,6 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
               }
             }
           )
-          .on(
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            'postgres_changes' as any,
-            { event: 'UPDATE', schema: 'public', table: 'salon_data', filter: `user_id=eq.${userId}` },
-            () => {
-              if (!mounted.current) return;
-              const now = Date.now();
-              if (now - lastSyncCheck.current < 60_000) return;
-              lastSyncCheck.current = now;
-              addNotification({ type: 'data_sync', message: '🔄 Dati aggiornati da un altro dispositivo.' });
-            }
-          )
           .subscribe((status, err) => {
             if (status === 'SUBSCRIBED') {
               console.log('[Realtime] ✅ Connesso -- notifiche istantanee attive');

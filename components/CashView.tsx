@@ -275,7 +275,8 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
   }
 
   function checkGiftCard() {
-    const gc = giftCards.find(g => g.code === form.giftCardCode.trim() && g.isActive);
+    const inputCode = form.giftCardCode.trim().toUpperCase();
+    const gc = giftCards.find(g => g.code.trim().toUpperCase() === inputCode && g.isActive);
     if (!gc) { setGiftCardInfo({ found: false, remainingValue: 0 }); return; }
     setGiftCardInfo({ found: true, remainingValue: gc.remainingValue });
     // Auto-fill amount if balance is sufficient
