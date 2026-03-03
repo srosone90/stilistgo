@@ -6,7 +6,7 @@ import { useSalon } from '@/context/SalonContext';
 import { isCashIn, isCashOut, formatCurrency, getTotalIncome, getTotalExpense } from '@/lib/calculations';
 import { Transaction, CATEGORY_ICONS, EntryCategory, EXPENSE_TYPE_ICONS, ExpenseType } from '@/types';
 import { format, parseISO } from 'date-fns';
-import { Trash2, ChevronUp, ChevronDown, FileDown, RotateCcw } from 'lucide-react';
+import { Trash2, ChevronUp, ChevronDown, FileDown } from 'lucide-react';
 import { exportTransactionsPDF } from '@/lib/pdf';
 import { useCombinedTransactions } from '@/lib/useCombinedTransactions';
 
@@ -25,7 +25,7 @@ function StatusBadge({ status }: { status: string }) {
 
 export default function TabularView() {
   const { deleteEntry } = useApp();
-  const { payments, addPayment } = useSalon();
+  const { deletePayment } = useSalon();
   const transactions = useCombinedTransactions();
 
   const [filterType, setFilterType] = useState<'all' | 'income' | 'expense'>('all');
@@ -35,7 +35,6 @@ export default function TabularView() {
   const [sortField, setSortField] = useState<'date' | 'amount'>('date');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
-  const [stornoId, setStornoId] = useState<string | null>(null);
 
   const months = Array.from({ length: 12 }, (_, i) => {
     const m = String(i + 1).padStart(2, '0');
@@ -83,7 +82,6 @@ export default function TabularView() {
   };
 
   return (
-    <>
     <div className="space-y-5">
       <div>
         <h1 className="text-2xl font-bold text-white">Tabella Movimenti</h1>
@@ -185,17 +183,18 @@ export default function TabularView() {
                     {isCashIn(t) ? '+' : '-'}{formatCurrency(t.amount)}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    {t.id.startsWith('salon-pay-') ? (
-                      <button onClick={e => { e.stopPropagation(); setStornoId(t.id); }} title="Storna incasso"
-                        style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.3)', color: '#fbbf24', borderRadius: '6px', padding: '4px 7px', cursor: 'pointer', opacity: t.amount < 0 ? 0.4 : 1, pointerEvents: t.amount < 0 ? 'none' : undefined }}
-                        disabled={t.amount < 0}>
-                        <RotateCcw size={13} />
-                      </button>
-                    ) : confirmDelete === t.id ? (
+                    {confirmDelete === t.id ? (
                       <div className="flex items-center gap-2 justify-end">
-                        <button onClick={async () => { await deleteEntry(t.id); setConfirmDelete(null); }}
+                        <button onClick={async () => {
+                            if (t.id.startsWith('salon-pay-')) {
+                              deletePayment(t.id.slice('salon-pay-'.length));
+                            } else {
+                              await deleteEntry(t.id);
+                            }
+                            setConfirmDelete(null);
+                          }}
                           className="text-xs px-2 py-1 rounded" style={{ background: 'rgba(239,68,68,0.8)', color: 'white' }}>
-                          Conferma
+                          Elimina
                         </button>
                         <button onClick={() => setConfirmDelete(null)}
                           className="text-xs px-2 py-1 rounded" style={{ background: 'var(--border)', color: 'var(--muted)' }}>
@@ -204,7 +203,7 @@ export default function TabularView() {
                       </div>
                     ) : (
                       <button onClick={() => setConfirmDelete(t.id)} className="opacity-40 hover:opacity-100 transition-opacity p-1 rounded"
-                        style={{ color: '#ef4444' }}>
+                        style={{ color: '#ef4444' }} title="Elimina transazione">
                         <Trash2 size={15} />
                       </button>
                     )}
@@ -216,62 +215,5 @@ export default function TabularView() {
         </table>
       </div>
     </div>
-
-      {/* Storno modal (TabularView) */}
-      {stornoId && (() => {
-        const SALON_PAY_PREFIX = 'salon-pay-';
-        const origPayId = stornoId.startsWith(SALON_PAY_PREFIX) ? stornoId.slice(SALON_PAY_PREFIX.length) : null;
-        const orig = origPayId ? payments.find(p => p.id === origPayId) : null;
-        if (!orig) return null;
-        return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
-            <div className="w-full max-w-sm rounded-2xl p-6" style={{ background: '#18181f', border: '1px solid var(--border)' }}>
-              <h3 className="font-semibold text-white mb-1 flex items-center gap-2">
-                <RotateCcw size={16} style={{ color: '#fbbf24' }} /> Storna incasso
-              </h3>
-              <p className="text-sm mb-1 mt-2" style={{ color: 'var(--text-3)' }}>
-                Cliente: <span className="text-white font-medium">{orig.clientName || '—'}</span>
-              </p>
-              <p className="text-sm mb-4" style={{ color: 'var(--text-3)' }}>
-                Importo: <span style={{ color: '#f87171', fontWeight: 700 }}>-{formatCurrency(orig.total)}</span>
-              </p>
-              <p className="text-xs mb-4" style={{ color: 'var(--muted)' }}>
-                Verrà registrato un movimento di storno negativo. L&rsquo;incasso originale rimane nello storico.
-              </p>
-              <div className="flex gap-2">
-                <button onClick={() => setStornoId(null)}
-                  style={{ flex: 1, background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--muted)', borderRadius: '8px', padding: '8px', fontSize: '13px', cursor: 'pointer' }}>
-                  Annulla
-                </button>
-                <button onClick={() => {
-                    addPayment({
-                      appointmentId: orig.appointmentId,
-                      clientId: orig.clientId,
-                      clientName: orig.clientName,
-                      operatorId: orig.operatorId,
-                      date: format(new Date(), 'yyyy-MM-dd'),
-                      items: orig.items.map(i => ({ ...i, price: -i.price })),
-                      subtotal: -orig.subtotal,
-                      discountPct: 0,
-                      discountEur: 0,
-                      total: -orig.total,
-                      paymentMethod: orig.paymentMethod,
-                      cashAmount: -orig.cashAmount,
-                      cardAmount: -orig.cardAmount,
-                      giftCardCode: orig.giftCardCode,
-                      giftCardAmount: -orig.giftCardAmount,
-                      notes: `🔄 Storno di incasso ${orig.id.slice(-6)} del ${orig.date}`,
-                    });
-                    setStornoId(null);
-                  }}
-                  style={{ flex: 1, background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.35)', color: '#fbbf24', borderRadius: '8px', padding: '8px', fontSize: '13px', cursor: 'pointer', fontWeight: 600 }}>
-                  Conferma storno
-                </button>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
-    </>
   );
 }
