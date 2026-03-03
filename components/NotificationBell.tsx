@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
-import { Bell, X, Check, Trash2 } from 'lucide-react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { Bell, X, Check, Trash2, GripHorizontal } from 'lucide-react';
 import { useNotifications, AppNotification } from '@/context/NotificationContext';
 
 const TYPE_ICON: Record<AppNotification['type'], string> = {
@@ -21,31 +21,102 @@ function timeAgo(iso: string): string {
   return `${Math.floor(h / 24)} g fa`;
 }
 
+const PANEL_W = 340;
+const PANEL_H_MAX = 500; // approximate, for clamping
+
 export default function NotificationBell() {
   const { notifications, unreadCount, markAllRead, clearNotification, clearAll } = useNotifications();
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const bellRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  // Panel position (fixed coords, null = auto-position under bell)
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  // Drag state stored in ref to avoid re-renders during drag
+  const dragState = useRef<{ startMouseX: number; startMouseY: number; startPanelX: number; startPanelY: number } | null>(null);
 
   // Close panel on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (
+        wrapRef.current && !wrapRef.current.contains(e.target as Node) &&
+        panelRef.current && !panelRef.current.contains(e.target as Node)
+      ) {
+        setOpen(false);
+      }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
   function toggle() {
+    if (!open) {
+      // Calculate position under the bell button
+      if (bellRef.current) {
+        const rect = bellRef.current.getBoundingClientRect();
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+        let x = rect.right - PANEL_W;
+        let y = rect.bottom + 8;
+        // Clamp to viewport
+        if (x < 8) x = 8;
+        if (x + PANEL_W > vw - 8) x = vw - PANEL_W - 8;
+        if (y + PANEL_H_MAX > vh - 8) y = rect.top - PANEL_H_MAX - 8;
+        if (y < 8) y = 8;
+        setPos({ x, y });
+      }
+      if (unreadCount > 0) markAllRead();
+    }
     setOpen(v => !v);
-    if (!open && unreadCount > 0) markAllRead();
   }
 
+  // Drag handlers
+  const onDragStart = useCallback((e: React.MouseEvent) => {
+    if (!panelRef.current) return;
+    e.preventDefault();
+    const rect = panelRef.current.getBoundingClientRect();
+    dragState.current = {
+      startMouseX: e.clientX,
+      startMouseY: e.clientY,
+      startPanelX: rect.left,
+      startPanelY: rect.top,
+    };
+
+    const onMove = (ev: MouseEvent) => {
+      if (!dragState.current) return;
+      const dx = ev.clientX - dragState.current.startMouseX;
+      const dy = ev.clientY - dragState.current.startMouseY;
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      let nx = dragState.current.startPanelX + dx;
+      let ny = dragState.current.startPanelY + dy;
+      // Clamp inside viewport
+      nx = Math.max(0, Math.min(nx, vw - PANEL_W));
+      ny = Math.max(0, Math.min(ny, vh - 48));
+      setPos({ x: nx, y: ny });
+    };
+    const onUp = () => {
+      dragState.current = null;
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }, []);
+
+  const panelStyle: React.CSSProperties = pos
+    ? { position: 'fixed', left: pos.x, top: pos.y, margin: 0 }
+    : { position: 'fixed', right: 16, top: 64 };
+
   return (
-    <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
+    <div ref={wrapRef} style={{ position: 'relative', display: 'inline-block' }}>
       {/* Bell button */}
       <button
+        ref={bellRef}
         onClick={toggle}
         title="Notifiche"
+        aria-label="Notifiche"
         style={{
           position: 'relative', background: 'none', border: 'none', cursor: 'pointer',
           padding: 6, borderRadius: 10, color: 'var(--muted)',
@@ -70,21 +141,42 @@ export default function NotificationBell() {
         )}
       </button>
 
-      {/* Dropdown panel */}
+      {/* Panel — rendered as fixed overlay so it's never clipped by overflow:hidden parents */}
       {open && (
-        <div style={{
-          position: 'fixed', top: 'auto', right: 16, marginTop: 8,
-          width: 340, maxHeight: '70vh',
-          background: 'var(--bg-card)', border: '1px solid var(--border)',
-          borderRadius: 16, boxShadow: '0 8px 32px rgba(0,0,0,0.35)',
-          zIndex: 9999, overflow: 'hidden',
-          display: 'flex', flexDirection: 'column',
-        }}>
-          {/* Header */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px 10px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
-            <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>
-              Notifiche {unreadCount > 0 && <span style={{ color: '#ef4444', fontSize: 12 }}>({unreadCount})</span>}
-            </span>
+        <div
+          ref={panelRef}
+          style={{
+            ...panelStyle,
+            width: PANEL_W,
+            maxHeight: '70vh',
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border)',
+            borderRadius: 16,
+            boxShadow: '0 8px 32px rgba(0,0,0,0.35)',
+            zIndex: 9999,
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          {/* Drag handle */}
+          <div
+            onMouseDown={onDragStart}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '10px 16px 8px',
+              borderBottom: '1px solid var(--border)',
+              cursor: 'grab',
+              flexShrink: 0,
+              userSelect: 'none',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <GripHorizontal size={13} style={{ color: 'var(--muted)', opacity: 0.5 }} />
+              <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>
+                Notifiche {unreadCount > 0 && <span style={{ color: '#ef4444', fontSize: 12 }}>({unreadCount})</span>}
+              </span>
+            </div>
             <div style={{ display: 'flex', gap: 6 }}>
               {notifications.length > 0 && (
                 <button onClick={clearAll} title="Cancella tutte"
@@ -98,7 +190,7 @@ export default function NotificationBell() {
                   <Check size={13} />
                 </button>
               )}
-              <button onClick={() => setOpen(false)}
+              <button onClick={() => setOpen(false)} aria-label="Chiudi notifiche"
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: 4, borderRadius: 6, display: 'flex', alignItems: 'center' }}>
                 <X size={13} />
               </button>
