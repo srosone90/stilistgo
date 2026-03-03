@@ -455,27 +455,32 @@ export default function ClientAppView() {
       </Section>
 
       {/* ── NEXT STEPS ───────────────────────────────────────────────────── */}
-      <Section title="Come pubblicare l'app" icon={<Smartphone size={16} />}>
-        <ol className="space-y-3 text-sm" style={{ color: 'var(--muted)' }}>
+      <Section title="Come funziona l'app" icon={<Smartphone size={16} />}>
+        <p className="text-sm mb-4" style={{ color: 'var(--muted)' }}>
+          Nessun App Store, nessun tecnico. La tua app è già online — basta condividere il link.
+        </p>
+        <ol className="space-y-4">
           {[
-            { n: 1, text: 'Copia il SALON_ID (vedi sezione sopra) e incollalo in client-app/.env come EXPO_PUBLIC_SALON_ID' },
-            { n: 2, text: 'Apri il terminale: cd client-app', code: 'cd client-app' },
-            { n: 3, text: 'Installa EAS CLI una sola volta: npm install -g eas-cli && eas login', code: 'npm install -g eas-cli && eas login' },
-            { n: 4, text: 'Collega il progetto al tuo account Expo: eas init', code: 'eas init' },
-            { n: 5, text: 'Testa subito sul telefono: npx expo start → scansiona il QR con l\'app Expo Go', code: 'npx expo start' },
-            { n: 6, text: 'Genera APK Android (free): npm run build:apk → email con download APK', code: 'npm run build:apk' },
-          ].map(({ n, text, code }) => (
-            <li key={n} className="flex gap-3">
-              <span className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white"
-                style={{ background: 'rgba(99,102,241,0.3)', border: '1px solid rgba(99,102,241,0.4)' }}>{n}</span>
-              <span>
-                {text.split(code ?? '__NONE__')[0]}
-                {code && <code style={{ color: 'var(--accent-light)', fontSize: 12 }}>{code}</code>}
-                {code && text.split(code ?? '__NONE__')[1]}
-              </span>
+            { n: 1, emoji: '🔗', title: 'Copia il link di installazione', desc: 'Lo trovi nella sezione "Link Installazione App" qui sopra. È il link della tua app personale.' },
+            { n: 2, emoji: '📲', title: 'Condividilo alle tue clienti', desc: 'Mandalo su WhatsApp, mettilo in bio su Instagram, stampalo sul biglietto da visita come QR code.' },
+            { n: 3, emoji: '👆', title: 'La cliente apre il link', desc: 'Si apre nel browser del telefono. iPhone: tocca Condividi → "Aggiungi a schermata Home". Android: il browser chiede direttamente di installare.' },
+            { n: 4, emoji: '🎉', title: 'Hai la tua app!', desc: 'Appare sull\'Home del telefono con il nome del tuo salone. Si apre a schermo intero come una vera app.' },
+          ].map(({ n, emoji, title, desc }) => (
+            <li key={n} className="flex gap-3 items-start">
+              <span className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white"
+                style={{ background: 'rgba(99,102,241,0.3)', border: '1px solid rgba(99,102,241,0.4)', marginTop: 1 }}>{n}</span>
+              <div>
+                <p className="text-sm font-semibold text-white mb-0.5">{emoji} {title}</p>
+                <p className="text-xs" style={{ color: 'var(--muted)', lineHeight: 1.5 }}>{desc}</p>
+              </div>
             </li>
           ))}
         </ol>
+        <div className="mt-5 rounded-xl p-4 text-xs" style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.25)', color: 'rgba(255,255,255,0.6)', lineHeight: 1.6 }}>
+          💡 <strong style={{ color: '#4ade80' }}>Automazione consigliata:</strong> vai in{' '}
+          <strong style={{ color: 'white' }}>Automazioni WhatsApp</strong> e attiva{' '}
+          <strong style={{ color: 'white' }}>&quot;Invia link app a nuova cliente&quot;</strong> — il link verrà inviato automaticamente via WhatsApp ogni volta che aggiungi una nuova cliente.
+        </div>
       </Section>
     </div>
   );
