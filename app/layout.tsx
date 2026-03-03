@@ -4,6 +4,7 @@ import { AppProvider } from "@/context/AppContext";
 import { SalonProvider } from "@/context/SalonContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { NotificationProvider } from "@/context/NotificationContext";
+import LandscapeGuard from "@/components/LandscapeGuard";
 
 export const metadata: Metadata = {
   title: "Stylistgo — Gestionale",
@@ -26,6 +27,7 @@ export default function RootLayout({
         />
       </head>
       <body className="antialiased">
+        <LandscapeGuard />
         <ThemeProvider>
           <AppProvider>
             <SalonProvider>

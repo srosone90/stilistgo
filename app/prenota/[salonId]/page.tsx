@@ -172,12 +172,29 @@ export default function PrenotaPWAPage({ params }: { params: Promise<{ salonId: 
   }, [salonId]);
 
   useEffect(() => {
-    fetch(`/api/booking-slots?salonId=${encodeURIComponent(salonId)}`).then(r => r.json()).then(d => {
-      setSalonName(d.salonName || '');
-      setServices(d.services || []);
-      if (d.operators?.length > 0) { setOperators(d.operators); setSelectedOperator(d.operators[0].id); }
-      if (d.clientAppConfig) setAppConfig(prev => ({ ...prev, ...d.clientAppConfig }));
-    }).catch(() => { setLoadError(true); }).finally(() => setLoading(false));
+    let cancelled = false;
+    async function loadWithRetry(attemptsLeft = 3, delay = 1500) {
+      try {
+        const r = await fetch(`/api/booking-slots?salonId=${encodeURIComponent(salonId)}`);
+        const d = await r.json();
+        if (cancelled) return;
+        setSalonName(d.salonName || '');
+        setServices(d.services || []);
+        if (d.operators?.length > 0) { setOperators(d.operators); setSelectedOperator(d.operators[0].id); }
+        if (d.clientAppConfig) setAppConfig(prev => ({ ...prev, ...d.clientAppConfig }));
+        setLoading(false);
+      } catch {
+        if (cancelled) return;
+        if (attemptsLeft > 1) {
+          await new Promise(res => setTimeout(res, delay));
+          return loadWithRetry(attemptsLeft - 1, delay);
+        }
+        setLoadError(true);
+        setLoading(false);
+      }
+    }
+    loadWithRetry();
+    return () => { cancelled = true; };
   }, [salonId]);
 
   useEffect(() => {

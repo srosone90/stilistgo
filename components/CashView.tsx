@@ -5,7 +5,7 @@ import { useSalon } from '@/context/SalonContext';
 import { Payment, PaymentMethod, PAYMENT_METHOD_LABELS, PaymentItem, CashSession } from '@/types/salon';
 import { format, parseISO } from 'date-fns';
 import { it } from 'date-fns/locale';
-import { Plus, X, Trash2, CreditCard, Banknote, Gift, TrendingUp, ChevronDown, ChevronUp, Printer, Package } from 'lucide-react';
+import { Plus, X, Trash2, CreditCard, Banknote, Gift, TrendingUp, ChevronDown, ChevronUp, Printer, Package, RotateCcw } from 'lucide-react';
 import { formatCurrency } from '@/lib/calculations';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -56,13 +56,15 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
     payments, addPayment, deletePayment,
     cashSessions, addCashSession, closeCashSession,
     clients, operators, services, appointments,
-    redeemGiftCard, salonConfig, changeAppointmentStatus,
+    giftCards, redeemGiftCard, salonConfig, changeAppointmentStatus,
     products, addStockMovement,
   } = useSalon();
 
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [giftCardInfo, setGiftCardInfo] = useState<{ found: boolean; remainingValue: number } | null>(null);
+  const [gcSecondaryMethod, setGcSecondaryMethod] = useState<'cash' | 'card'>('cash');
 
   useEffect(() => { if (newTrigger && newTrigger > 0) { setShowForm(true); setForm({ ...EMPTY_FORM, date: selectedDate }); } }, [newTrigger, selectedDate]);
 
@@ -96,6 +98,7 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
   const [expandedPaymentId, setExpandedPaymentId] = useState<string | null>(null);
   const [newItemServiceId, setNewItemServiceId] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [stornoId, setStornoId] = useState<string | null>(null);
 
   // Today's session
   const todaySession = useMemo(() =>
@@ -264,16 +267,56 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
   function syncPaymentAmounts(method: PaymentMethod, total: number) {
     if (method === 'cash') return { cashAmount: total, cardAmount: 0, giftCardAmount: 0 };
     if (method === 'card') return { cashAmount: 0, cardAmount: total, giftCardAmount: 0 };
-    if (method === 'gift_card') return { cashAmount: 0, cardAmount: 0, giftCardAmount: total };
+    if (method === 'gift_card') {
+      // If gift card covers everything
+      return { cashAmount: 0, cardAmount: 0, giftCardAmount: total };
+    }
     return { cashAmount: form.cashAmount, cardAmount: form.cardAmount, giftCardAmount: form.giftCardAmount };
+  }
+
+  function checkGiftCard() {
+    const gc = giftCards.find(g => g.code === form.giftCardCode.trim() && g.isActive);
+    if (!gc) { setGiftCardInfo({ found: false, remainingValue: 0 }); return; }
+    setGiftCardInfo({ found: true, remainingValue: gc.remainingValue });
+    // Auto-fill amount if balance is sufficient
+    if (gc.remainingValue >= formTotal) {
+      setForm(p => ({ ...p, giftCardAmount: formTotal }));
+    } else {
+      // Partial: set gift amount to available balance, remainder goes to secondary method
+      setForm(p => ({ ...p, giftCardAmount: gc.remainingValue }));
+    }
   }
 
   function handleSave() {
     if (form.items.length === 0 || formTotal === 0) return;
-    const amounts = syncPaymentAmounts(form.paymentMethod, formTotal);
+
+    // --- Gift card partial payment logic ---
+    let finalMethod: PaymentMethod = form.paymentMethod;
+    let finalCash = form.cashAmount;
+    let finalCard = form.cardAmount;
+    let finalGc = form.giftCardAmount;
+
+    if (form.paymentMethod === 'gift_card' && giftCardInfo?.found) {
+      if (giftCardInfo.remainingValue >= formTotal) {
+        // Full gift card payment
+        finalMethod = 'gift_card';
+        finalCash = 0; finalCard = 0; finalGc = formTotal;
+      } else {
+        // Partial: gift card covers giftCardInfo.remainingValue, rest is secondary
+        finalMethod = 'mixed';
+        finalGc = giftCardInfo.remainingValue;
+        const remainder = Math.max(0, formTotal - finalGc);
+        if (gcSecondaryMethod === 'cash') { finalCash = remainder; finalCard = 0; }
+        else { finalCard = remainder; finalCash = 0; }
+      }
+    } else if (form.paymentMethod !== 'gift_card') {
+      const amounts = syncPaymentAmounts(form.paymentMethod, formTotal);
+      finalCash = amounts.cashAmount; finalCard = amounts.cardAmount; finalGc = amounts.giftCardAmount;
+    }
+
     // Redeem gift card if applicable
-    if ((form.paymentMethod === 'gift_card' || form.paymentMethod === 'mixed') && form.giftCardCode) {
-      redeemGiftCard(form.giftCardCode, amounts.giftCardAmount || form.giftCardAmount);
+    if (form.giftCardCode && finalGc > 0) {
+      redeemGiftCard(form.giftCardCode, finalGc);
     }
     addPayment({
       appointmentId: form.appointmentId,
@@ -286,11 +329,11 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
       discountPct: form.discountPct,
       discountEur: formDiscount,
       total: formTotal,
-      paymentMethod: form.paymentMethod,
-      cashAmount: amounts.cashAmount,
-      cardAmount: amounts.cardAmount,
+      paymentMethod: finalMethod,
+      cashAmount: finalCash,
+      cardAmount: finalCard,
       giftCardCode: form.giftCardCode,
-      giftCardAmount: amounts.giftCardAmount || form.giftCardAmount,
+      giftCardAmount: finalGc,
       notes: form.notes,
     });
     // Mark appointment completed
@@ -310,6 +353,7 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
     });
     setShowForm(false);
     setForm(EMPTY_FORM);
+    setGiftCardInfo(null);
   }
 
   const todayAppts = useMemo(() =>
@@ -387,8 +431,14 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className="font-bold" style={{ color: '#22c55e' }}>{formatCurrency(p.total)}</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold" style={{ color: p.total < 0 ? '#f87171' : '#22c55e' }}>{formatCurrency(p.total)}</span>
+                  {p.total > 0 && (
+                    <button onClick={e => { e.stopPropagation(); setStornoId(p.id); }} title="Storna incasso"
+                      style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.3)', color: '#fbbf24', borderRadius: '8px', padding: '5px 8px', cursor: 'pointer' }}>
+                      <RotateCcw size={13} />
+                    </button>
+                  )}
                   <button onClick={e => { e.stopPropagation(); setConfirmDeleteId(p.id); }}
                     style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: '#f87171', borderRadius: '8px', padding: '5px 8px', cursor: 'pointer' }}>
                     <Trash2 size={13} />
@@ -472,6 +522,60 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
         </div>
       )}
 
+      {/* Storno confirmation modal */}
+      {stornoId && (() => {
+        const orig = payments.find(p => p.id === stornoId);
+        if (!orig) return null;
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
+            <div className="w-full max-w-sm rounded-2xl p-6" style={{ background: '#18181f', border: '1px solid var(--border)' }}>
+              <h3 className="font-semibold text-white mb-1 flex items-center gap-2">
+                <RotateCcw size={16} style={{ color: '#fbbf24' }} /> Storna incasso
+              </h3>
+              <p className="text-sm mb-1 mt-2" style={{ color: 'var(--text-3)' }}>
+                Cliente: <span className="text-white font-medium">{orig.clientName || '—'}</span>
+              </p>
+              <p className="text-sm mb-4" style={{ color: 'var(--text-3)' }}>
+                Importo: <span style={{ color: '#f87171', fontWeight: 700 }}>-{formatCurrency(orig.total)}</span>
+              </p>
+              <p className="text-xs mb-4" style={{ color: 'var(--muted)' }}>
+                Verrà registrato un movimento di storno negativo. L&rsquo;incasso originale rimane nello storico.
+              </p>
+              <div className="flex gap-2">
+                <button onClick={() => setStornoId(null)}
+                  style={{ flex: 1, background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--muted)', borderRadius: '8px', padding: '8px', fontSize: '13px', cursor: 'pointer' }}>
+                  Annulla
+                </button>
+                <button onClick={() => {
+                    addPayment({
+                      appointmentId: orig.appointmentId,
+                      clientId: orig.clientId,
+                      clientName: orig.clientName,
+                      operatorId: orig.operatorId,
+                      date: format(new Date(), 'yyyy-MM-dd'),
+                      items: orig.items.map(i => ({ ...i, price: -i.price })),
+                      subtotal: -orig.subtotal,
+                      discountPct: 0,
+                      discountEur: 0,
+                      total: -orig.total,
+                      paymentMethod: orig.paymentMethod,
+                      cashAmount: -orig.cashAmount,
+                      cardAmount: -orig.cardAmount,
+                      giftCardCode: orig.giftCardCode,
+                      giftCardAmount: -orig.giftCardAmount,
+                      notes: `🔄 Storno di incasso ${orig.id.slice(-6)} del ${orig.date}`,
+                    });
+                    setStornoId(null);
+                  }}
+                  style={{ flex: 1, background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.35)', color: '#fbbf24', borderRadius: '8px', padding: '8px', fontSize: '13px', cursor: 'pointer', fontWeight: 600 }}>
+                  Conferma storno
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Open session modal */}
       {showOpenSession && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
@@ -523,7 +627,7 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
           <div className="w-full max-w-lg max-h-[92vh] overflow-y-auto rounded-2xl p-6" style={{ background: '#18181f', border: '1px solid var(--border)' }}>
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-semibold text-white">Nuovo incasso</h3>
-              <button onClick={() => setShowForm(false)} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}><X size={18} /></button>
+              <button onClick={() => { setShowForm(false); setGiftCardInfo(null); }} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}><X size={18} /></button>
             </div>
             <div className="space-y-3">
               {/* Link to appointment */}
@@ -626,7 +730,7 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
                 <label style={labelStyle}>Metodo di pagamento</label>
                 <div className="flex gap-2 flex-wrap">
                   {(Object.keys(PAYMENT_METHOD_LABELS) as PaymentMethod[]).map(m => (
-                    <button key={m} onClick={() => setForm(p => ({ ...p, paymentMethod: m }))}
+                    <button key={m} onClick={() => { setForm(p => ({ ...p, paymentMethod: m })); setGiftCardInfo(null); }}
                       className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg"
                       style={{ background: form.paymentMethod === m ? 'rgba(99,102,241,0.2)' : 'var(--bg-input)', border: `1px solid ${form.paymentMethod === m ? 'rgba(99,102,241,0.5)' : 'var(--border)'}`, color: form.paymentMethod === m ? 'var(--accent-light)' : 'var(--muted)', cursor: 'pointer' }}>
                       {METHOD_ICONS[m]} {PAYMENT_METHOD_LABELS[m]}
@@ -642,9 +746,59 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
                 </div>
               )}
 
-              {(form.paymentMethod === 'gift_card' || form.paymentMethod === 'mixed') && (
+              {/* Gift card — dedicated flow: code lookup + balance check + partial fallback */}
+              {form.paymentMethod === 'gift_card' && (
+                <div className="space-y-2">
+                  <label style={labelStyle}>Codice gift card</label>
+                  <div className="flex gap-2">
+                    <input
+                      value={form.giftCardCode}
+                      onChange={e => { setForm(p => ({ ...p, giftCardCode: e.target.value })); setGiftCardInfo(null); }}
+                      placeholder="Es. GC-XXXX"
+                      style={{ ...inputStyle, flex: 1 }}
+                    />
+                    <button onClick={checkGiftCard} disabled={!form.giftCardCode.trim()}
+                      style={{ ...btnPrimary, flexShrink: 0, opacity: form.giftCardCode.trim() ? 1 : 0.4 }}>
+                      Verifica
+                    </button>
+                  </div>
+                  {giftCardInfo && !giftCardInfo.found && (
+                    <p className="text-xs px-3 py-2 rounded-lg" style={{ background: 'rgba(239,68,68,0.1)', color: '#f87171', border: '1px solid rgba(239,68,68,0.25)' }}>
+                      ❌ Codice non valido o gift card esaurita / disattivata.
+                    </p>
+                  )}
+                  {giftCardInfo?.found && giftCardInfo.remainingValue >= formTotal && (
+                    <p className="text-xs px-3 py-2 rounded-lg" style={{ background: 'rgba(34,197,94,0.08)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.25)' }}>
+                      ✅ Saldo disponibile: <strong>{formatCurrency(giftCardInfo.remainingValue)}</strong> — sufficiente per coprire il totale.
+                    </p>
+                  )}
+                  {giftCardInfo?.found && giftCardInfo.remainingValue < formTotal && (
+                    <div className="space-y-2">
+                      <p className="text-xs px-3 py-2 rounded-lg" style={{ background: 'rgba(245,158,11,0.1)', color: '#fbbf24', border: '1px solid rgba(245,158,11,0.25)' }}>
+                        ⚠️ Saldo insufficiente: <strong>{formatCurrency(giftCardInfo.remainingValue)}</strong> disponibili su <strong>{formatCurrency(formTotal)}</strong>.
+                        {' '}Mancano ancora <strong>{formatCurrency(formTotal - giftCardInfo.remainingValue)}</strong>.
+                      </p>
+                      <div>
+                        <label style={labelStyle}>Metodo aggiuntivo per il restante {formatCurrency(formTotal - giftCardInfo.remainingValue)}</label>
+                        <div className="flex gap-2">
+                          {(['cash', 'card'] as const).map(m => (
+                            <button key={m} onClick={() => setGcSecondaryMethod(m)}
+                              className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg"
+                              style={{ background: gcSecondaryMethod === m ? 'rgba(99,102,241,0.2)' : 'var(--bg-input)', border: `1px solid ${gcSecondaryMethod === m ? 'rgba(99,102,241,0.5)' : 'var(--border)'}`, color: gcSecondaryMethod === m ? 'var(--accent-light)' : 'var(--muted)', cursor: 'pointer' }}>
+                              {m === 'cash' ? <><Banknote size={12} /> Contanti</> : <><CreditCard size={12} /> Carta / POS</>}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Mixed method — manual cash+card split (keep existing behaviour) */}
+              {form.paymentMethod === 'mixed' && (
                 <div className="grid grid-cols-2 gap-3">
-                  <div><label style={labelStyle}>Codice gift card</label><input value={form.giftCardCode} onChange={e => setForm(p => ({ ...p, giftCardCode: e.target.value }))} style={inputStyle} /></div>
+                  <div><label style={labelStyle}>Codice gift card (opz.)</label><input value={form.giftCardCode} onChange={e => setForm(p => ({ ...p, giftCardCode: e.target.value }))} style={inputStyle} /></div>
                   <div><label style={labelStyle}>Importo gift card (€)</label><input type="number" min={0} step={0.01} value={form.giftCardAmount} onChange={e => setForm(p => ({ ...p, giftCardAmount: parseFloat(e.target.value) || 0 }))} style={inputStyle} /></div>
                 </div>
               )}
@@ -653,8 +807,13 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
             </div>
 
             <div className="flex justify-end gap-2 mt-4">
-              <button onClick={() => setShowForm(false)} style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--muted)', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', cursor: 'pointer' }}>Annulla</button>
-              <button onClick={handleSave} disabled={form.items.length === 0} style={{ ...btnPrimary, opacity: form.items.length === 0 ? 0.4 : 1 }}>Registra incasso</button>
+              <button onClick={() => { setShowForm(false); setGiftCardInfo(null); }}
+                style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--muted)', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', cursor: 'pointer' }}>Annulla</button>
+              <button onClick={handleSave}
+                disabled={form.items.length === 0 || (form.paymentMethod === 'gift_card' && !giftCardInfo?.found)}
+                style={{ ...btnPrimary, opacity: (form.items.length === 0 || (form.paymentMethod === 'gift_card' && !giftCardInfo?.found)) ? 0.4 : 1 }}>
+                Registra incasso
+              </button>
             </div>
           </div>
         </div>

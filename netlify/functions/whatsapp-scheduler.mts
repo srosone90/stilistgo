@@ -70,7 +70,7 @@ const DEFAULT_LOYALTY_MSG     = 'Complimenti {nome}! 🌟 Hai raggiunto {punti} 
 
 async function sendUltraMsg(instanceId: string, token: string, to: string, message: string): Promise<boolean> {
   const phone = to.replace(/\D/g, '');
-  if (!phone) return false;
+  if (!phone) { console.warn('[WhatsApp] numero non valido:', to); return false; }
   try {
     const res = await fetch(`https://api.ultramsg.com/${instanceId}/messages/chat`, {
       method: 'POST',
@@ -78,14 +78,23 @@ async function sendUltraMsg(instanceId: string, token: string, to: string, messa
       body: new URLSearchParams({ token, to: phone, body: message }),
     });
     const data = await res.json();
-    return data.sent === true || data.message === 'ok';
-  } catch {
+    const ok = data.sent === true || data.message === 'ok';
+    if (!ok) console.warn('[WhatsApp] invio fallito per', phone, '→ risposta API:', JSON.stringify(data));
+    return ok;
+  } catch (err) {
+    console.error('[WhatsApp] errore di rete per', phone, ':', err);
     return false;
   }
 }
 
 // ─── Main ────────────────────────────────────────────────────────────────────
 export default async function handler() {
+  // Guard: verify required env vars are present
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.error('[Scheduler] ❌ Variabili d\'ambiente mancanti: NEXT_PUBLIC_SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY non impostate su Netlify.');
+    return;
+  }
+
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -118,7 +127,10 @@ export default async function handler() {
     } catch { continue; }
 
     const wa = state.salonConfig?.whatsapp;
-    if (!wa?.enabled || !wa.ultraMsgInstanceId || !wa.ultraMsgToken) continue;
+    if (!wa?.enabled || !wa.ultraMsgInstanceId || !wa.ultraMsgToken) {
+      if (wa?.enabled) console.warn(`[Scheduler] Salone ${userId.slice(0,8)}… ha WhatsApp abilitato ma InstanceId o Token mancanti.`);
+      continue;
+    }
 
     const { ultraMsgInstanceId: instanceId, ultraMsgToken: token } = wa;
     const salonName = state.salonConfig?.salonName ?? 'il salone';
@@ -191,10 +203,15 @@ export default async function handler() {
     const { error: saveErr } = await supabase
       .from('salon_data')
       .upsert({ user_id: userId, state: updatedState, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
-    if (saveErr) console.error(`Scheduler: failed to save log for ${userId}`, saveErr);
+    if (saveErr) console.error(`[Scheduler] Errore salvataggio log per ${userId}:`, saveErr);
+
+    const sentToday = log.filter(m => m.sentAt.startsWith(today));
+    const sentCount = sentToday.filter(m => m.status === 'sent').length;
+    const failCount = sentToday.filter(m => m.status === 'failed').length;
+    console.log(`[Scheduler] Salone ${userId.slice(0,8)}… → ✅ ${sentCount} inviati, ❌ ${failCount} falliti`);
   }
 
-  console.log('WhatsApp scheduler completed for', rows.length, 'salons');
+  console.log('[Scheduler] ✅ Completato per', rows.length, 'salon/i');
 }
 
 export const config: Config = {

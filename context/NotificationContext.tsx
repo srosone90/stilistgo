@@ -210,7 +210,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             () => {
               if (!mounted.current) return;
               const now = Date.now();
-              if (now - lastSyncCheck.current < 5000) return;
+              if (now - lastSyncCheck.current < 60_000) return;
               lastSyncCheck.current = now;
               addNotification({ type: 'data_sync', message: '🔄 Dati aggiornati da un altro dispositivo.' });
             }

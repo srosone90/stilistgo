@@ -22,7 +22,7 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 export default function OnlineBookingsView() {
-  const { addAppointment, clients, addClient, services, importPendingBookings } = useSalon();
+  const { addAppointment, clients, addClient, services } = useSalon();
   const { realtimeBookingTick } = useNotifications();
   const [bookings, setBookings] = useState<OnlineBooking[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,12 +49,19 @@ export default function OnlineBookingsView() {
     setLoading(false);
   }, [userId]);
 
-  // Re-load display list AND import into calendar when real-time tick fires
+  // Initial load when userId becomes available
   useEffect(() => {
-    load();
-    if (realtimeBookingTick > 0) importPendingBookings();
+    if (userId) load();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [load, realtimeBookingTick]);
+  }, [userId]);
+
+  // Reload display list when a new real-time booking arrives.
+  // Do NOT call importPendingBookings() here — auto-import runs exclusively
+  // inside SalonContext.loadCloud() with full deduplication.
+  useEffect(() => {
+    if (realtimeBookingTick > 0) load();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [realtimeBookingTick]);
 
   const handleConfirm = async (id: string) => {
     await dbUpdateBookingStatus(id, 'confirmed');
