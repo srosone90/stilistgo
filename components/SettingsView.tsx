@@ -6,7 +6,7 @@ import { useSalon } from '@/context/SalonContext';
 import { Transaction, CashIn, CashOut } from '@/types';
 import { GiftCard, SalonConfig, DayOfWeek } from '@/types/salon';
 import Papa from 'papaparse';
-import { Upload, Download, AlertTriangle, CheckCircle2, RefreshCw, Wifi, WifiOff, FileDown, Plus, Trash2 } from 'lucide-react';
+import { Upload, Download, AlertTriangle, CheckCircle2, RefreshCw, Wifi, WifiOff, FileDown, Plus, Trash2, Check } from 'lucide-react';
 import { generateId } from '@/lib/storage';
 import { resetSupabaseAvailability } from '@/lib/db';
 import { exportTransactionsPDF } from '@/lib/pdf';
@@ -43,12 +43,16 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function SaveBtn({ onClick }: { onClick: () => void }) {
+function SaveBtn({ onClick, saved }: { onClick: () => void; saved?: boolean }) {
   return (
     <button onClick={onClick}
       className="mt-3 px-4 py-2 rounded-xl text-sm font-semibold text-white"
-      style={{ background: 'rgba(99,102,241,0.8)' }}>
-      Salva modifiche
+      style={{
+        background: saved ? 'rgba(34,197,94,0.75)' : 'rgba(99,102,241,0.8)',
+        display: 'inline-flex', alignItems: 'center', gap: 6,
+        transition: 'background 0.25s',
+      }}>
+      {saved ? <><Check size={14} /> Salvato!</> : 'Salva modifiche'}
     </button>
   );
 }
@@ -98,8 +102,14 @@ export default function SettingsView() {
   const [importStatus, setImportStatus] = useState<{ ok?: number; skip?: number; error?: string } | null>(null);
   const [backupStatus, setBackupStatus] = useState<{ ok?: boolean; error?: string } | null>(null);
   const [reconnecting, setReconnecting] = useState(false);
+  const [savedSection, setSavedSection] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const backupRef = useRef<HTMLInputElement>(null);
+
+  const flash = (sec: string) => {
+    setSavedSection(sec);
+    setTimeout(() => setSavedSection(s => (s === sec ? null : s)), 2500);
+  };
 
   // ── Handlers ───────────────────────────────────────────────
   const handleReconnect = async () => {
@@ -110,14 +120,14 @@ export default function SettingsView() {
 
   const saveTax = async () => {
     const v = parseFloat(taxInput);
-    if (!isNaN(v) && v >= 0 && v <= 100) await updateSettings({ taxRate: v });
+    if (!isNaN(v) && v >= 0 && v <= 100) { await updateSettings({ taxRate: v }); flash('tax'); }
   };
 
-  const saveInfo = () => updateSalonConfig(info);
+  const saveInfo = () => { updateSalonConfig(info); flash('info'); };
 
-  const saveSchedule = () => updateSalonConfig(schedule);
+  const saveSchedule = () => { updateSalonConfig(schedule); flash('schedule'); };
 
-  const saveLoyalty = () => updateSalonConfig(loyalty);
+  const saveLoyalty = () => { updateSalonConfig(loyalty); flash('loyalty'); };
 
   const toggleDay = (d: DayOfWeek) => {
     setSchedule(prev => ({
@@ -299,7 +309,7 @@ export default function SettingsView() {
             </Field>
           </div>
         </div>
-        <SaveBtn onClick={saveInfo} />
+        <SaveBtn onClick={saveInfo} saved={savedSection === 'info'} />
       </Section>
 
       {/* ─── 2. Agenda & Orari ──────────────────────────────── */}
@@ -338,7 +348,7 @@ export default function SettingsView() {
             ))}
           </div>
         </Field>
-        <SaveBtn onClick={saveSchedule} />
+        <SaveBtn onClick={saveSchedule} saved={savedSection === 'schedule'} />
       </Section>
 
       {/* ─── 3. Programma Fedeltà ───────────────────────────── */}
@@ -356,7 +366,7 @@ export default function SettingsView() {
               onChange={e => setLoyalty(p => ({ ...p, dormientiDays: parseInt(e.target.value) || 60 }))} style={inputStyle} />
           </Field>
         </div>
-        <SaveBtn onClick={saveLoyalty} />
+        <SaveBtn onClick={saveLoyalty} saved={savedSection === 'loyalty'} />
       </Section>
 
       {/* ─── 4. Gift Card ───────────────────────────────────── */}
@@ -450,8 +460,12 @@ export default function SettingsView() {
           <span style={{ color: 'var(--muted)' }}>%</span>
           <button onClick={saveTax}
             className="px-4 py-2 rounded-xl text-sm font-semibold text-white"
-            style={{ background: 'rgba(99,102,241,0.8)' }}>
-            Salva
+            style={{
+              background: savedSection === 'tax' ? 'rgba(34,197,94,0.75)' : 'rgba(99,102,241,0.8)',
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              transition: 'background 0.25s',
+            }}>
+            {savedSection === 'tax' ? <><Check size={14} /> Salvato!</> : 'Salva'}
           </button>
         </div>
         <p className="text-xs mt-2" style={{ color: 'var(--muted)' }}>
