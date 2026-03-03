@@ -1,77 +1,121 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, use } from 'react';
-import { CheckCircle2, Clock, Scissors, ArrowLeft, Calendar, User, Download, Share, X } from 'lucide-react';
+import { CheckCircle2, Clock, Scissors, ArrowLeft, Calendar, User, Download, Share, Sparkles, MapPin } from 'lucide-react';
 
 // ── Types ──────────────────────────────────────────────────────────
-interface SalonService {
-  id: string; name: string; duration: number; price: number; category: string;
-}
+interface SalonService { id: string; name: string; duration: number; price: number; category: string; }
 interface SalonOperator { id: string; name: string; color: string; }
 interface ClientAppConfig {
-  accentColor: string;
-  welcomeMessage: string;
-  aboutText: string;
-  showPrices: boolean;
-  maxAdvanceDays: number;
-  minAdvanceHours: number;
-  cancellationPolicy: string;
-  bookingConfirmationMessage: string;
+  accentColor: string; welcomeMessage: string; aboutText: string;
+  showPrices: boolean; maxAdvanceDays: number; minAdvanceHours: number;
+  cancellationPolicy: string; bookingConfirmationMessage: string;
+  contactPhone?: string; contactAddress?: string;
 }
-interface StoredClient {
-  salonId: string;
-  clientPhone: string;
-  clientName: string;
-  clientEmail: string;
-}
+interface StoredClient { salonId: string; clientPhone: string; clientName: string; clientEmail: string; }
 
 const STORAGE_KEY = 'stilistgo_client_identity';
 const DEFAULT_COLOR = '#c084fc';
 
-// ── Helpers ────────────────────────────────────────────────────────
 function hexToRgb(hex: string) {
   const r = parseInt(hex.slice(1, 3), 16);
   const g = parseInt(hex.slice(3, 5), 16);
   const b = parseInt(hex.slice(5, 7), 16);
-  return `${r} ${g} ${b}`;
+  return `${r},${g},${b}`;
 }
 
-// ── iOS Install Banner ─────────────────────────────────────────────
-function IosBanner({ color, onClose }: { color: string; onClose: () => void }) {
+function lighten(hex: string, amount = 0.3) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  const lr = Math.round(r + (255 - r) * amount);
+  const lg = Math.round(g + (255 - g) * amount);
+  const lb = Math.round(b + (255 - b) * amount);
+  return `#${lr.toString(16).padStart(2,'0')}${lg.toString(16).padStart(2,'0')}${lb.toString(16).padStart(2,'0')}`;
+}
+
+// ── Progress dots ──────────────────────────────────────────────────
+function ProgressBar({ step, accent }: { step: string; accent: string }) {
+  const steps = ['services', 'operator', 'datetime', 'confirm'];
+  const cur = steps.indexOf(step);
+  if (cur < 0) return null;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center', padding: '12px 0 0' }}>
+      {steps.map((_, i) => (
+        <div key={i} style={{
+          height: 4, borderRadius: 2,
+          width: i === cur ? 24 : 8,
+          background: i <= cur ? accent : 'rgba(255,255,255,0.15)',
+          transition: 'all 0.3s',
+        }} />
+      ))}
+    </div>
+  );
+}
+
+// ── Install bottom sheet ───────────────────────────────────────────
+function InstallSheet({ accent, onClose }: { accent: string; onClose: () => void }) {
+  const rgb = hexToRgb(accent);
   return (
     <div style={{
-      position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9999,
-      background: '#1c1c1e', borderTop: '1px solid rgba(255,255,255,0.15)',
-      padding: '16px 20px 32px', borderRadius: '16px 16px 0 0',
-      boxShadow: '0 -8px 32px rgba(0,0,0,0.5)',
-    }}>
-      <button onClick={onClose} style={{
-        position: 'absolute', top: 12, right: 16,
-        background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)',
-        fontSize: 22, cursor: 'pointer', lineHeight: 1,
-      }}>×</button>
-      <p style={{ color: 'white', fontWeight: 700, fontSize: 16, margin: '0 0 8px' }}>
-        📲 Aggiungi alla schermata Home
-      </p>
-      <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13, margin: '0 0 14px', lineHeight: 1.5 }}>
-        Su iPhone: tocca <Share size={13} style={{ display: 'inline', verticalAlign: 'middle' }} /> in basso, poi &ldquo;Aggiungi a schermata Home&rdquo;.
-        Su Android: tocca ⋮ in alto e poi &ldquo;Aggiungi a schermata Home&rdquo;.
-      </p>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: `rgba(${hexToRgb(color)},0.15)`, borderRadius: 12, border: `1px solid rgba(${hexToRgb(color)},0.35)` }}>
-        <Download size={16} style={{ color }} />
-        <span style={{ color, fontSize: 13, fontWeight: 600 }}>
-          L&apos;app si aprirà a schermo intero, senza barra del browser
-        </span>
+      position: 'fixed', inset: 0, zIndex: 9999,
+      background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+      display: 'flex', alignItems: 'flex-end',
+    }} onClick={onClose}>
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          width: '100%', background: '#1a1a24',
+          borderTop: `1px solid rgba(${rgb},0.3)`,
+          borderRadius: '24px 24px 0 0', padding: '8px 24px 40px',
+          boxShadow: `0 -16px 60px rgba(${rgb},0.2)`,
+        }}
+      >
+        <div style={{ width: 40, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.2)', margin: '12px auto 20px' }} />
+        <div style={{ textAlign: 'center', marginBottom: 20 }}>
+          <div style={{ fontSize: 40, marginBottom: 8 }}>📲</div>
+          <p style={{ color: 'white', fontWeight: 800, fontSize: 18, margin: '0 0 6px' }}>Aggiungi alla schermata Home</p>
+          <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: 14, margin: 0, lineHeight: 1.5 }}>
+            Accedi all&apos;app direttamente dall&apos;icona, senza aprire il browser
+          </p>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 14, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ fontSize: 20 }}>🍎</span>
+            <div>
+              <p style={{ color: 'white', fontSize: 13, fontWeight: 600, margin: 0 }}>iPhone / iPad</p>
+              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, margin: 0 }}>
+                Tocca <Share size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /> in basso → &ldquo;Aggiungi a schermata Home&rdquo;
+              </p>
+            </div>
+          </div>
+          <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 14, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ fontSize: 20 }}>🤖</span>
+            <div>
+              <p style={{ color: 'white', fontSize: 13, fontWeight: 600, margin: 0 }}>Android</p>
+              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, margin: 0 }}>Tocca ⋮ in alto → &ldquo;Aggiungi a schermata Home&rdquo;</p>
+            </div>
+          </div>
+        </div>
+        <button
+          onClick={onClose}
+          style={{
+            width: '100%', marginTop: 16, padding: '14px', borderRadius: 16, border: 'none',
+            background: `linear-gradient(135deg, rgba(${rgb},0.9), rgba(${rgb},0.7))`,
+            color: 'white', fontSize: 16, fontWeight: 700, cursor: 'pointer',
+          }}
+        >
+          Capito!
+        </button>
       </div>
     </div>
   );
 }
 
-// ── Main Page ──────────────────────────────────────────────────────
+// ── Main ───────────────────────────────────────────────────────────
 export default function PrenotaPWAPage({ params }: { params: Promise<{ salonId: string }> }) {
   const { salonId } = use(params);
 
-  // ── Salon data
   const [salonName, setSalonName] = useState('');
   const [services, setServices] = useState<SalonService[]>([]);
   const [operators, setOperators] = useState<SalonOperator[]>([]);
@@ -81,12 +125,8 @@ export default function PrenotaPWAPage({ params }: { params: Promise<{ salonId: 
     cancellationPolicy: '', bookingConfirmationMessage: 'Prenotazione confermata! Ti aspettiamo. 🌸',
   });
   const [loading, setLoading] = useState(true);
-
-  // ── Client identity (from token or localStorage)
   const [client, setClient] = useState<StoredClient | null>(null);
-  const [tokenVerified, setTokenVerified] = useState(false);
 
-  // ── Booking flow
   const [step, setStep] = useState<'home' | 'services' | 'operator' | 'datetime' | 'confirm' | 'success'>('home');
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [selectedOperator, setSelectedOperator] = useState('');
@@ -99,456 +139,401 @@ export default function PrenotaPWAPage({ params }: { params: Promise<{ salonId: 
   const [manualPhone, setManualPhone] = useState('');
   const [manualEmail, setManualEmail] = useState('');
 
-  // ── PWA install
-  const [showInstallBanner, setShowInstallBanner] = useState(false);
+  const [showInstallSheet, setShowInstallSheet] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<Event | null>(null);
   const [isStandalone, setIsStandalone] = useState(false);
 
   const accent = appConfig.accentColor || DEFAULT_COLOR;
   const rgb = hexToRgb(accent);
+  const light = lighten(accent, 0.4);
 
-  // ── Inject manifest + service worker + theme color ─────────────────────
+  // ── PWA setup ──────────────────────────────────────────────────────────
   useEffect(() => {
-    // Dynamic manifest link
     const existing = document.querySelector('link[rel="manifest"]');
     if (!existing) {
       const link = document.createElement('link');
-      link.rel = 'manifest';
-      link.href = `/api/manifest/${salonId}`;
+      link.rel = 'manifest'; link.href = `/api/manifest/${salonId}`;
       document.head.appendChild(link);
-    } else {
-      (existing as HTMLLinkElement).href = `/api/manifest/${salonId}`;
-    }
-    // Service worker
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch(() => {});
-    }
-    // PWA install prompt (Android/Chrome)
-    const handler = (e: Event) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-    };
+    } else { (existing as HTMLLinkElement).href = `/api/manifest/${salonId}`; }
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+    const handler = (e: Event) => { e.preventDefault(); setDeferredPrompt(e); };
     window.addEventListener('beforeinstallprompt', handler);
-    // Show install banner after 3 sec if not already installed
-    const standalone = window.matchMedia('(display-mode: standalone)').matches;
-    setIsStandalone(standalone);
-    const stored = localStorage.getItem('stilistgo_install_dismissed');
-    if (!stored && !standalone) {
-      setTimeout(() => setShowInstallBanner(true), 3000);
-    }
+    setIsStandalone(window.matchMedia('(display-mode: standalone)').matches);
     return () => window.removeEventListener('beforeinstallprompt', handler);
   }, [salonId]);
 
-  // Update theme-color in meta whenever accent changes
   useEffect(() => {
     let meta = document.querySelector('meta[name="theme-color"]') as HTMLMetaElement | null;
-    if (!meta) {
-      meta = document.createElement('meta') as HTMLMetaElement;
-      meta.name = 'theme-color';
-      document.head.appendChild(meta);
-    }
+    if (!meta) { meta = document.createElement('meta') as HTMLMetaElement; meta.name = 'theme-color'; document.head.appendChild(meta); }
     meta.content = accent;
   }, [accent]);
 
-  // ── Read ?t=TOKEN from URL ─────────────────────────────────────────────
   useEffect(() => {
-    const searchParams = new URLSearchParams(window.location.search);
-    const token = searchParams.get('t');
+    const token = new URLSearchParams(window.location.search).get('t');
     if (token) {
-      fetch(`/api/client-token?t=${encodeURIComponent(token)}`)
-        .then(r => r.json())
-        .then(d => {
-          if (d.valid && d.payload.salonId === salonId) {
-            const identity: StoredClient = {
-              salonId,
-              clientPhone: d.payload.clientPhone,
-              clientName: d.payload.clientName,
-              clientEmail: d.payload.clientEmail ?? '',
-            };
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(identity));
-            setClient(identity);
-            setTokenVerified(true);
-            // Clean token from URL without reload
-            const clean = new URL(window.location.href);
-            clean.searchParams.delete('t');
-            window.history.replaceState({}, '', clean.toString());
-          }
-        })
-        .catch(() => {});
-    } else {
-      // Try stored identity
-      try {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored) {
-          const parsed: StoredClient = JSON.parse(stored);
-          if (parsed.salonId === salonId) setClient(parsed);
+      fetch(`/api/client-token?t=${encodeURIComponent(token)}`).then(r => r.json()).then(d => {
+        if (d.valid && d.payload.salonId === salonId) {
+          const id: StoredClient = { salonId, clientPhone: d.payload.clientPhone, clientName: d.payload.clientName, clientEmail: d.payload.clientEmail ?? '' };
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(id));
+          setClient(id);
+          const clean = new URL(window.location.href); clean.searchParams.delete('t');
+          window.history.replaceState({}, '', clean.toString());
         }
-      } catch { /* ignore */ }
+      }).catch(() => {});
+    } else {
+      try {
+        const s = localStorage.getItem(STORAGE_KEY);
+        if (s) { const p: StoredClient = JSON.parse(s); if (p.salonId === salonId) setClient(p); }
+      } catch { /**/ }
     }
   }, [salonId]);
 
-  // ── Load salon data ────────────────────────────────────────────────────
   useEffect(() => {
-    fetch(`/api/booking-slots?salonId=${encodeURIComponent(salonId)}`)
-      .then(r => r.json())
-      .then(d => {
-        setSalonName(d.salonName || '');
-        setServices(d.services || []);
-        if (d.operators?.length > 0) {
-          setOperators(d.operators);
-          setSelectedOperator(d.operators[0].id);
-        }
-        if (d.clientAppConfig) {
-          setAppConfig(prev => ({ ...prev, ...d.clientAppConfig }));
-        }
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    fetch(`/api/booking-slots?salonId=${encodeURIComponent(salonId)}`).then(r => r.json()).then(d => {
+      setSalonName(d.salonName || '');
+      setServices(d.services || []);
+      if (d.operators?.length > 0) { setOperators(d.operators); setSelectedOperator(d.operators[0].id); }
+      if (d.clientAppConfig) setAppConfig(prev => ({ ...prev, ...d.clientAppConfig }));
+    }).catch(() => {}).finally(() => setLoading(false));
   }, [salonId]);
 
-  // ── Fetch slots when date changes ──────────────────────────────────────
   useEffect(() => {
     if (!selectedDate) { setAvailableSlots([]); return; }
     setLoadingSlots(true);
-    const opParam = selectedOperator ? `&operatorId=${encodeURIComponent(selectedOperator)}` : '';
-    fetch(`/api/booking-slots?salonId=${encodeURIComponent(salonId)}&date=${selectedDate}${opParam}`)
-      .then(r => r.json())
-      .then(d => setAvailableSlots(d.available || []))
-      .catch(() => setAvailableSlots([]))
-      .finally(() => setLoadingSlots(false));
+    const op = selectedOperator ? `&operatorId=${encodeURIComponent(selectedOperator)}` : '';
+    fetch(`/api/booking-slots?salonId=${encodeURIComponent(salonId)}&date=${selectedDate}${op}`)
+      .then(r => r.json()).then(d => setAvailableSlots(d.available || [])).catch(() => setAvailableSlots([])).finally(() => setLoadingSlots(false));
     setSelectedTime('');
   }, [selectedDate, salonId, selectedOperator]);
 
-  // ── Min date (minAdvanceHours) ─────────────────────────────────────────
-  const minDate = useMemo(() => {
-    const d = new Date();
-    d.setHours(d.getHours() + (appConfig.minAdvanceHours || 2));
-    return d.toISOString().split('T')[0];
-  }, [appConfig.minAdvanceHours]);
+  const minDate = useMemo(() => { const d = new Date(); d.setHours(d.getHours() + (appConfig.minAdvanceHours || 2)); return d.toISOString().split('T')[0]; }, [appConfig.minAdvanceHours]);
+  const maxDate = useMemo(() => { const d = new Date(); d.setDate(d.getDate() + (appConfig.maxAdvanceDays || 90)); return d.toISOString().split('T')[0]; }, [appConfig.maxAdvanceDays]);
 
-  const maxDate = useMemo(() => {
-    const d = new Date();
-    d.setDate(d.getDate() + (appConfig.maxAdvanceDays || 90));
-    return d.toISOString().split('T')[0];
-  }, [appConfig.maxAdvanceDays]);
-
-  // ── Group services by category ─────────────────────────────────────────
   const categories = useMemo(() => {
     const map = new Map<string, SalonService[]>();
-    for (const s of services) {
-      if (!map.has(s.category)) map.set(s.category, []);
-      map.get(s.category)!.push(s);
-    }
+    for (const s of services) { if (!map.has(s.category)) map.set(s.category, []); map.get(s.category)!.push(s); }
     return map;
   }, [services]);
 
-  const selectedServiceObjects = useMemo(
-    () => services.filter(s => selectedServices.includes(s.id)),
-    [services, selectedServices]
-  );
-  const totalDuration = selectedServiceObjects.reduce((sum, s) => sum + s.duration, 0);
-  const totalPrice = selectedServiceObjects.reduce((sum, s) => sum + (s.price || 0), 0);
-
-  const effectiveName  = client?.clientName  ?? manualName;
+  const selectedObjs = useMemo(() => services.filter(s => selectedServices.includes(s.id)), [services, selectedServices]);
+  const totalDuration = selectedObjs.reduce((n, s) => n + s.duration, 0);
+  const totalPrice = selectedObjs.reduce((n, s) => n + (s.price || 0), 0);
+  const effectiveName = client?.clientName ?? manualName;
   const effectivePhone = client?.clientPhone ?? manualPhone;
   const effectiveEmail = client?.clientEmail ?? manualEmail;
 
-  // ── Submit booking ─────────────────────────────────────────────────────
   async function submitBooking() {
     if (!effectiveName || !effectivePhone) return;
     setSubmitting(true);
     try {
-      const serviceNames = selectedServiceObjects.map(s => s.name).join(', ');
       const op = operators.find(o => o.id === selectedOperator);
       await fetch('/api/booking-request', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          salonId,
-          clientName: effectiveName,
-          clientPhone: effectivePhone,
-          clientEmail: effectiveEmail,
-          services: serviceNames,
-          operatorId: selectedOperator,
-          operatorName: op?.name ?? '',
-          preferredDate: selectedDate,
-          preferredTime: selectedTime,
-          notes: '',
-        }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ salonId, clientName: effectiveName, clientPhone: effectivePhone, clientEmail: effectiveEmail, services: selectedObjs.map(s => s.name).join(', '), operatorId: selectedOperator, operatorName: op?.name ?? '', preferredDate: selectedDate, preferredTime: selectedTime, notes: '' }),
       });
-      setStep('success');
-    } catch {
-      // still show success (booking stored client-side)
-      setStep('success');
-    } finally {
-      setSubmitting(false);
-    }
+    } catch { /**/ } finally { setSubmitting(false); setStep('success'); }
   }
 
   // ── Style helpers ──────────────────────────────────────────────────────
-  const pageStyle: React.CSSProperties = {
-    minHeight: '100vh',
-    background: '#0f0f13',
-    color: 'white',
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-    paddingBottom: 100,
+  const page: React.CSSProperties = {
+    minHeight: '100vh', color: 'white', paddingBottom: 100,
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    background: `radial-gradient(ellipse 80% 50% at 50% -10%, rgba(${rgb},0.28) 0%, transparent 65%), #0d0d14`,
   };
-  const cardStyle: React.CSSProperties = {
-    background: 'rgba(255,255,255,0.05)',
-    border: '1px solid rgba(255,255,255,0.1)',
-    borderRadius: 16,
-    padding: 20,
+  const glass: React.CSSProperties = {
+    background: 'rgba(255,255,255,0.04)', backdropFilter: 'blur(12px)',
+    border: '1px solid rgba(255,255,255,0.08)', borderRadius: 20, padding: 20,
   };
-  const btnPrimary: React.CSSProperties = {
-    background: `rgba(${rgb},0.85)`,
-    color: 'white',
-    border: 'none',
-    borderRadius: 14,
-    padding: '14px 28px',
-    fontSize: 16,
-    fontWeight: 700,
-    cursor: 'pointer',
-    width: '100%',
-    marginTop: 8,
+  const btnMain: React.CSSProperties = {
+    width: '100%', padding: '16px', borderRadius: 18, border: 'none',
+    background: `linear-gradient(135deg, ${accent}, ${lighten(accent, 0.15)})`,
+    color: 'white', fontSize: 16, fontWeight: 700, cursor: 'pointer',
+    boxShadow: `0 8px 32px rgba(${rgb},0.4)`, letterSpacing: '0.01em',
   };
-  const btnSecondary: React.CSSProperties = {
-    background: 'rgba(255,255,255,0.08)',
-    color: 'rgba(255,255,255,0.8)',
-    border: '1px solid rgba(255,255,255,0.15)',
-    borderRadius: 14,
-    padding: '12px 24px',
-    fontSize: 15,
-    cursor: 'pointer',
-    width: '100%',
+  const backBtn: React.CSSProperties = {
+    background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)',
+    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+    fontSize: 14, padding: '12px 0', width: 'fit-content',
   };
+  const inputStyle: React.CSSProperties = {
+    background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
+    borderRadius: 12, padding: '12px 16px', color: 'white', fontSize: 15,
+    width: '100%', outline: 'none', boxSizing: 'border-box',
+  };
+  const inner: React.CSSProperties = { maxWidth: 520, margin: '0 auto', padding: '0 20px' };
 
+  // ── Loading ────────────────────────────────────────────────────────────
   if (loading) return (
-    <div style={{ ...pageStyle, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
-      <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)' }}>Caricamento…</span>
+    <div style={{ ...page, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}>
+      <div style={{ width: 56, height: 56, borderRadius: 18, background: `rgba(${rgb},0.2)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Scissors size={28} style={{ color: accent }} />
+      </div>
+      <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 14 }}>Caricamento…</p>
     </div>
   );
 
-  // ── STEP: HOME ─────────────────────────────────────────────────────────
+  // ── HOME ───────────────────────────────────────────────────────────────
   if (step === 'home') return (
-    <div style={pageStyle}>
-      {/* Header strip */}
-      <div style={{ background: `rgba(${rgb},0.15)`, borderBottom: `1px solid rgba(${rgb},0.25)`, padding: '20px 20px 16px' }}>
-        <div style={{ maxWidth: 520, margin: '0 auto' }}>
-          <div style={{ width: 48, height: 48, borderRadius: 14, background: `rgba(${rgb},0.3)`, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
-            <Scissors size={24} style={{ color: accent }} />
+    <div style={page}>
+      {/* Hero */}
+      <div style={{ position: 'relative', overflow: 'hidden', padding: '64px 20px 48px' }}>
+        <div style={{ position: 'absolute', top: -40, left: '50%', transform: 'translateX(-50%)', width: 320, height: 320, borderRadius: '50%', background: `radial-gradient(circle, rgba(${rgb},0.3) 0%, transparent 70%)`, pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', bottom: -60, right: -40, width: 180, height: 180, borderRadius: '50%', background: `radial-gradient(circle, rgba(${rgb},0.12) 0%, transparent 70%)`, pointerEvents: 'none' }} />
+
+        <div style={{ ...inner, textAlign: 'center', position: 'relative' }}>
+          {/* Salon avatar */}
+          <div style={{
+            width: 80, height: 80, borderRadius: 26, margin: '0 auto 20px',
+            background: `linear-gradient(135deg, rgba(${rgb},0.6), rgba(${rgb},0.2))`,
+            border: `2px solid rgba(${rgb},0.4)`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: `0 0 40px rgba(${rgb},0.25)`,
+          }}>
+            <Scissors size={36} style={{ color: light }} />
           </div>
-          <p style={{ fontSize: 11, color: `rgba(${rgb},1)`, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', margin: '0 0 4px' }}>{salonName}</p>
-          <h1 style={{ fontSize: 24, fontWeight: 800, margin: '0 0 6px' }}>{appConfig.welcomeMessage}</h1>
-          {appConfig.aboutText && <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)', margin: 0, lineHeight: 1.6 }}>{appConfig.aboutText}</p>}
+
+          {salonName && (
+            <p style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: accent, margin: '0 0 10px' }}>
+              {salonName}
+            </p>
+          )}
+
+          <h1 style={{ fontSize: 30, fontWeight: 900, margin: '0 0 12px', lineHeight: 1.2, letterSpacing: '-0.02em' }}>
+            {appConfig.welcomeMessage}
+          </h1>
+
+          {appConfig.aboutText && (
+            <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.55)', margin: 0, lineHeight: 1.7, maxWidth: 340, marginInline: 'auto' }}>
+              {appConfig.aboutText}
+            </p>
+          )}
+
+          {client && (
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginTop: 18, padding: '8px 18px', borderRadius: 40, background: `rgba(${rgb},0.15)`, border: `1px solid rgba(${rgb},0.3)` }}>
+              <span style={{ fontSize: 13, color: accent, fontWeight: 600 }}>✨ Ciao, {client.clientName}!</span>
+            </div>
+          )}
         </div>
       </div>
 
-      <div style={{ maxWidth: 520, margin: '0 auto', padding: '24px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-
-        {/* Client greeting */}
-        {client && (
-          <div style={{ ...cardStyle, borderColor: `rgba(${rgb},0.3)`, background: `rgba(${rgb},0.08)` }}>
-            <p style={{ margin: 0, fontSize: 14, color: 'rgba(255,255,255,0.7)' }}>
-              Ciao <strong style={{ color: 'white' }}>{client.clientName}</strong>! Sei pronta per prenotare? 💇‍♀️
-            </p>
-          </div>
-        )}
-
-        <button onClick={() => setStep('services')} style={btnPrimary}>
-          📅 Prenota un appuntamento
+      {/* Actions */}
+      <div style={{ ...inner, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <button onClick={() => setStep('services')} style={btnMain}>
+          <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+            <Calendar size={18} /> Prenota un appuntamento
+          </span>
         </button>
 
-        {/* Install banner button */}
         {!isStandalone && (
           <button
             onClick={() => {
-              if (deferredPrompt) {
-                (deferredPrompt as unknown as { prompt: () => void }).prompt();
-                setDeferredPrompt(null);
-              } else {
-                setShowInstallBanner(true);
-              }
+              if (deferredPrompt) { (deferredPrompt as unknown as { prompt: () => void }).prompt(); setDeferredPrompt(null); }
+              else setShowInstallSheet(true);
             }}
-            style={btnSecondary}
+            style={{
+              width: '100%', padding: '13px', borderRadius: 16, cursor: 'pointer',
+              background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+              color: 'rgba(255,255,255,0.6)', fontSize: 14, fontWeight: 500,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            }}
           >
-            <Download size={15} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 6 }} />
-            Aggiungi alla schermata Home
+            <Download size={15} /> Aggiungi alla schermata Home
           </button>
         )}
 
-        {appConfig.cancellationPolicy && (
-          <div style={{ ...cardStyle, padding: '14px 16px' }}>
-            <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', margin: '0 0 4px', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Disdetta</p>
-            <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', margin: 0, lineHeight: 1.5 }}>{appConfig.cancellationPolicy}</p>
+        {/* Info cards */}
+        {(appConfig.contactAddress || appConfig.cancellationPolicy) && (
+          <div style={{ display: 'grid', gridTemplateColumns: appConfig.contactAddress && appConfig.cancellationPolicy ? '1fr 1fr' : '1fr', gap: 10, marginTop: 4 }}>
+            {appConfig.contactAddress && (
+              <div style={{ ...glass, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <MapPin size={14} style={{ color: accent }} />
+                <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', margin: 0, lineHeight: 1.4 }}>{appConfig.contactAddress}</p>
+              </div>
+            )}
+            {appConfig.cancellationPolicy && (
+              <div style={{ ...glass, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)' }}>Disdetta</span>
+                <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', margin: 0, lineHeight: 1.4 }}>{appConfig.cancellationPolicy}</p>
+              </div>
+            )}
           </div>
         )}
       </div>
 
-      {showInstallBanner && (
-        <IosBanner color={accent} onClose={() => {
-          setShowInstallBanner(false);
-          localStorage.setItem('stilistgo_install_dismissed', '1');
-        }} />
+      {showInstallSheet && <InstallSheet accent={accent} onClose={() => setShowInstallSheet(false)} />}
+    </div>
+  );
+
+  // ── SERVICES ───────────────────────────────────────────────────────────
+  if (step === 'services') return (
+    <div style={page}>
+      <div style={{ ...inner }}>
+        <ProgressBar step={step} accent={accent} />
+        <button style={backBtn} onClick={() => setStep('home')}><ArrowLeft size={15} /> Indietro</button>
+        <h2 style={{ fontSize: 22, fontWeight: 800, margin: '0 0 4px' }}>Scegli i servizi</h2>
+        <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', margin: '0 0 24px' }}>Puoi selezionare anche più servizi</p>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20, paddingBottom: selectedServices.length > 0 ? 120 : 0 }}>
+          {categories.size === 0 && <p style={{ color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: '60px 0' }}>Nessun servizio configurato</p>}
+          {[...categories.entries()].map(([cat, items]) => (
+            <div key={cat}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                <div style={{ height: 1, flex: 1, background: 'rgba(255,255,255,0.06)' }} />
+                <span style={{ fontSize: 11, fontWeight: 700, color: accent, textTransform: 'uppercase', letterSpacing: '0.1em' }}>{cat}</span>
+                <div style={{ height: 1, flex: 1, background: 'rgba(255,255,255,0.06)' }} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {items.map(s => {
+                  const sel = selectedServices.includes(s.id);
+                  return (
+                    <button key={s.id}
+                      onClick={() => setSelectedServices(p => sel ? p.filter(x => x !== s.id) : [...p, s.id])}
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        cursor: 'pointer', textAlign: 'left', width: '100%',
+                        borderRadius: 16, padding: '14px 16px',
+                        backdropFilter: 'blur(12px)', transition: 'all 0.15s',
+                        border: `1px solid ${sel ? `rgba(${rgb},0.5)` : 'rgba(255,255,255,0.07)'}`,
+                        background: sel ? `rgba(${rgb},0.12)` : 'rgba(255,255,255,0.03)',
+                        boxShadow: sel ? `inset 3px 0 0 ${accent}` : 'none',
+                      }}
+                    >
+                      <div>
+                        <p style={{ margin: 0, fontSize: 15, fontWeight: sel ? 600 : 400, color: sel ? 'white' : 'rgba(255,255,255,0.85)' }}>{s.name}</p>
+                        <div style={{ display: 'flex', gap: 10, marginTop: 5 }}>
+                          <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.38)', display: 'flex', alignItems: 'center', gap: 3 }}>
+                            <Clock size={10} /> {s.duration} min
+                          </span>
+                          {appConfig.showPrices && s.price > 0 && (
+                            <span style={{ fontSize: 12, color: sel ? accent : 'rgba(255,255,255,0.38)', fontWeight: sel ? 600 : 400 }}>€{s.price}</span>
+                          )}
+                        </div>
+                      </div>
+                      <div style={{
+                        width: 24, height: 24, borderRadius: '50%', flexShrink: 0,
+                        background: sel ? accent : 'rgba(255,255,255,0.08)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        border: `2px solid ${sel ? accent : 'rgba(255,255,255,0.15)'}`,
+                        transition: 'all 0.15s',
+                      }}>
+                        {sel && <CheckCircle2 size={14} style={{ color: 'white' }} />}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {selectedServices.length > 0 && (
+        <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, padding: '0 0 env(safe-area-inset-bottom)', background: 'rgba(13,13,20,0.96)', backdropFilter: 'blur(20px)', borderTop: `1px solid rgba(${rgb},0.2)` }}>
+          <div style={{ ...inner, padding: '14px 20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', maxWidth: '60%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedObjs.map(s => s.name).join(' + ')}</span>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>{totalDuration} min</span>
+                {appConfig.showPrices && totalPrice > 0 && <span style={{ fontSize: 14, color: accent, fontWeight: 700 }}>€{totalPrice}</span>}
+              </div>
+            </div>
+            <button onClick={() => setStep(operators.length > 1 ? 'operator' : 'datetime')} style={btnMain}>
+              Continua →
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
 
-  // ── STEP: SERVICES ─────────────────────────────────────────────────────
-  if (step === 'services') return (
-    <div style={pageStyle}>
-      <div style={{ maxWidth: 520, margin: '0 auto', padding: '20px 20px 0' }}>
-        <button onClick={() => setStep('home')} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, padding: '0 0 16px' }}>
-          <ArrowLeft size={16} /> Indietro
-        </button>
-        <h2 style={{ fontSize: 20, fontWeight: 700, margin: '0 0 4px' }}>Scegli i servizi</h2>
-        <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', margin: '0 0 20px' }}>Puoi selezionare anche più servizi</p>
-      </div>
-
-      <div style={{ maxWidth: 520, margin: '0 auto', padding: '0 20px', display: 'flex', flexDirection: 'column', gap: 20 }}>
-        {categories.size === 0 && (
-          <p style={{ color: 'rgba(255,255,255,0.4)', textAlign: 'center', padding: 40 }}>Nessun servizio disponibile</p>
-        )}
-        {[...categories.entries()].map(([cat, items]) => (
-          <div key={cat}>
-            <p style={{ fontSize: 11, fontWeight: 700, color: `rgba(${rgb},1)`, textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 10px' }}>{cat}</p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {items.map(s => {
-                const sel = selectedServices.includes(s.id);
-                return (
-                  <button
-                    key={s.id}
-                    onClick={() => setSelectedServices(prev => sel ? prev.filter(x => x !== s.id) : [...prev, s.id])}
-                    style={{
-                      ...cardStyle,
-                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                      cursor: 'pointer', textAlign: 'left',
-                      border: `1px solid ${sel ? `rgba(${rgb},0.6)` : 'rgba(255,255,255,0.1)'}`,
-                      background: sel ? `rgba(${rgb},0.15)` : 'rgba(255,255,255,0.05)',
-                      transition: 'all 0.15s',
-                    }}
-                  >
-                    <div>
-                      <p style={{ margin: 0, fontSize: 15, fontWeight: sel ? 600 : 400 }}>{s.name}</p>
-                      <div style={{ display: 'flex', gap: 12, marginTop: 4 }}>
-                        <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <Clock size={11} /> {s.duration} min
-                        </span>
-                        {appConfig.showPrices && s.price > 0 && (
-                          <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>€{s.price}</span>
-                        )}
-                      </div>
-                    </div>
-                    {sel && <CheckCircle2 size={20} style={{ color: accent, flexShrink: 0 }} />}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-
-        {selectedServices.length > 0 && (
-          <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, padding: '16px 20px 32px', background: '#0f0f13', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-            <div style={{ maxWidth: 520, margin: '0 auto' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
-                <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)' }}>{selectedServices.length} servizi · {totalDuration} min</span>
-                {appConfig.showPrices && totalPrice > 0 && <span style={{ fontSize: 13, color: accent, fontWeight: 600 }}>€{totalPrice}</span>}
-              </div>
-              <button onClick={() => setStep(operators.length > 1 ? 'operator' : 'datetime')} style={btnPrimary}>
-                Continua →
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-
-  // ── STEP: OPERATOR ─────────────────────────────────────────────────────
+  // ── OPERATOR ───────────────────────────────────────────────────────────
   if (step === 'operator') return (
-    <div style={pageStyle}>
-      <div style={{ maxWidth: 520, margin: '0 auto', padding: '20px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <button onClick={() => setStep('services')} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, padding: 0 }}>
-          <ArrowLeft size={16} /> Indietro
-        </button>
-        <div>
-          <h2 style={{ fontSize: 20, fontWeight: 700, margin: '0 0 4px' }}>Scegli operatrice</h2>
-          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', margin: 0 }}>Con chi preferisci?</p>
+    <div style={page}>
+      <div style={{ ...inner }}>
+        <ProgressBar step={step} accent={accent} />
+        <button style={backBtn} onClick={() => setStep('services')}><ArrowLeft size={15} /> Indietro</button>
+        <h2 style={{ fontSize: 22, fontWeight: 800, margin: '0 0 4px' }}>Con chi preferisci?</h2>
+        <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', margin: '0 0 24px' }}>Scegli la tua operatrice</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {operators.map(op => {
+            const sel = selectedOperator === op.id;
+            return (
+              <button key={op.id} onClick={() => { setSelectedOperator(op.id); setStep('datetime'); }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 16,
+                  cursor: 'pointer', textAlign: 'left', width: '100%',
+                  backdropFilter: 'blur(12px)', borderRadius: 20, padding: '16px 18px',
+                  transition: 'all 0.15s',
+                  border: `1px solid ${sel ? `rgba(${rgb},0.5)` : 'rgba(255,255,255,0.07)'}`,
+                  background: sel ? `rgba(${rgb},0.12)` : 'rgba(255,255,255,0.03)',
+                }}
+              >
+                <div style={{
+                  width: 48, height: 48, borderRadius: 16, flexShrink: 0,
+                  background: op.color || accent,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 20, fontWeight: 800, color: 'white',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                }}>
+                  {op.name.charAt(0).toUpperCase()}
+                </div>
+                <span style={{ fontSize: 17, fontWeight: 600, flex: 1 }}>{op.name}</span>
+                {sel && <CheckCircle2 size={22} style={{ color: accent }} />}
+              </button>
+            );
+          })}
         </div>
-        {operators.map(op => (
-          <button
-            key={op.id}
-            onClick={() => { setSelectedOperator(op.id); setStep('datetime'); }}
-            style={{
-              ...cardStyle,
-              display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer', textAlign: 'left',
-              border: `1px solid ${selectedOperator === op.id ? `rgba(${rgb},0.6)` : 'rgba(255,255,255,0.1)'}`,
-              background: selectedOperator === op.id ? `rgba(${rgb},0.15)` : 'rgba(255,255,255,0.05)',
-            }}
-          >
-            <div style={{ width: 40, height: 40, borderRadius: '50%', background: op.color || accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 16, color: 'white', flexShrink: 0 }}>
-              {op.name.charAt(0).toUpperCase()}
-            </div>
-            <span style={{ fontSize: 16, fontWeight: 500 }}>{op.name}</span>
-            {selectedOperator === op.id && <CheckCircle2 size={20} style={{ color: accent, marginLeft: 'auto' }} />}
-          </button>
-        ))}
       </div>
     </div>
   );
 
-  // ── STEP: DATE & TIME ──────────────────────────────────────────────────
+  // ── DATE & TIME ────────────────────────────────────────────────────────
   if (step === 'datetime') return (
-    <div style={pageStyle}>
-      <div style={{ maxWidth: 520, margin: '0 auto', padding: '20px 20px', display: 'flex', flexDirection: 'column', gap: 20 }}>
-        <button onClick={() => setStep(operators.length > 1 ? 'operator' : 'services')} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, padding: 0 }}>
-          <ArrowLeft size={16} /> Indietro
-        </button>
-        <div>
-          <h2 style={{ fontSize: 20, fontWeight: 700, margin: '0 0 4px' }}>Scegli data e ora</h2>
-        </div>
+    <div style={page}>
+      <div style={{ ...inner }}>
+        <ProgressBar step={step} accent={accent} />
+        <button style={backBtn} onClick={() => setStep(operators.length > 1 ? 'operator' : 'services')}><ArrowLeft size={15} /> Indietro</button>
+        <h2 style={{ fontSize: 22, fontWeight: 800, margin: '0 0 4px' }}>Quando vieni?</h2>
+        <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', margin: '0 0 24px' }}>Scegli data e ora</p>
 
-        <div style={cardStyle}>
-          <label style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', fontWeight: 600, display: 'block', marginBottom: 8 }}>DATA</label>
-          <input
-            type="date"
-            min={minDate}
-            max={maxDate}
-            value={selectedDate}
+        <div style={{ ...glass, marginBottom: 16 }}>
+          <label style={{ fontSize: 11, fontWeight: 700, color: accent, letterSpacing: '0.1em', textTransform: 'uppercase', display: 'block', marginBottom: 10 }}>Data</label>
+          <input type="date" min={minDate} max={maxDate} value={selectedDate}
             onChange={e => setSelectedDate(e.target.value)}
-            style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 10, padding: '10px 14px', color: 'white', fontSize: 15, width: '100%', outline: 'none', boxSizing: 'border-box' }}
-          />
+            style={inputStyle} />
         </div>
 
         {selectedDate && (
-          <div style={cardStyle}>
-            <label style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', fontWeight: 600, display: 'block', marginBottom: 10 }}>ORA</label>
+          <div style={{ ...glass }}>
+            <label style={{ fontSize: 11, fontWeight: 700, color: accent, letterSpacing: '0.1em', textTransform: 'uppercase', display: 'block', marginBottom: 14 }}>Orario</label>
             {loadingSlots ? (
-              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>Caricamento orari…</p>
+              <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 13 }}>Caricamento orari…</p>
             ) : availableSlots.length === 0 ? (
-              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>Nessun orario disponibile per questa data.</p>
+              <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 13 }}>Nessun orario disponibile — prova un&apos;altra data.</p>
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
-                {availableSlots.map(slot => (
-                  <button
-                    key={slot}
-                    onClick={() => setSelectedTime(slot)}
-                    style={{
-                      padding: '10px 4px', borderRadius: 10, fontSize: 14, fontWeight: 500, cursor: 'pointer', border: 'none',
-                      background: selectedTime === slot ? accent : 'rgba(255,255,255,0.08)',
-                      color: selectedTime === slot ? 'white' : 'rgba(255,255,255,0.7)',
+                {availableSlots.map(slot => {
+                  const sel = selectedTime === slot;
+                  return (
+                    <button key={slot} onClick={() => setSelectedTime(slot)} style={{
+                      padding: '11px 4px', borderRadius: 12, fontSize: 14, fontWeight: sel ? 700 : 400,
+                      cursor: 'pointer', border: `1px solid ${sel ? accent : 'rgba(255,255,255,0.1)'}`,
+                      background: sel ? accent : 'rgba(255,255,255,0.04)',
+                      color: sel ? 'white' : 'rgba(255,255,255,0.65)',
+                      boxShadow: sel ? `0 4px 16px rgba(${rgb},0.4)` : 'none',
                       transition: 'all 0.15s',
-                    }}
-                  >
-                    {slot}
-                  </button>
-                ))}
+                    }}>
+                      {slot}
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>
         )}
 
         {selectedDate && selectedTime && (
-          <button onClick={() => setStep('confirm')} style={btnPrimary}>
+          <button onClick={() => setStep('confirm')} style={{ ...btnMain, marginTop: 20 }}>
             Continua →
           </button>
         )}
@@ -556,90 +541,101 @@ export default function PrenotaPWAPage({ params }: { params: Promise<{ salonId: 
     </div>
   );
 
-  // ── STEP: CONFIRM ──────────────────────────────────────────────────────
+  // ── CONFIRM ────────────────────────────────────────────────────────────
   if (step === 'confirm') return (
-    <div style={pageStyle}>
-      <div style={{ maxWidth: 520, margin: '0 auto', padding: '20px 20px', display: 'flex', flexDirection: 'column', gap: 20 }}>
-        <button onClick={() => setStep('datetime')} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, padding: 0 }}>
-          <ArrowLeft size={16} /> Indietro
-        </button>
-        <div>
-          <h2 style={{ fontSize: 20, fontWeight: 700, margin: '0 0 4px' }}>Conferma prenotazione</h2>
-        </div>
+    <div style={page}>
+      <div style={{ ...inner }}>
+        <ProgressBar step={step} accent={accent} />
+        <button style={backBtn} onClick={() => setStep('datetime')}><ArrowLeft size={15} /> Indietro</button>
+        <h2 style={{ fontSize: 22, fontWeight: 800, margin: '0 0 4px' }}>Conferma</h2>
+        <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', margin: '0 0 24px' }}>Controlla tutto prima di confermare</p>
 
-        {/* Summary */}
-        <div style={cardStyle}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {/* Gradient summary card */}
+        <div style={{
+          borderRadius: 20, padding: 20, marginBottom: 16,
+          background: `linear-gradient(135deg, rgba(${rgb},0.22) 0%, rgba(${rgb},0.06) 100%)`,
+          border: `1px solid rgba(${rgb},0.3)`,
+        }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             {[
-              { icon: <Scissors size={14} />, label: selectedServiceObjects.map(s => s.name).join(', ') },
-              { icon: <User size={14} />, label: operators.find(o => o.id === selectedOperator)?.name ?? 'Qualsiasi' },
-              { icon: <Calendar size={14} />, label: `${selectedDate} alle ${selectedTime}` },
-              { icon: <Clock size={14} />, label: `${totalDuration} min${appConfig.showPrices && totalPrice > 0 ? ` · €${totalPrice}` : ''}` },
+              { icon: <Scissors size={15} />, text: selectedObjs.map(s => s.name).join(', ') },
+              { icon: <User size={15} />, text: operators.find(o => o.id === selectedOperator)?.name ?? 'Qualsiasi' },
+              { icon: <Calendar size={15} />, text: new Date(selectedDate + 'T12:00:00').toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' }) + ' alle ' + selectedTime },
+              { icon: <Clock size={15} />, text: `${totalDuration} min${appConfig.showPrices && totalPrice > 0 ? ` · €${totalPrice}` : ''}` },
             ].map((row, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ color: accent }}>{row.icon}</div>
-                <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.8)' }}>{row.label}</span>
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 32, height: 32, borderRadius: 10, background: `rgba(${rgb},0.2)`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <span style={{ color: accent }}>{row.icon}</span>
+                </div>
+                <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.85)', lineHeight: 1.4 }}>{row.text}</span>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Client info — pre-filled if known, editable if not */}
         {!client ? (
-          <div style={cardStyle}>
-            <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', margin: '0 0 14px', fontWeight: 600 }}>I TUOI DATI</p>
+          <div style={{ ...glass, marginBottom: 16 }}>
+            <p style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.3)', margin: '0 0 16px', letterSpacing: '0.1em', textTransform: 'uppercase' }}>I tuoi dati</p>
             {[
-              { label: 'Nome *', value: manualName, key: 'name', type: 'text', setter: setManualName },
-              { label: 'Telefono *', value: manualPhone, key: 'phone', type: 'tel', setter: setManualPhone },
-              { label: 'Email', value: manualEmail, key: 'email', type: 'email', setter: setManualEmail },
+              { label: 'Nome *', value: manualName, type: 'text', set: setManualName },
+              { label: 'Telefono *', value: manualPhone, type: 'tel', set: setManualPhone },
+              { label: 'Email', value: manualEmail, type: 'email', set: setManualEmail },
             ].map(f => (
-              <div key={f.key} style={{ marginBottom: 12 }}>
-                <label style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', display: 'block', marginBottom: 4 }}>{f.label}</label>
-                <input
-                  type={f.type}
-                  value={f.value}
-                  onChange={e => f.setter(e.target.value)}
-                  style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 10, padding: '10px 14px', color: 'white', fontSize: 14, width: '100%', outline: 'none', boxSizing: 'border-box' }}
-                />
+              <div key={f.label} style={{ marginBottom: 12 }}>
+                <label style={{ fontSize: 12, color: 'rgba(255,255,255,0.38)', display: 'block', marginBottom: 6 }}>{f.label}</label>
+                <input type={f.type} value={f.value} onChange={e => f.set(e.target.value)} style={inputStyle} />
               </div>
             ))}
           </div>
         ) : (
-          <div style={{ ...cardStyle, background: `rgba(${rgb},0.08)`, borderColor: `rgba(${rgb},0.3)` }}>
-            <p style={{ fontSize: 13, color: accent, margin: '0 0 4px', fontWeight: 600 }}>Prenotazione per</p>
-            <p style={{ fontSize: 15, fontWeight: 700, margin: '0 0 2px' }}>{client.clientName}</p>
-            <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', margin: 0 }}>{client.clientPhone}</p>
+          <div style={{ ...glass, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div style={{ width: 44, height: 44, borderRadius: 14, background: `rgba(${rgb},0.25)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 800, color: accent, flexShrink: 0 }}>
+              {client.clientName.charAt(0).toUpperCase()}
+            </div>
+            <div>
+              <p style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>{client.clientName}</p>
+              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', margin: 0 }}>{client.clientPhone}</p>
+            </div>
           </div>
         )}
 
-        <button
-          onClick={submitBooking}
+        <button onClick={submitBooking}
           disabled={submitting || !effectiveName || !effectivePhone}
-          style={{ ...btnPrimary, opacity: submitting || !effectiveName || !effectivePhone ? 0.5 : 1, cursor: submitting || !effectiveName || !effectivePhone ? 'not-allowed' : 'pointer' }}
-        >
-          {submitting ? 'Invio in corso…' : '✅ Conferma prenotazione'}
+          style={{ ...btnMain, opacity: submitting || !effectiveName || !effectivePhone ? 0.4 : 1 }}>
+          {submitting ? 'Invio…' : '✅  Conferma prenotazione'}
         </button>
       </div>
     </div>
   );
 
-  // ── STEP: SUCCESS ──────────────────────────────────────────────────────
+  // ── SUCCESS ────────────────────────────────────────────────────────────
   if (step === 'success') return (
-    <div style={{ ...pageStyle, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
-      <div style={{ maxWidth: 400, padding: 32, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
-        <div style={{ width: 72, height: 72, borderRadius: '50%', background: `rgba(${rgb},0.2)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <CheckCircle2 size={36} style={{ color: accent }} />
+    <div style={{ ...page, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
+      <div style={{ ...inner, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, textAlign: 'center' }}>
+        <div style={{ position: 'relative', width: 100, height: 100, marginBottom: 8 }}>
+          <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: `radial-gradient(circle, rgba(${rgb},0.4) 0%, transparent 70%)` }} />
+          <div style={{ width: 100, height: 100, borderRadius: '50%', background: `rgba(${rgb},0.15)`, border: `2px solid rgba(${rgb},0.4)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Sparkles size={42} style={{ color: accent }} />
+          </div>
         </div>
-        <h2 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>Richiesta inviata!</h2>
-        <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.6)', margin: 0, lineHeight: 1.6 }}>
-          {appConfig.bookingConfirmationMessage}
-        </p>
-        <div style={{ ...cardStyle, width: '100%', textAlign: 'left' }}>
-          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', margin: '0 0 8px' }}>Riepilogo</p>
-          <p style={{ fontSize: 15, fontWeight: 600, margin: '0 0 4px' }}>{selectedServiceObjects.map(s => s.name).join(', ')}</p>
-          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', margin: 0 }}>{selectedDate} alle {selectedTime}</p>
+
+        <div>
+          <h2 style={{ fontSize: 28, fontWeight: 900, margin: '0 0 8px', letterSpacing: '-0.02em' }}>Richiesta inviata!</h2>
+          <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.55)', margin: 0, lineHeight: 1.7, maxWidth: 300, marginInline: 'auto' }}>
+            {appConfig.bookingConfirmationMessage}
+          </p>
         </div>
-        <button onClick={() => { setStep('home'); setSelectedServices([]); setSelectedDate(''); setSelectedTime(''); }} style={btnSecondary}>
+
+        <div style={{ ...glass, width: '100%', textAlign: 'left', borderColor: `rgba(${rgb},0.2)`, background: `rgba(${rgb},0.06)` }}>
+          <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', margin: '0 0 10px' }}>Riepilogo</p>
+          <p style={{ fontSize: 16, fontWeight: 700, margin: '0 0 4px' }}>{selectedObjs.map(s => s.name).join(', ')}</p>
+          <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', margin: 0 }}>
+            {new Date(selectedDate + 'T12:00:00').toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })} · {selectedTime}
+          </p>
+        </div>
+
+        <button onClick={() => { setStep('home'); setSelectedServices([]); setSelectedDate(''); setSelectedTime(''); }}
+          style={{ width: '100%', padding: '14px', borderRadius: 16, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.65)', fontSize: 15, cursor: 'pointer' }}>
           Torna all&apos;inizio
         </button>
       </div>
