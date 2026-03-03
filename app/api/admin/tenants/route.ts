@@ -118,14 +118,15 @@ export async function PATCH(req: NextRequest) {
   const db = getAdminDb();
 
   // Whitelist only columns that exist in admin_tenants — prevents any unknown field from causing a DB error
-  const ALLOWED: (keyof typeof patch)[] = [
+  const ALLOWED: string[] = [
     'email', 'full_name', 'salon_name', 'plan', 'monthly_price',
     'trial_ends_at', 'status', 'region', 'sector', 'notes', 'csm',
     'registered_at', 'last_seen_at', 'is_admin',
   ];
+  const patchObj = patch as Record<string, unknown>;
   const safe: Record<string, unknown> = {};
   for (const key of ALLOWED) {
-    if (key in patch) safe[key] = patch[key];
+    if (key in patchObj) safe[key] = patchObj[key];
   }
 
   const { error } = await db.from('admin_tenants')
