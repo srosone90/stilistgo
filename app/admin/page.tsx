@@ -184,6 +184,8 @@ export default function AdminPage() {
   const [testPhone, setTestPhone] = useState('');
   const [testSending, setTestSending] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null);
+  // Sales section
+  const [copiedPlan, setCopiedPlan] = useState<string | null>(null);
 
   function getToken() { return sessionStorage.getItem('stylistgo_admin_token') ?? ''; }
 
@@ -1341,8 +1343,6 @@ export default function AdminPage() {
 
   // â”€â”€â”€ SALES / PRESENTAZIONE COMMERCIALE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const SalesSection = () => {
-    const [copiedPlan, setCopiedPlan] = React.useState<string | null>(null);
-
     const copyLink = (planKey: string) => {
       const url = `${window.location.origin}/login`;
       navigator.clipboard.writeText(url).then(() => {
