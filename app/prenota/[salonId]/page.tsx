@@ -102,6 +102,7 @@ export default function PrenotaPWAPage({ params }: { params: Promise<{ salonId: 
   // ── PWA install
   const [showInstallBanner, setShowInstallBanner] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<Event | null>(null);
+  const [isStandalone, setIsStandalone] = useState(false);
 
   const accent = appConfig.accentColor || DEFAULT_COLOR;
   const rgb = hexToRgb(accent);
@@ -129,9 +130,10 @@ export default function PrenotaPWAPage({ params }: { params: Promise<{ salonId: 
     };
     window.addEventListener('beforeinstallprompt', handler);
     // Show install banner after 3 sec if not already installed
+    const standalone = window.matchMedia('(display-mode: standalone)').matches;
+    setIsStandalone(standalone);
     const stored = localStorage.getItem('stilistgo_install_dismissed');
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
-    if (!stored && !isStandalone) {
+    if (!stored && !standalone) {
       setTimeout(() => setShowInstallBanner(true), 3000);
     }
     return () => window.removeEventListener('beforeinstallprompt', handler);
@@ -357,7 +359,7 @@ export default function PrenotaPWAPage({ params }: { params: Promise<{ salonId: 
         </button>
 
         {/* Install banner button */}
-        {!window.matchMedia?.('(display-mode: standalone)').matches && (
+        {!isStandalone && (
           <button
             onClick={() => {
               if (deferredPrompt) {

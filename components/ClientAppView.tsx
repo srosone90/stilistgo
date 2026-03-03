@@ -6,7 +6,8 @@ import { ClientAppConfig } from '@/types/salon';
 import { getCurrentUser } from '@/lib/supabase';
 import {
   Smartphone, Copy, Check, Palette, Settings2, MessageSquare,
-  MapPin, Phone, Instagram, Facebook, Clock, Eye, Lock, Info, Link2, ExternalLink, UserPlus,
+  MapPin, Phone, Instagram, Facebook, Clock, Eye, Lock,
+  Link2, ExternalLink, UserPlus,
 } from 'lucide-react';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://stilistgo.netlify.app';
@@ -89,7 +90,6 @@ export default function ClientAppView() {
   const { clientAppConfig, updateClientAppConfig } = useSalon();
 
   const [salonId, setSalonId] = useState('');
-  const [idCopied, setIdCopied] = useState(false);
   const [baseLinkCopied, setBaseLinkCopied] = useState(false);
   const [clientPhone, setClientPhone] = useState('');
   const [clientNameInput, setClientNameInput] = useState('');
@@ -97,7 +97,6 @@ export default function ClientAppView() {
   const [generatingLink, setGeneratingLink] = useState(false);
   const [clientLinkCopied, setClientLinkCopied] = useState(false);
   useEffect(() => { getCurrentUser().then(u => { if (u) setSalonId(u.id); }); }, []);
-  function copySalonId() { navigator.clipboard.writeText(salonId); setIdCopied(true); setTimeout(() => setIdCopied(false), 2000); }
   const baseInstallUrl = salonId ? `${APP_URL}/prenota/${salonId}` : '';
   function copyBaseLink() { navigator.clipboard.writeText(baseInstallUrl); setBaseLinkCopied(true); setTimeout(() => setBaseLinkCopied(false), 2000); }
   async function generateClientLink() {
@@ -200,23 +199,6 @@ export default function ClientAppView() {
           Personalizza l&apos;app di prenotazione per le tue clienti.
         </p>
       </div>
-
-      {/* ── SALON ID ─────────────────────────────────────────────────────── */}
-      <Section title="Collegamento App" icon={<Info size={16} />}>
-        <p className="text-sm mb-3" style={{ color: 'var(--muted)' }}>
-          ID univoco del tuo salone — necessario per collegare l&apos;app.
-        </p>
-        <div style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 14px' }}
-          className="flex items-center gap-3">
-          <p className="text-xs font-mono flex-1 break-all" style={{ color: 'var(--accent-light)' }}>
-            {salonId || '—'}
-          </p>
-          <button onClick={copySalonId} title="Copia ID"
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: idCopied ? '#22c55e' : 'var(--muted)', flexShrink: 0 }}>
-            {idCopied ? <Check size={16} /> : <Copy size={16} />}
-          </button>
-        </div>
-      </Section>
 
       {/* ── INSTALL LINK ──────────────────────────────────────────────────── */}
       <Section title="Link Installazione App" icon={<Link2 size={16} />}>
