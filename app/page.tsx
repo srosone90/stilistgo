@@ -23,15 +23,16 @@ import FornitoriView from '@/components/FornitoriView';
 import AbbonamentiView from '@/components/AbbonamentiView';
 import GiftCardsView from '@/components/GiftCardsView';
 import ClientAppView from '@/components/ClientAppView';
+import GuideView from '@/components/GuideView';
 import OperatorLockScreen from '@/components/OperatorLockScreen';
 import { useApp } from '@/context/AppContext';
 import { useSalon } from '@/context/SalonContext';
 import { getCurrentUser, signOut } from '@/lib/supabase';
 import { DEFAULT_OPERATOR_PERMISSIONS, OperatorPermissions } from '@/types/salon';
 import { PLAN_FEATURES, PlanFeatures, VIEW_TO_FEATURE, UPGRADE_TEXT } from '@/lib/planGate';
-import { Plus, Loader2, CalendarDays, Users, Sparkles, UserCog, Package, Banknote, Trophy, Star, Globe, LogOut, Lock, MessageSquare, BarChart3, Building2, CreditCard, Gift, Smartphone } from 'lucide-react';
+import { Plus, Loader2, CalendarDays, Users, Sparkles, UserCog, Package, Banknote, Trophy, Star, Globe, LogOut, Lock, MessageSquare, BarChart3, Building2, CreditCard, Gift, Smartphone, BookOpen } from 'lucide-react';
 
-type View = 'dashboard' | 'tabella' | 'analisi' | 'impostazioni' | 'calendar' | 'clients' | 'services' | 'staff' | 'inventory' | 'cash' | 'gamification' | 'loyalty' | 'bookings' | 'automazioni' | 'report-operatori' | 'fornitori' | 'abbonamenti' | 'gift-cards' | 'client-app';
+type View = 'dashboard' | 'tabella' | 'analisi' | 'impostazioni' | 'calendar' | 'clients' | 'services' | 'staff' | 'inventory' | 'cash' | 'gamification' | 'loyalty' | 'bookings' | 'automazioni' | 'report-operatori' | 'fornitori' | 'abbonamenti' | 'gift-cards' | 'client-app' | 'guida';
 
 export default function Home() {
   const router = useRouter();
@@ -68,7 +69,7 @@ export default function Home() {
       gamification: true, loyalty: true, bookings: effectivePerms.accounting, automazioni: true,
       'report-operatori': effectivePerms.accounting, fornitori: effectivePerms.inventory,
       abbonamenti: effectivePerms.cash, 'gift-cards': effectivePerms.cash,
-      'client-app': effectivePerms.accounting,
+      'client-app': effectivePerms.accounting, guida: true,
     };
     if (!viewPermsMap[view]) {
       const fallback = (Object.keys(viewPermsMap) as View[]).find(v => viewPermsMap[v]);
@@ -131,7 +132,7 @@ export default function Home() {
   };
 
   // Views that have no meaningful FAB action — hide the button entirely
-  const NO_FAB_VIEWS = new Set<View>(['gamification', 'loyalty', 'bookings', 'automazioni', 'report-operatori', 'client-app']);
+  const NO_FAB_VIEWS = new Set<View>(['gamification', 'loyalty', 'bookings', 'automazioni', 'report-operatori', 'client-app', 'guida']);
 
   const FAB_CONFIG: Record<View, { label: string; icon: React.ReactNode; action: () => void }> = {
     dashboard:    { label: 'Nuova Voce',       icon: <Plus size={20} />,      action: () => setShowForm(true) },
@@ -153,6 +154,7 @@ export default function Home() {
     abbonamenti:           { label: 'Nuovo Abbonamento',   icon: <CreditCard size={20} />,   action: () => setFabTrigger(t => t + 1) },
     'gift-cards':          { label: 'Nuova Gift Card',     icon: <Gift size={20} />,         action: () => setFabTrigger(t => t + 1) },
     'client-app':          { label: 'App Cliente',          icon: <Smartphone size={20} />,   action: () => {} },
+    'guida':               { label: 'Guida',                icon: <BookOpen size={20} />,     action: () => {} },
   };
 
   const renderView = () => {
@@ -181,6 +183,7 @@ export default function Home() {
       case 'abbonamenti':      return effectivePerms.cash       ? <AbbonamentiView newTrigger={fabTrigger} /> : AccessDenied;
       case 'gift-cards':       return effectivePerms.cash       ? <GiftCardsView newTrigger={fabTrigger} /> : AccessDenied;
       case 'client-app':       return effectivePerms.accounting ? <ClientAppView /> : AccessDenied;
+      case 'guida':            return <GuideView />;
     }
   };
 
