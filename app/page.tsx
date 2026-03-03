@@ -25,6 +25,7 @@ import GiftCardsView from '@/components/GiftCardsView';
 import ClientAppView from '@/components/ClientAppView';
 import GuideView from '@/components/GuideView';
 import OperatorLockScreen from '@/components/OperatorLockScreen';
+import OnboardingWizard from '@/components/OnboardingWizard';
 import BottomNav from '@/components/BottomNav';
 import { useApp } from '@/context/AppContext';
 import { useSalon } from '@/context/SalonContext';
@@ -47,7 +48,8 @@ export default function Home() {
   const [planFeatures, setPlanFeatures] = useState<PlanFeatures>(PLAN_FEATURES.trial);
   const [currentPlan, setCurrentPlan] = useState('trial');
   const { loading } = useApp();
-  const { activeOperatorId, operators } = useSalon();
+  const { activeOperatorId, operators, services, setActiveOperatorId, salonLoading } = useSalon();
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   // Calcola permessi effettivi: admin/titolare = accesso totale, altri operatori = permissions
   const FULL_PERMISSIONS: OperatorPermissions = { calendar: true, clients: true, services: true, staff: true, inventory: true, cash: true, accounting: true };
@@ -79,14 +81,13 @@ export default function Home() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeOperatorId, showLockScreen]);
 
-  // Auth guard — mostra SEMPRE il lock screen al caricamento
+  // Auth guard — mostra onboarding se nuovo utente, altrimenti lock screen
   useEffect(() => {
     getCurrentUser().then(async (user) => {
       if (!user) {
         router.push('/login');
       } else {
         setAuthChecked(true);
-        setShowLockScreen(true);
         // Fetch plan for this user
         try {
           const res = await fetch(`/api/user/plan?userId=${user.id}`);
@@ -99,6 +100,17 @@ export default function Home() {
       }
     });
   }, [router]);
+
+  // Once auth + salon data are ready, decide: onboarding (new user) or lock screen (returning)
+  useEffect(() => {
+    if (!authChecked || salonLoading) return;
+    if (operators.length === 0 && services.length === 0) {
+      setShowOnboarding(true);
+    } else {
+      setShowLockScreen(true);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authChecked, salonLoading]);
 
   // Reset FAB trigger ogni volta che si cambia sezione
   useEffect(() => { setFabTrigger(0); }, [view]);
@@ -276,6 +288,17 @@ export default function Home() {
       {/* Operator Lock Screen */}
       {showLockScreen && (
         <OperatorLockScreen onUnlock={() => setShowLockScreen(false)} />
+      )}
+
+      {/* Onboarding Wizard — shown only on first access (no operators + no services) */}
+      {showOnboarding && (
+        <OnboardingWizard
+          onComplete={(opId) => {
+            if (opId) setActiveOperatorId(opId);
+            setShowOnboarding(false);
+            setView('calendar');
+          }}
+        />
       )}
     </div>
   );

@@ -65,9 +65,18 @@ export default function OperatorLockScreen({ onUnlock }: { onUnlock: () => void 
       {step === 'select' ? (
         <div className="w-full max-w-sm space-y-2.5">
           {activeOps.length === 0 ? (
-            <p className="text-center text-sm py-8" style={{ color: 'var(--muted)' }}>
-              Nessun operatore attivo. Accedi come titolare e crea gli operatori dalla sezione Personale.
-            </p>
+            <div className="flex flex-col items-center gap-4 py-8">
+              <p className="text-center text-sm" style={{ color: 'var(--muted)' }}>
+                Nessun operatore configurato.
+              </p>
+              <button
+                onClick={onUnlock}
+                className="w-full py-3.5 rounded-2xl font-semibold text-white text-sm transition-all hover:scale-[1.02] active:scale-[0.98]"
+                style={{ background: 'linear-gradient(135deg,#6366f1,#a855f7)', border: 'none', cursor: 'pointer' }}
+              >
+                Entra come titolare →
+              </button>
+            </div>
           ) : (
             activeOps.map(op => (
               <button

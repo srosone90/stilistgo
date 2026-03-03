@@ -68,7 +68,7 @@ interface SalonContextValue {
   deleteService: (id: string) => void;
 
   // Operators
-  addOperator: (o: Omit<Operator, 'id' | 'createdAt'>) => void;
+  addOperator: (o: Omit<Operator, 'id' | 'createdAt'>) => string;
   updateOperator: (o: Operator) => void;
   deleteOperator: (id: string) => void;
 
@@ -515,9 +515,10 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
 
   // ─── Operators ────────────────────────────────────────────────────────────
 
-  const addOperator = useCallback((o: Omit<Operator, 'id' | 'createdAt'>) => {
+  const addOperator = useCallback((o: Omit<Operator, 'id' | 'createdAt'>): string => {
     const full: Operator = { ...o, id: salonGenerateId(), createdAt: new Date().toISOString() };
     setOperators(prev => { const n = [...prev, full]; storageSaveOperators(n); return n; });
+    return full.id;
   }, []);
 
   const updateOperator = useCallback((o: Operator) => {
