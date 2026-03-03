@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
@@ -10,7 +10,7 @@ import {
   MessageSquare, Wifi, WifiOff, ArrowUpRight, Send, Star, Zap, Check,
 } from 'lucide-react';
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 type Section = 'overview' | 'tenants' | 'tickets' | 'broadcasts' | 'flags' | 'audit' | 'whatsapp' | 'sales';
 
@@ -53,10 +53,10 @@ interface AnalyticsData {
   onlineBookingsPending: number;
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—';
-const fmtDT = (d: string | null) => d ? new Date(d).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'â€”';
+const fmtDT = (d: string | null) => d ? new Date(d).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'â€”';
 
 const STATUS: Record<string, { bg: string; text: string; border: string; label: string }> = {
   trial:     { bg: 'rgba(245,158,11,0.15)', text: '#fbbf24', border: 'rgba(245,158,11,0.4)', label: 'Trial' },
@@ -89,7 +89,7 @@ const ACTION_LABELS: Record<string, string> = {
   tenant_deleted: 'Tenant eliminato',
 };
 
-// ─── Styled helpers ───────────────────────────────────────────────────────────
+// â”€â”€â”€ Styled helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const inp = (extra?: React.CSSProperties): React.CSSProperties => ({
   width: '100%', background: '#12121a', border: '1px solid #2e2e40', borderRadius: '10px',
@@ -122,7 +122,7 @@ function KpiCard({ label, value, sub, color }: { label: string; value: string | 
   );
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Main Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default function AdminPage() {
   const router = useRouter();
@@ -266,7 +266,7 @@ export default function AdminPage() {
 
   const logout = () => { sessionStorage.removeItem('stylistgo_admin_token'); router.replace('/admin/login'); };
 
-  // ─── Analytics + impersonation + WA test ────────────────────────────────
+  // â”€â”€â”€ Analytics + impersonation + WA test â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const loadAnalytics = useCallback(async (userId: string) => {
     setAnalyticsLoading(true);
     setAnalyticsData(null);
@@ -299,7 +299,7 @@ export default function AdminPage() {
         instanceId: waForm.ultraMsgInstanceId,
         token: waForm.ultraMsgToken,
         to: testPhone,
-        message: `✅ Messaggio di test da Stylistgo Admin — ${waModal.salon_name}`,
+        message: `âœ… Messaggio di test da Stylistgo Admin â€” ${waModal.salon_name}`,
       }),
     });
     const d = await res.json();
@@ -309,7 +309,7 @@ export default function AdminPage() {
 
   if (!authed) return null;
 
-  // ─── Tenant save ──────────────────────────────────────────────────────────
+  // â”€â”€â”€ Tenant save â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const saveTenant = async () => {
     if (!selTenant) return;
     setSavingTenant(true);
@@ -329,7 +329,7 @@ export default function AdminPage() {
     }
   };
 
-  // ─── Tenant delete ────────────────────────────────────────────────────────
+  // â”€â”€â”€ Tenant delete â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const deleteTenant = async () => {
     if (!selTenant) return;
     setDeletingTenant(true);
@@ -351,7 +351,7 @@ export default function AdminPage() {
     }
   };
 
-  // ─── Ticket save ─────────────────────────────────────────────────────────
+  // â”€â”€â”€ Ticket save â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const saveTicket = async () => {
     if (selTicket) {
       await af('/api/admin/tickets', { method: 'PATCH', body: JSON.stringify({ id: selTicket.id, ...ticketForm }) });
@@ -362,14 +362,14 @@ export default function AdminPage() {
     loadSection('tickets');
   };
 
-  // ─── Broadcast send ───────────────────────────────────────────────────────
+  // â”€â”€â”€ Broadcast send â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const sendBroadcast = async () => {
     await af('/api/admin/broadcasts', { method: 'POST', body: JSON.stringify(bcastForm) });
     setNewBcast(false); setBcastForm({ title: '', body: '', target: 'all' });
     loadSection('broadcasts');
   };
 
-  // ─── Flag toggle ──────────────────────────────────────────────────────────
+  // â”€â”€â”€ Flag toggle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const toggleFlag = async (flag: Flag) => {
     await af('/api/admin/flags', { method: 'PATCH', body: JSON.stringify({ id: flag.id, enabled: !flag.enabled }) });
     setFlags(prev => prev.map(f => f.id === flag.id ? { ...f, enabled: !f.enabled } : f));
@@ -381,7 +381,7 @@ export default function AdminPage() {
     loadSection('flags');
   };
 
-  // ─── Filtered lists ───────────────────────────────────────────────────────
+  // â”€â”€â”€ Filtered lists â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const filteredTenants = tenants.filter(t => {
     const q = tenantSearch.toLowerCase();
     const matchQ = !q || t.salon_name.toLowerCase().includes(q) || t.email.toLowerCase().includes(q) || t.full_name.toLowerCase().includes(q);
@@ -392,7 +392,7 @@ export default function AdminPage() {
 
   const filteredTickets = tickets.filter(t => !ticketStatusFilter || t.status === ticketStatusFilter);
 
-  // ─── SIDEBAR ─────────────────────────────────────────────────────────────
+  // â”€â”€â”€ SIDEBAR â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const navItems: { id: Section; icon: React.ReactNode; label: string; count?: number }[] = [
     { id: 'overview', icon: <LayoutDashboard size={18} />, label: 'Overview' },
     { id: 'tenants', icon: <Users size={18} />, label: 'Tenant', count: metrics?.total },
@@ -401,22 +401,22 @@ export default function AdminPage() {
     { id: 'flags', icon: <Flag size={18} />, label: 'Feature Flag' },
     { id: 'audit', icon: <ScrollText size={18} />, label: 'Audit Log' },
     { id: 'whatsapp', icon: <MessageSquare size={18} />, label: 'WhatsApp' },
-    { id: 'sales', icon: <Star size={18} />, label: 'Vendita 💰' },
+    { id: 'sales', icon: <Star size={18} />, label: 'Vendita ðŸ’°' },
   ];
 
-  // ─── OVERVIEW ────────────────────────────────────────────────────────────
+  // â”€â”€â”€ OVERVIEW â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const OverviewSection = () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       <h2 style={{ color: '#f4f4f5', fontWeight: 700, fontSize: '20px', margin: 0 }}>Panoramica SaaS</h2>
 
       {/* KPI Row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(160px,1fr))', gap: '12px' }}>
-        <KpiCard label="Tenant totali" value={metrics?.total ?? '—'} />
-        <KpiCard label="Attivi" value={metrics?.active ?? '—'} color="#4ade80" />
-        <KpiCard label="Trial" value={metrics?.trial ?? '—'} color="#fbbf24" />
-        <KpiCard label="MRR stimato" value={metrics ? `€${metrics.mrr.toLocaleString('it-IT', { minimumFractionDigits: 0 })}` : '—'} color="#818cf8" sub={metrics ? `ARR €${metrics.arr.toLocaleString('it-IT')}` : undefined} />
-        <KpiCard label="Ticket aperti" value={metrics?.openTickets ?? '—'} color={metrics?.urgentTickets ? '#f87171' : undefined} sub={metrics?.urgentTickets ? `${metrics.urgentTickets} urgenti` : undefined} />
-        <KpiCard label="A rischio churn" value={metrics?.atRisk ?? '—'} color={metrics?.atRisk ? '#f59e0b' : undefined} />
+        <KpiCard label="Tenant totali" value={metrics?.total ?? 'â€”'} />
+        <KpiCard label="Attivi" value={metrics?.active ?? 'â€”'} color="#4ade80" />
+        <KpiCard label="Trial" value={metrics?.trial ?? 'â€”'} color="#fbbf24" />
+        <KpiCard label="MRR stimato" value={metrics ? `â‚¬${metrics.mrr.toLocaleString('it-IT', { minimumFractionDigits: 0 })}` : 'â€”'} color="#818cf8" sub={metrics ? `ARR â‚¬${metrics.arr.toLocaleString('it-IT')}` : undefined} />
+        <KpiCard label="Ticket aperti" value={metrics?.openTickets ?? 'â€”'} color={metrics?.urgentTickets ? '#f87171' : undefined} sub={metrics?.urgentTickets ? `${metrics.urgentTickets} urgenti` : undefined} />
+        <KpiCard label="A rischio churn" value={metrics?.atRisk ?? 'â€”'} color={metrics?.atRisk ? '#f59e0b' : undefined} />
       </div>
 
       {/* Plans + recent registrations */}
@@ -496,7 +496,7 @@ export default function AdminPage() {
     </div>
   );
 
-  // ─── TENANT DETAIL MODAL ─────────────────────────────────────────────────
+  // â”€â”€â”€ TENANT DETAIL MODAL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const TenantModal = () => {
     if (!selTenant) return null;
     const t = selTenant;
@@ -520,7 +520,7 @@ export default function AdminPage() {
               <button onClick={() => { setSelTenant(null); setConfirmDeleteTenant(false); setDeleteDataToo(false); setSelTenantTab('info'); setAnalyticsData(null); }} style={{ background: 'none', border: 'none', color: '#71717a', cursor: 'pointer', padding: '4px' }}><X size={18} /></button>
               <button onClick={() => impersonateTenant(t)} disabled={impersonating}
                 style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '5px 10px', borderRadius: '8px', border: '1px solid rgba(99,102,241,0.35)', background: 'rgba(99,102,241,0.08)', color: '#818cf8', fontSize: '11px', cursor: impersonating ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' }}>
-                <ArrowUpRight size={11} /> {impersonating ? 'Apertura…' : 'Accedi come'}
+                <ArrowUpRight size={11} /> {impersonating ? 'Aperturaâ€¦' : 'Accedi come'}
               </button>
             </div>
           </div>
@@ -532,7 +532,7 @@ export default function AdminPage() {
                 setSelTenantTab(tab);
                 if (tab === 'analytics' && !analyticsData && !analyticsLoading) loadAnalytics(t.user_id);
               }} style={{ flex: 1, padding: '7px', borderRadius: '8px', border: 'none', background: selTenantTab === tab ? '#1c1c27' : 'transparent', color: selTenantTab === tab ? '#f4f4f5' : '#71717a', fontWeight: selTenantTab === tab ? 600 : 400, fontSize: '12px', cursor: 'pointer' }}>
-                {tab === 'info' ? '📋 Info' : '📊 Analytics'}
+                {tab === 'info' ? 'ðŸ“‹ Info' : 'ðŸ“Š Analytics'}
               </button>
             ))}
           </div>
@@ -575,7 +575,7 @@ export default function AdminPage() {
                   set('plan', p);
                   set('monthly_price', PLAN_PRICES[p] ?? 0);
                 }} style={sel()}>
-                  {['trial','starter','pro','business'].map(p => <option key={p} value={p}>{p.charAt(0).toUpperCase()+p.slice(1)} — €{PLAN_PRICES[p]}/mese</option>)}
+                  {['trial','starter','pro','business'].map(p => <option key={p} value={p}>{p.charAt(0).toUpperCase()+p.slice(1)} â€” â‚¬{PLAN_PRICES[p]}/mese</option>)}
                 </select>
               </div>
               <div>
@@ -585,7 +585,7 @@ export default function AdminPage() {
                 </select>
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: '11px', color: '#71717a', marginBottom: '4px' }}>Prezzo mensile (€)</label>
+                <label style={{ display: 'block', fontSize: '11px', color: '#71717a', marginBottom: '4px' }}>Prezzo mensile (â‚¬)</label>
                 <input type="number" min={0} value={((e.monthly_price ?? t.monthly_price) as number)}
                   onChange={ev => set('monthly_price', parseFloat(ev.target.value) || 0)} style={inp()} />
               </div>
@@ -630,7 +630,7 @@ export default function AdminPage() {
           {/* Save */}
           <button onClick={saveTenant} disabled={savingTenant}
             style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px', borderRadius: '12px', border: 'none', background: savingTenant ? '#2e2e40' : 'linear-gradient(135deg,#f59e0b,#ef4444)', color: 'white', fontWeight: 600, cursor: savingTenant ? 'not-allowed' : 'pointer' }}>
-            <Save size={15} /> {savingTenant ? 'Salvataggio…' : 'Salva modifiche'}
+            <Save size={15} /> {savingTenant ? 'Salvataggioâ€¦' : 'Salva modifiche'}
           </button>
 
           {/* Delete */}
@@ -641,13 +641,13 @@ export default function AdminPage() {
             </button>
           ) : (
             <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.4)', borderRadius: '12px', padding: '14px' }}>
-              <p style={{ color: '#f87171', fontWeight: 600, fontSize: '13px', margin: '0 0 6px' }}>⚠️ Conferma eliminazione</p>
+              <p style={{ color: '#f87171', fontWeight: 600, fontSize: '13px', margin: '0 0 6px' }}>âš ï¸ Conferma eliminazione</p>
               <p style={{ color: '#a1a1aa', fontSize: '12px', margin: '0 0 10px' }}>
                 Questa operazione elimina i metadati del tenant da admin_tenants.
               </p>
               <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', cursor: 'pointer' }}>
                 <input type="checkbox" checked={deleteDataToo} onChange={e => setDeleteDataToo(e.target.checked)} />
-                <span style={{ color: '#f87171', fontSize: '12px', fontWeight: 600 }}>Elimina anche i dati del salone (salon_data) — non reversibile</span>
+                <span style={{ color: '#f87171', fontSize: '12px', fontWeight: 600 }}>Elimina anche i dati del salone (salon_data) â€” non reversibile</span>
               </label>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button onClick={() => { setConfirmDeleteTenant(false); setDeleteDataToo(false); }}
@@ -656,7 +656,7 @@ export default function AdminPage() {
                 </button>
                 <button onClick={deleteTenant} disabled={deletingTenant}
                   style={{ flex: 1, padding: '8px', borderRadius: '8px', border: 'none', background: deletingTenant ? '#2e2e40' : '#ef4444', color: 'white', cursor: deletingTenant ? 'not-allowed' : 'pointer', fontSize: '12px', fontWeight: 600 }}>
-                  {deletingTenant ? 'Eliminazione…' : 'Elimina definitivamente'}
+                  {deletingTenant ? 'Eliminazioneâ€¦' : 'Elimina definitivamente'}
                 </button>
               </div>
             </div>
@@ -666,11 +666,11 @@ export default function AdminPage() {
           {/* Analytics tab */}
           {selTenantTab === 'analytics' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              {analyticsLoading && <p style={{ color: '#71717a', fontSize: '13px', textAlign: 'center', padding: '20px 0' }}>Caricamento analytics…</p>}
+              {analyticsLoading && <p style={{ color: '#71717a', fontSize: '13px', textAlign: 'center', padding: '20px 0' }}>Caricamento analyticsâ€¦</p>}
               {analyticsData && (() => {
                 const maxRev = Math.max(...analyticsData.monthlyRevenue.map(m => m.total), 1);
                 const totalMethod = analyticsData.paymentBreakdown.reduce((s, p) => s + p.total, 0);
-                const fmtEur = (n: number) => `€${n.toLocaleString('it-IT', { minimumFractionDigits: 0 })}`;
+                const fmtEur = (n: number) => `â‚¬${n.toLocaleString('it-IT', { minimumFractionDigits: 0 })}`;
                 return (<>
                   {/* KPI strip */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '8px' }}>
@@ -707,7 +707,7 @@ export default function AdminPage() {
                       {analyticsData.topServices.map((s, i) => (
                         <div key={s.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', borderBottom: i < analyticsData.topServices.length - 1 ? '1px solid #1e1e2a' : 'none' }}>
                           <div><span style={{ color: '#71717a', fontSize: '10px', marginRight: '6px' }}>#{i + 1}</span><span style={{ color: '#f4f4f5', fontSize: '12px' }}>{s.name}</span></div>
-                          <div><span style={{ color: '#4ade80', fontSize: '12px', fontWeight: 600 }}>{fmtEur(s.revenue)}</span><span style={{ color: '#71717a', fontSize: '10px', marginLeft: '6px' }}>{s.count}×</span></div>
+                          <div><span style={{ color: '#4ade80', fontSize: '12px', fontWeight: 600 }}>{fmtEur(s.revenue)}</span><span style={{ color: '#71717a', fontSize: '10px', marginLeft: '6px' }}>{s.count}Ã—</span></div>
                         </div>
                       ))}
                     </div>
@@ -746,7 +746,7 @@ export default function AdminPage() {
     );
   };
 
-  // ─── TENANTS ─────────────────────────────────────────────────────────────
+  // â”€â”€â”€ TENANTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const TenantsSection = () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
@@ -754,7 +754,7 @@ export default function AdminPage() {
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           <div style={{ position: 'relative' }}>
             <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#71717a' }} />
-            <input placeholder="Cerca…" value={tenantSearch} onChange={e => setTenantSearch(e.target.value)} style={{ ...inp(), paddingLeft: '30px', width: '180px' }} />
+            <input placeholder="Cercaâ€¦" value={tenantSearch} onChange={e => setTenantSearch(e.target.value)} style={{ ...inp(), paddingLeft: '30px', width: '180px' }} />
           </div>
           <select value={tenantPlanFilter} onChange={e => setTenantPlanFilter(e.target.value)} style={sel({ width: '120px' })}>
             <option value="">Tutti i piani</option>
@@ -784,7 +784,7 @@ export default function AdminPage() {
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                   onClick={() => { setSelTenant(t); setEditTenant({ ...t }); setConfirmDeleteTenant(false); setDeleteDataToo(false); setSelTenantTab('info'); setAnalyticsData(null); }}>
                   <td style={{ padding: '12px 14px', color: '#f4f4f5', fontWeight: 600 }}>{t.salon_name}</td>
-                  <td style={{ padding: '12px 14px', color: '#a1a1aa' }}>{t.full_name || '—'}</td>
+                  <td style={{ padding: '12px 14px', color: '#a1a1aa' }}>{t.full_name || 'â€”'}</td>
                   <td style={{ padding: '12px 14px' }}><Badge s={t.plan} map={PLAN} /></td>
                   <td style={{ padding: '12px 14px' }}><Badge s={t.status} map={STATUS} /></td>
                   <td style={{ padding: '12px 14px', color: '#a1a1aa', textAlign: 'center' }}>{t.clients_count}</td>
@@ -792,7 +792,7 @@ export default function AdminPage() {
                   <td style={{ padding: '12px 14px', textAlign: 'center' }}>
                     {(t.online_bookings_30d ?? 0) > 0
                       ? <span style={{ color: '#818cf8', fontWeight: 600 }}>{t.online_bookings_30d}</span>
-                      : <span style={{ color: '#3f3f5a' }}>—</span>}
+                      : <span style={{ color: '#3f3f5a' }}>â€”</span>}
                   </td>
                   <td style={{ padding: '12px 14px', color: '#71717a', whiteSpace: 'nowrap' }}>{fmtDate(t.registered_at)}</td>
                   <td style={{ padding: '12px 14px' }}>
@@ -813,7 +813,7 @@ export default function AdminPage() {
     </div>
   );
 
-  // ─── TICKETS ─────────────────────────────────────────────────────────────
+  // â”€â”€â”€ TICKETS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const TicketsSection = () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
@@ -834,7 +834,7 @@ export default function AdminPage() {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
           <thead>
             <tr style={{ borderBottom: '1px solid #2e2e40' }}>
-              {['Salone','Oggetto','Categoria','Priorità','Stato','Data','Azioni'].map(h => (
+              {['Salone','Oggetto','Categoria','PrioritÃ ','Stato','Data','Azioni'].map(h => (
                 <th key={h} style={{ padding: '12px 14px', textAlign: 'left', color: '#71717a', fontWeight: 500, fontSize: '11px' }}>{h}</th>
               ))}
             </tr>
@@ -842,7 +842,7 @@ export default function AdminPage() {
           <tbody>
             {filteredTickets.map(t => (
               <tr key={t.id} style={{ borderBottom: '1px solid #1e1e2a' }}>
-                <td style={{ padding: '12px 14px', color: '#f4f4f5', fontWeight: 600 }}>{t.tenant_name || '—'}</td>
+                <td style={{ padding: '12px 14px', color: '#f4f4f5', fontWeight: 600 }}>{t.tenant_name || 'â€”'}</td>
                 <td style={{ padding: '12px 14px', color: '#a1a1aa', maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.subject}</td>
                 <td style={{ padding: '12px 14px', color: '#71717a' }}>{t.category}</td>
                 <td style={{ padding: '12px 14px' }}><span style={{ color: PRIO[t.priority]?.text ?? '#71717a', fontWeight: 600 }}>{PRIO[t.priority]?.label ?? t.priority}</span></td>
@@ -885,7 +885,7 @@ export default function AdminPage() {
               <textarea rows={3} value={ticketForm.body ?? ''} onChange={ev => setTicketForm(p => ({ ...p, body: ev.target.value }))} style={{ ...inp(), resize: 'vertical' }} />
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-              {[['Categoria', 'category', ['bug','domanda','feature','altro']], ['Priorità', 'priority', ['bassa','normale','alta','urgente']], ['Stato', 'status', ['aperto','in_lavorazione','risolto','chiuso']]].map(([l, k, opts]) => (
+              {[['Categoria', 'category', ['bug','domanda','feature','altro']], ['PrioritÃ ', 'priority', ['bassa','normale','alta','urgente']], ['Stato', 'status', ['aperto','in_lavorazione','risolto','chiuso']]].map(([l, k, opts]) => (
                 <div key={k as string}>
                   <label style={{ display: 'block', fontSize: '11px', color: '#71717a', marginBottom: '4px' }}>{l as string}</label>
                   <select value={(ticketForm[k as keyof Ticket] ?? '') as string} onChange={ev => setTicketForm(p => ({ ...p, [k as string]: ev.target.value }))} style={sel()}>
@@ -913,7 +913,7 @@ export default function AdminPage() {
     </div>
   );
 
-  // ─── BROADCASTS ──────────────────────────────────────────────────────────
+  // â”€â”€â”€ BROADCASTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const BroadcastsSection = () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -955,11 +955,11 @@ export default function AdminPage() {
             </div>
             <div>
               <label style={{ display: 'block', fontSize: '11px', color: '#71717a', marginBottom: '4px' }}>Titolo</label>
-              <input value={bcastForm.title} onChange={e => setBcastForm(p => ({ ...p, title: e.target.value }))} style={inp()} placeholder="Es. Novità del prodotto" />
+              <input value={bcastForm.title} onChange={e => setBcastForm(p => ({ ...p, title: e.target.value }))} style={inp()} placeholder="Es. NovitÃ  del prodotto" />
             </div>
             <div>
               <label style={{ display: 'block', fontSize: '11px', color: '#71717a', marginBottom: '4px' }}>Messaggio</label>
-              <textarea rows={4} value={bcastForm.body} onChange={e => setBcastForm(p => ({ ...p, body: e.target.value }))} style={{ ...inp(), resize: 'vertical' }} placeholder="Testo del messaggio…" />
+              <textarea rows={4} value={bcastForm.body} onChange={e => setBcastForm(p => ({ ...p, body: e.target.value }))} style={{ ...inp(), resize: 'vertical' }} placeholder="Testo del messaggioâ€¦" />
             </div>
             <div>
               <label style={{ display: 'block', fontSize: '11px', color: '#71717a', marginBottom: '4px' }}>Destinatari</label>
@@ -981,7 +981,7 @@ export default function AdminPage() {
     </div>
   );
 
-  // ─── FEATURE FLAGS ────────────────────────────────────────────────────────
+  // â”€â”€â”€ FEATURE FLAGS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const FlagsSection = () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -996,7 +996,7 @@ export default function AdminPage() {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
           <thead>
             <tr style={{ borderBottom: '1px solid #2e2e40' }}>
-              {['Funzionalità','Descrizione','Attivo per','Stato'].map(h => (
+              {['FunzionalitÃ ','Descrizione','Attivo per','Stato'].map(h => (
                 <th key={h} style={{ padding: '12px 14px', textAlign: 'left', color: '#71717a', fontWeight: 500, fontSize: '11px' }}>{h}</th>
               ))}
             </tr>
@@ -1005,7 +1005,7 @@ export default function AdminPage() {
             {flags.map(f => (
               <tr key={f.id} style={{ borderBottom: '1px solid #1e1e2a' }}>
                 <td style={{ padding: '12px 14px', color: '#f4f4f5', fontWeight: 600 }}>{f.name}</td>
-                <td style={{ padding: '12px 14px', color: '#71717a' }}>{f.description || '—'}</td>
+                <td style={{ padding: '12px 14px', color: '#71717a' }}>{f.description || 'â€”'}</td>
                 <td style={{ padding: '12px 14px' }}><span style={{ background: 'rgba(99,102,241,0.1)', color: '#818cf8', padding: '2px 8px', borderRadius: '6px', fontSize: '11px' }}>{f.enabled_for}</span></td>
                 <td style={{ padding: '12px 14px' }}>
                   <button onClick={() => toggleFlag(f)} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', color: f.enabled ? '#4ade80' : '#71717a' }}>
@@ -1053,7 +1053,7 @@ export default function AdminPage() {
     </div>
   );
 
-  // ─── AUDIT LOG ───────────────────────────────────────────────────────────
+  // â”€â”€â”€ AUDIT LOG â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const AuditSection = () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -1075,9 +1075,9 @@ export default function AdminPage() {
             {audit.map(e => (
               <tr key={e.id} style={{ borderBottom: '1px solid #1e1e2a' }}>
                 <td style={{ padding: '10px 14px', color: '#f4f4f5', fontWeight: 500 }}>{ACTION_LABELS[e.action] ?? e.action}</td>
-                <td style={{ padding: '10px 14px', color: '#a1a1aa', fontSize: '11px' }}>{e.target_tenant ? e.target_tenant.slice(0, 16) : '—'}</td>
+                <td style={{ padding: '10px 14px', color: '#a1a1aa', fontSize: '11px' }}>{e.target_tenant ? e.target_tenant.slice(0, 16) : 'â€”'}</td>
                 <td style={{ padding: '10px 14px', color: '#71717a', maxWidth: '260px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {Object.entries(e.details ?? {}).map(([k, v]) => `${k}: ${v}`).join(' · ') || '—'}
+                  {Object.entries(e.details ?? {}).map(([k, v]) => `${k}: ${v}`).join(' Â· ') || 'â€”'}
                 </td>
                 <td style={{ padding: '10px 14px', color: '#3f3f5a', whiteSpace: 'nowrap' }}>{fmtDT(e.created_at)}</td>
               </tr>
@@ -1091,7 +1091,7 @@ export default function AdminPage() {
     </div>
   );
 
-  // ─── WHATSAPP ────────────────────────────────────────────────────────────
+  // â”€â”€â”€ WHATSAPP â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const openWaModal = async (tenant: Tenant) => {
     setWaModal(tenant);
     setWaSaved(false);
@@ -1163,11 +1163,11 @@ export default function AdminPage() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
           <div>
             <h2 style={{ color: '#f4f4f5', fontWeight: 700, fontSize: '20px', margin: 0 }}>Istanze WhatsApp (UltraMsg)</h2>
-            <p style={{ color: '#71717a', fontSize: '12px', margin: '4px 0 0' }}>Assegna un&apos;istanza UltraMsg a ogni salone. Il salone vede solo i toggle — le credenziali le gestisci solo tu.</p>
+            <p style={{ color: '#71717a', fontSize: '12px', margin: '4px 0 0' }}>Assegna un&apos;istanza UltraMsg a ogni salone. Il salone vede solo i toggle â€” le credenziali le gestisci solo tu.</p>
           </div>
           <div style={{ position: 'relative' }}>
             <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#71717a' }} />
-            <input value={waSearch} onChange={e => setWaSearch(e.target.value)} placeholder="Cerca salone…" style={{ ...inp({ paddingLeft: '30px', width: '220px' }) }} />
+            <input value={waSearch} onChange={e => setWaSearch(e.target.value)} placeholder="Cerca saloneâ€¦" style={{ ...inp({ paddingLeft: '30px', width: '220px' }) }} />
           </div>
         </div>
 
@@ -1185,16 +1185,16 @@ export default function AdminPage() {
                 const status = waStatuses[t.user_id] ?? 'none';
                 return (
                   <tr key={t.user_id} style={{ borderBottom: '1px solid #1e1e2a' }}>
-                    <td style={{ padding: '12px 14px', color: '#f4f4f5', fontWeight: 600 }}>{t.salon_name || '—'}</td>
+                    <td style={{ padding: '12px 14px', color: '#f4f4f5', fontWeight: 600 }}>{t.salon_name || 'â€”'}</td>
                     <td style={{ padding: '12px 14px', color: '#71717a', fontSize: '11px' }}>{t.email}</td>
                     <td style={{ padding: '12px 14px' }}><Badge s={t.plan} map={PLAN} /></td>
                     <td style={{ padding: '12px 14px', color: '#a1a1aa', fontSize: '11px', fontFamily: 'monospace' }}>
-                      {waInstances[t.user_id] ?? '—'}
+                      {waInstances[t.user_id] ?? 'â€”'}
                     </td>
                     <td style={{ padding: '12px 14px' }}>
                       {status === 'connected'    && <span style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#4ade80', fontSize: '12px' }}><Wifi size={13} /> Connesso</span>}
                       {status === 'disconnected' && <span style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#fbbf24', fontSize: '12px' }}><WifiOff size={13} /> Attesa QR</span>}
-                      {status === 'none'         && <span style={{ color: '#3f3f5a', fontSize: '12px' }}>—</span>}
+                      {status === 'none'         && <span style={{ color: '#3f3f5a', fontSize: '12px' }}>â€”</span>}
                     </td>
                     <td style={{ padding: '12px 14px' }}>
                       <button
@@ -1234,7 +1234,7 @@ export default function AdminPage() {
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       {waStatuses[waModal.user_id] === 'connected'
-                        ? <><Wifi size={14} style={{ color: '#4ade80' }} /><span style={{ color: '#4ade80', fontWeight: 600, fontSize: '13px' }}>WhatsApp connesso ✓</span></>
+                        ? <><Wifi size={14} style={{ color: '#4ade80' }} /><span style={{ color: '#4ade80', fontWeight: 600, fontSize: '13px' }}>WhatsApp connesso âœ“</span></>
                         : <><WifiOff size={14} style={{ color: '#fbbf24' }} /><span style={{ color: '#fbbf24', fontWeight: 600, fontSize: '13px' }}>In attesa del QR scan</span></>
                       }
                     </div>
@@ -1242,31 +1242,31 @@ export default function AdminPage() {
                       onClick={() => waModal && checkWaStatus(waModal, waForm.ultraMsgInstanceId, waForm.ultraMsgToken)}
                       style={{ background: 'none', border: '1px solid #2e2e40', borderRadius: '6px', padding: '3px 8px', color: '#71717a', fontSize: '11px', cursor: 'pointer' }}
                     >
-                      ↻ Aggiorna
+                      â†» Aggiorna
                     </button>
                   </div>
                   {/* QR code se disponibile e non ancora connesso */}
                   {waStatuses[waModal.user_id] === 'disconnected' && waQrCodes[waModal.user_id] && (
                     <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
                       <p style={{ color: '#71717a', fontSize: '11px', textAlign: 'center' }}>
-                        Scansiona con WhatsApp del salone →<br/>
-                        <em style={{ fontSize: '10px' }}>Impostazioni → Dispositivi collegati → Collega dispositivo</em>
+                        Scansiona con WhatsApp del salone â†’<br/>
+                        <em style={{ fontSize: '10px' }}>Impostazioni â†’ Dispositivi collegati â†’ Collega dispositivo</em>
                       </p>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={waQrCodes[waModal.user_id]!} alt="QR WhatsApp" style={{ width: '180px', height: '180px', borderRadius: '8px', background: 'white', padding: '8px' }} />
-                      <p style={{ color: '#52525b', fontSize: '10px' }}>Il QR scade dopo 45 secondi — clicca ↻ Aggiorna per rigenerarlo</p>
+                      <p style={{ color: '#52525b', fontSize: '10px' }}>Il QR scade dopo 45 secondi â€” clicca â†» Aggiorna per rigenerarlo</p>
                     </div>
                   )}
                   {waStatuses[waModal.user_id] === 'disconnected' && !waQrCodes[waModal.user_id] && (
                     <p style={{ color: '#71717a', fontSize: '11px', marginTop: '6px' }}>
-                      Clicca ↻ Aggiorna per caricare il QR code da scansionare con il telefono del salone.
+                      Clicca â†» Aggiorna per caricare il QR code da scansionare con il telefono del salone.
                     </p>
                   )}
                 </div>
               )}
 
               <div style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '10px', padding: '12px', fontSize: '12px', color: '#a1a1aa' }}>
-                💡 Crea l&apos;istanza su <a href="https://ultramsg.com" target="_blank" rel="noreferrer" style={{ color: '#818cf8' }}>ultramsg.com</a>, copia Instance ID e Token, incollali qui sotto e salva. Poi scansiona il QR che apparirà sopra.
+                ðŸ’¡ Crea l&apos;istanza su <a href="https://ultramsg.com" target="_blank" rel="noreferrer" style={{ color: '#818cf8' }}>ultramsg.com</a>, copia Instance ID e Token, incollali qui sotto e salva. Poi scansiona il QR che apparirÃ  sopra.
               </div>
 
               <div>
@@ -1294,7 +1294,7 @@ export default function AdminPage() {
                   disabled={waSaving || !waForm.ultraMsgInstanceId || !waForm.ultraMsgToken}
                   style={{ flex: 1, padding: '11px', borderRadius: '12px', border: 'none', background: (!waForm.ultraMsgInstanceId || !waForm.ultraMsgToken) ? '#2e2e40' : 'linear-gradient(135deg,#6366f1,#818cf8)', color: 'white', fontWeight: 600, cursor: (!waForm.ultraMsgInstanceId || !waForm.ultraMsgToken) ? 'not-allowed' : 'pointer' }}
                 >
-                  {waSaving ? 'Salvataggio…' : waSaved ? '✓ Salvato' : 'Salva istanza'}
+                  {waSaving ? 'Salvataggioâ€¦' : waSaved ? 'âœ“ Salvato' : 'Salva istanza'}
                 </button>
                 {(waForm.ultraMsgInstanceId || waForm.ultraMsgToken) && (
                   <button
@@ -1322,12 +1322,12 @@ export default function AdminPage() {
                       onClick={sendWaTest}
                       disabled={testSending || !testPhone.trim()}
                       style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '9px 14px', borderRadius: '10px', border: 'none', background: testSending || !testPhone.trim() ? '#2e2e40' : 'rgba(99,102,241,0.2)', color: '#818cf8', fontWeight: 600, fontSize: '12px', cursor: testSending || !testPhone.trim() ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' }}>
-                      <Send size={12} /> {testSending ? '…' : 'Manda test'}
+                      <Send size={12} /> {testSending ? 'â€¦' : 'Manda test'}
                     </button>
                   </div>
                   {testResult && (
                     <p style={{ marginTop: '6px', fontSize: '12px', color: testResult.ok ? '#4ade80' : '#f87171' }}>
-                      {testResult.ok ? '✅' : '❌'} {testResult.msg}
+                      {testResult.ok ? 'âœ…' : 'âŒ'} {testResult.msg}
                     </p>
                   )}
                 </div>
@@ -1339,169 +1339,216 @@ export default function AdminPage() {
     );
   };
 
-  // ─── SALES / PRESENTAZIONE COMMERCIALE ────────────────────────────────────
+  // â”€â”€â”€ SALES / PRESENTAZIONE COMMERCIALE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const SalesSection = () => {
+    const [copiedPlan, setCopiedPlan] = React.useState<string | null>(null);
+
+    const copyLink = (planKey: string) => {
+      const url = `${window.location.origin}/login`;
+      navigator.clipboard.writeText(url).then(() => {
+        setCopiedPlan(planKey);
+        setTimeout(() => setCopiedPlan(null), 2000);
+      });
+    };
+
     const PLANS = [
       {
-        key: 'starter', label: 'Starter', price: 25, color: '#818cf8', gradient: 'linear-gradient(135deg,#6366f1,#818cf8)',
+        key: 'starter', label: 'Starter', price: 25,
+        color: '#818cf8', border: 'rgba(129,140,248,0.35)',
+        gradient: 'linear-gradient(135deg,#6366f1,#818cf8)',
         tagline: 'Per chi inizia a professionalizzarsi',
         features: [
           'Calendario appuntamenti illimitati',
           'Gestione clienti (fino a 500)',
-          'Cassa e pagamenti (contanti, carta)',
+          'Cassa: contanti + carta',
           'Schede cliente con storico',
           'Gift card e buoni regalo',
-          'Abbonamenti e tessere fedeltà',
+          'Abbonamenti e tessere fedeltÃ ',
           'Fino a 3 operatori',
           'Assistenza via email',
         ],
-        notIncluded: ['Analytics avanzata', 'App cliente', 'WhatsApp automation'],
+        notIncluded: ['Analytics avanzata', 'App prenotazione', 'WhatsApp automation'],
       },
       {
-        key: 'pro', label: 'Pro', price: 49, color: '#c084fc', gradient: 'linear-gradient(135deg,#9333ea,#c084fc)',
-        tagline: 'Per saloni in crescita che vogliono più controllo',
-        badge: '⭐ Più scelto',
+        key: 'pro', label: 'Pro', price: 49,
+        color: '#c084fc', border: 'rgba(192,132,252,0.45)',
+        gradient: 'linear-gradient(135deg,#9333ea,#c084fc)',
+        tagline: 'Per saloni in crescita',
+        badge: 'â­ PiÃ¹ scelto',
         features: [
-          'Tutto di Starter +',
+          'Tutto Starter incluso',
           'Clienti illimitati',
           'Fino a 10 operatori',
           'Analytics e report avanzati',
           'Gestione fornitori e magazzino',
-          'Report per operatore',
-          'Gamification (punti fedeltà, badge)',
-          'App cliente (prenotazione online)',
+          'Report per singolo operatore',
+          'Gamification (punti, badge)',
+          'App per prenotazioni online',
           'Assistenza prioritaria',
         ],
         notIncluded: ['WhatsApp automation'],
       },
       {
-        key: 'business', label: 'Business', price: 99, color: '#4ade80', gradient: 'linear-gradient(135deg,#059669,#4ade80)',
-        tagline: 'Per saloni premium con automazione totale',
-        badge: '🚀 Premium',
+        key: 'business', label: 'Business', price: 99,
+        color: '#4ade80', border: 'rgba(74,222,128,0.35)',
+        gradient: 'linear-gradient(135deg,#059669,#4ade80)',
+        tagline: 'Automazione totale',
+        badge: 'ðŸš€ Premium',
         features: [
-          'Tutto di Pro +',
+          'Tutto Pro incluso',
           'Operatori illimitati',
-          'WhatsApp automation (promemoria, follow-up)',
-          'Istanza UltraMsg dedicata inclusa',
-          'Messaggi automatici post-appuntamento',
+          'WhatsApp automation inclusa',
+          'Istanza UltraMsg dedicata',
+          'Promemoria automatici',
+          'Follow-up post-trattamento',
           'Riattivazione clienti dormienti',
           'CSM dedicato',
           'Onboarding guidato in sede',
-          'SLA risposta < 4h',
+          'Risposta garantita < 4h',
         ],
         notIncluded: [],
       },
     ];
 
     const CHECKLIST = [
-      { step: '1', label: 'Mostra il gestionale live', sub: 'Apri il demo e fai vedere calendario + cassa' },
+      { step: '1', label: 'Mostra il gestionale live', sub: 'Apri il demo dal tuo telefono/laptop' },
       { step: '2', label: 'Chiedi quanti appuntamenti/giorno', sub: 'Aiuta a quantificare il tempo risparmiato' },
-      { step: '3', label: 'Mostra le gift card', sub: 'Entrate extra senza lavoro aggiuntivo' },
-      { step: '4', label: 'Proponi il piano giusto', sub: 'Starter per chi inizia, Pro per crescere, Business per automazione' },
-      { step: '5', label: 'Trial gratuito 14 giorni', sub: 'Nessun rischio — parte subito oggi' },
-      { step: '6', label: 'Registra e configura insieme', sub: 'Aggiungi il primo servizio e operatore' },
+      { step: '3', label: 'Mostra le gift card', sub: 'Entrate extra immediate, nessun lavoro aggiuntivo' },
+      { step: '4', label: 'Proponi il piano giusto', sub: 'Starter per partire, Pro per crescere' },
+      { step: '5', label: 'Trial gratuito 14 giorni', sub: 'Nessun rischio, nessuna carta di credito' },
+      { step: '6', label: 'Registra insieme sul posto', sub: 'Clicca "Apri registrazione" qui sotto' },
     ];
 
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '32px', maxWidth: '960px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '32px', width: '100%' }}>
         {/* Header */}
-        <div style={{ textAlign: 'center', padding: '20px 0 0' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '999px', padding: '4px 16px', marginBottom: '12px' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '999px', padding: '5px 18px', marginBottom: '14px' }}>
             <Zap size={13} style={{ color: '#fbbf24' }} />
-            <span style={{ color: '#fbbf24', fontSize: '12px', fontWeight: 600 }}>PRESENTAZIONE COMMERCIALE</span>
+            <span style={{ color: '#fbbf24', fontSize: '12px', fontWeight: 700, letterSpacing: '0.5px' }}>PRESENTAZIONE COMMERCIALE Â· Mostra al cliente</span>
           </div>
-          <h2 style={{ color: '#f4f4f5', fontSize: '28px', fontWeight: 800, margin: '0 0 8px' }}>Stylistgo — Gestionale per saloni</h2>
-          <p style={{ color: '#71717a', fontSize: '15px', margin: 0 }}>Mostra questa pagina al cliente durante la visita</p>
+          <h2 style={{ color: '#f4f4f5', fontSize: '28px', fontWeight: 800, margin: '0 0 8px' }}>Stylistgo</h2>
+          <p style={{ color: '#71717a', fontSize: '15px', margin: 0 }}>Il gestionale pensato per saloni di parrucchieri e centri estetici</p>
         </div>
 
-        {/* Piano cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+        {/* ROI strip in cima â€” prima cosa da mostrare al cliente */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '12px' }}>
+          {[
+            { value: '~3h', label: 'risparmiate ogni settimana', sub: 'Niente piÃ¹ agenda cartacea', color: '#818cf8' },
+            { value: '-30%', label: 'no-show appuntamenti', sub: 'Promemoria automatici SMS/WA', color: '#4ade80' },
+            { value: '+â‚¬300', label: 'entrate medie da gift card', sub: 'I clienti regalano, tu incassi subito', color: '#fbbf24' },
+          ].map(k => (
+            <div key={k.label} style={{ background: '#1c1c27', border: '1px solid #2e2e40', borderRadius: '16px', padding: '18px', textAlign: 'center' }}>
+              <p style={{ color: k.color, fontSize: '32px', fontWeight: 900, margin: '0 0 4px', lineHeight: 1 }}>{k.value}</p>
+              <p style={{ color: '#f4f4f5', fontSize: '12px', fontWeight: 700, margin: '0 0 3px' }}>{k.label}</p>
+              <p style={{ color: '#52525b', fontSize: '10px', margin: 0 }}>{k.sub}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Piani â€” 3 card verticali, nessun overflow hidden */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '16px', alignItems: 'start' }}>
           {PLANS.map(plan => (
-            <div key={plan.key} style={{ background: '#1c1c27', border: `1px solid ${plan.color}40`, borderRadius: '20px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px', position: 'relative', overflow: 'hidden' }}>
-              {plan.badge && (
-                <div style={{ position: 'absolute', top: '14px', right: '14px', background: plan.gradient, borderRadius: '999px', padding: '3px 10px', fontSize: '10px', color: 'white', fontWeight: 700 }}>{plan.badge}</div>
+            <div key={plan.key} style={{
+              background: '#1c1c27',
+              border: `2px solid ${plan.border}`,
+              borderRadius: '20px',
+              padding: '24px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '14px',
+            }}>
+              {/* Badge */}
+              {'badge' in plan && plan.badge && (
+                <div style={{ display: 'inline-block', background: plan.gradient, borderRadius: '999px', padding: '4px 12px', fontSize: '11px', color: 'white', fontWeight: 700, alignSelf: 'flex-start' }}>
+                  {plan.badge}
+                </div>
               )}
+
               {/* Price */}
               <div>
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                  <span style={{ fontSize: '11px', fontWeight: 700, color: plan.color, textTransform: 'uppercase', letterSpacing: '1px' }}>{plan.label}</span>
-                </div>
+                <p style={{ color: plan.color, fontSize: '12px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px', margin: '0 0 4px' }}>{plan.label}</p>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
-                  <span style={{ fontSize: '36px', fontWeight: 800, color: '#f4f4f5' }}>€{plan.price}</span>
-                  <span style={{ fontSize: '13px', color: '#71717a' }}>/mese</span>
+                  <span style={{ color: '#f4f4f5', fontSize: '40px', fontWeight: 900, lineHeight: 1 }}>â‚¬{plan.price}</span>
+                  <span style={{ color: '#71717a', fontSize: '13px' }}>/mese</span>
                 </div>
-                <p style={{ color: '#a1a1aa', fontSize: '12px', margin: '4px 0 0', lineHeight: 1.4 }}>{plan.tagline}</p>
+                <p style={{ color: '#a1a1aa', fontSize: '12px', margin: '6px 0 0', lineHeight: 1.5 }}>{plan.tagline}</p>
               </div>
 
-              {/* Features */}
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {/* Divider */}
+              <div style={{ height: '1px', background: '#2e2e40' }} />
+
+              {/* Included features */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '9px' }}>
                 {plan.features.map(f => (
-                  <div key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                    <Check size={13} style={{ color: plan.color, flexShrink: 0, marginTop: '2px' }} />
-                    <span style={{ color: '#d4d4d8', fontSize: '12px', lineHeight: 1.4 }}>{f}</span>
-                  </div>
-                ))}
-                {plan.notIncluded.map(f => (
-                  <div key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', opacity: 0.3 }}>
-                    <X size={13} style={{ color: '#71717a', flexShrink: 0, marginTop: '2px' }} />
-                    <span style={{ color: '#71717a', fontSize: '12px', lineHeight: 1.4 }}>{f}</span>
+                  <div key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                    <div style={{ width: '16px', height: '16px', borderRadius: '50%', background: `${plan.color}22`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '1px' }}>
+                      <Check size={10} style={{ color: plan.color }} />
+                    </div>
+                    <span style={{ color: '#d4d4d8', fontSize: '12px', lineHeight: 1.5 }}>{f}</span>
                   </div>
                 ))}
               </div>
+
+              {/* Not included */}
+              {plan.notIncluded.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '7px', opacity: 0.4 }}>
+                  {plan.notIncluded.map(f => (
+                    <div key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                      <div style={{ width: '16px', height: '16px', borderRadius: '50%', background: '#2e2e40', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '1px' }}>
+                        <X size={10} style={{ color: '#71717a' }} />
+                      </div>
+                      <span style={{ color: '#71717a', fontSize: '12px', lineHeight: 1.5 }}>{f}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {/* CTA */}
-              <button
-                onClick={() => { changeSection('tenants'); }}
-                style={{ width: '100%', padding: '11px', borderRadius: '12px', border: 'none', background: plan.gradient, color: 'white', fontWeight: 700, cursor: 'pointer', fontSize: '13px' }}>
-                Attiva {plan.label}
-              </button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}>
+                <button
+                  onClick={() => window.open('/login', '_blank')}
+                  style={{ width: '100%', padding: '12px', borderRadius: '12px', border: 'none', background: plan.gradient, color: 'white', fontWeight: 700, cursor: 'pointer', fontSize: '13px' }}>
+                  Inizia con {plan.label} â†’
+                </button>
+                <button
+                  onClick={() => copyLink(plan.key)}
+                  style={{ width: '100%', padding: '8px', borderRadius: '10px', border: `1px solid ${plan.border}`, background: 'transparent', color: plan.color, fontWeight: 600, cursor: 'pointer', fontSize: '11px' }}>
+                  {copiedPlan === plan.key ? 'âœ“ Link copiato!' : 'ðŸ”— Copia link registrazione'}
+                </button>
+              </div>
             </div>
           ))}
         </div>
 
         {/* Trial banner */}
-        <div style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: '16px', padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
+        <div style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '16px', padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
           <div>
-            <p style={{ color: '#fbbf24', fontWeight: 700, fontSize: '16px', margin: '0 0 4px' }}>🎁 Prova gratis 14 giorni</p>
-            <p style={{ color: '#a1a1aa', fontSize: '13px', margin: 0 }}>Nessuna carta di credito richiesta. Accesso completo al piano Pro per 14 giorni. Poi decidi tu.</p>
+            <p style={{ color: '#fbbf24', fontWeight: 800, fontSize: '18px', margin: '0 0 4px' }}>ðŸŽ Prima 14 giorni gratis, poi decidi</p>
+            <p style={{ color: '#a1a1aa', fontSize: '13px', margin: 0 }}>Nessuna carta di credito. Accesso completo. Zero rischio. Ti aiuto a configurare tutto ora in 10 minuti.</p>
           </div>
-          <div style={{ background: 'linear-gradient(135deg,#f59e0b,#ef4444)', borderRadius: '12px', padding: '10px 20px', color: 'white', fontWeight: 700, fontSize: '14px', whiteSpace: 'nowrap' }}>
-            Inizia il trial →
-          </div>
+          <button
+            onClick={() => window.open('/login', '_blank')}
+            style={{ background: 'linear-gradient(135deg,#f59e0b,#ef4444)', border: 'none', borderRadius: '12px', padding: '12px 24px', color: 'white', fontWeight: 700, fontSize: '14px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            Apri registrazione â†’
+          </button>
         </div>
 
-        {/* Checklist di vendita */}
+        {/* Script vendita */}
         <div style={card()}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
             <Star size={16} style={{ color: '#fbbf24' }} />
-            <p style={{ color: '#f4f4f5', fontSize: '15px', fontWeight: 700, margin: 0 }}>Script di vendita — segui questi passi dal vivo</p>
+            <p style={{ color: '#f4f4f5', fontSize: '15px', fontWeight: 700, margin: 0 }}>Script di vendita â€” segui questi passi</p>
+            <span style={{ fontSize: '11px', color: '#52525b', marginLeft: '4px' }}>(solo per te, il cliente non vede questa parte)</span>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: '10px' }}>
             {CHECKLIST.map(item => (
-              <div key={item.step} style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', padding: '12px', background: '#12121a', borderRadius: '12px' }}>
-                <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'linear-gradient(135deg,#f59e0b,#ef4444)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontWeight: 700, fontSize: '12px', color: 'white' }}>{item.step}</div>
+              <div key={item.step} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '12px 14px', background: '#12121a', borderRadius: '12px' }}>
+                <div style={{ width: '26px', height: '26px', borderRadius: '50%', background: 'linear-gradient(135deg,#f59e0b,#ef4444)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontWeight: 800, fontSize: '11px', color: 'white' }}>{item.step}</div>
                 <div>
                   <p style={{ color: '#f4f4f5', fontWeight: 600, fontSize: '13px', margin: '0 0 2px' }}>{item.label}</p>
-                  <p style={{ color: '#71717a', fontSize: '11px', margin: 0 }}>{item.sub}</p>
+                  <p style={{ color: '#71717a', fontSize: '11px', margin: 0, lineHeight: 1.4 }}>{item.sub}</p>
                 </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* ROI estimate */}
-        <div style={card()}>
-          <p style={{ color: '#71717a', fontSize: '12px', margin: '0 0 14px' }}>💡 Aiuta il cliente a calcolare il ROI</p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '12px' }}>
-            {[
-              { label: 'Tempo risparmiato', value: '~3h/settimana', sub: 'No più agenda carta, no dimenticanze', color: '#818cf8' },
-              { label: 'Clienti recuperati', value: '+15-20%', sub: 'Promemoria automatici riducono i no-show', color: '#4ade80' },
-              { label: 'Entrate extra gift card', value: '+€200-500/mese', sub: 'I clienti regalano, tu incassi subito', color: '#fbbf24' },
-            ].map(kpi => (
-              <div key={kpi.label} style={{ background: '#12121a', borderRadius: '12px', padding: '14px', textAlign: 'center' }}>
-                <p style={{ color: kpi.color, fontSize: '20px', fontWeight: 800, margin: '0 0 4px' }}>{kpi.value}</p>
-                <p style={{ color: '#f4f4f5', fontSize: '12px', fontWeight: 600, margin: '0 0 4px' }}>{kpi.label}</p>
-                <p style={{ color: '#52525b', fontSize: '10px', margin: 0, lineHeight: 1.4 }}>{kpi.sub}</p>
               </div>
             ))}
           </div>
@@ -1510,7 +1557,8 @@ export default function AdminPage() {
     );
   };
 
-  // ─── LAYOUT ───────────────────────────────────────────────────────────────
+
+  // â”€â”€â”€ LAYOUT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   return (
     <div style={{ display: 'flex', height: '100vh', background: '#0f0f13', overflow: 'hidden' }}>
       {/* Sidebar */}
@@ -1549,7 +1597,7 @@ export default function AdminPage() {
             <LogOut size={16} style={{ flexShrink: 0 }} />
             {sidebarOpen && <span style={{ fontSize: '12px' }}>Esci</span>}
           </button>
-          {sidebarOpen && <a href="/login" style={{ fontSize: '10px', color: '#2e2e40', textAlign: 'center', textDecoration: 'none', padding: '4px 0' }}>← Gestionale</a>}
+          {sidebarOpen && <a href="/login" style={{ fontSize: '10px', color: '#2e2e40', textAlign: 'center', textDecoration: 'none', padding: '4px 0' }}>â† Gestionale</a>}
         </div>
       </div>
 
@@ -1557,7 +1605,7 @@ export default function AdminPage() {
       <div style={{ flex: 1, overflow: 'auto', padding: '28px' }}>
         {loading ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '200px', color: '#71717a', gap: '10px' }}>
-            <RefreshCw size={18} className="animate-spin" /> Caricamento…
+            <RefreshCw size={18} className="animate-spin" /> Caricamentoâ€¦
           </div>
         ) : (
           <>
