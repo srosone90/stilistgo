@@ -649,10 +649,11 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const redeemGiftCard = useCallback((code: string, amount: number): boolean => {
+    const normalizedCode = code.trim().toUpperCase();
     let ok = false;
     setGiftCards(prev => {
       const n = prev.map(g => {
-        if (g.code === code && g.isActive && g.remainingValue >= amount) {
+        if (g.code.trim().toUpperCase() === normalizedCode && g.isActive && g.remainingValue >= amount) {
           ok = true;
           const remaining = g.remainingValue - amount;
           return { ...g, remainingValue: remaining, isActive: remaining > 0 };

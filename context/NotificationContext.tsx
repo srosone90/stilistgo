@@ -93,10 +93,10 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       // Check for recently cancelled bookings
       const { data: cancelledRows } = await rt.current
         .from('online_bookings')
-        .select('id, client_name, service, status, updated_at')
+        .select('id, client_name, service, status, created_at')
         .eq('salon_id', userId)
         .eq('status', 'cancelled')
-        .gte('updated_at', since);
+        .gte('created_at', since);
 
       for (const b of (cancelledRows ?? []) as Array<{ id: string; client_name?: string; service?: string }>) {
         const key = `cancel-${b.id}`;

@@ -65,6 +65,7 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [giftCardInfo, setGiftCardInfo] = useState<{ found: boolean; remainingValue: number } | null>(null);
   const [gcSecondaryMethod, setGcSecondaryMethod] = useState<'cash' | 'card'>('cash');
+  const [gcAmountToUse, setGcAmountToUse] = useState<number>(0);
 
   useEffect(() => { if (newTrigger && newTrigger > 0) { setShowForm(true); setForm({ ...EMPTY_FORM, date: selectedDate }); } }, [newTrigger, selectedDate]);
 
@@ -279,13 +280,10 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
     const gc = giftCards.find(g => g.code.trim().toUpperCase() === inputCode && g.isActive);
     if (!gc) { setGiftCardInfo({ found: false, remainingValue: 0 }); return; }
     setGiftCardInfo({ found: true, remainingValue: gc.remainingValue });
-    // Auto-fill amount if balance is sufficient
-    if (gc.remainingValue >= formTotal) {
-      setForm(p => ({ ...p, giftCardAmount: formTotal }));
-    } else {
-      // Partial: set gift amount to available balance, remainder goes to secondary method
-      setForm(p => ({ ...p, giftCardAmount: gc.remainingValue }));
-    }
+    // Pre-fill gcAmountToUse with the max usable (min of balance and total)
+    const maxUsable = Math.min(gc.remainingValue, formTotal);
+    setGcAmountToUse(maxUsable);
+    setForm(p => ({ ...p, giftCardAmount: maxUsable }));
   }
 
   function handleSave() {
@@ -298,15 +296,15 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
     let finalGc = form.giftCardAmount;
 
     if (form.paymentMethod === 'gift_card' && giftCardInfo?.found) {
-      if (giftCardInfo.remainingValue >= formTotal) {
-        // Full gift card payment
+      // Use the amount the user selected (gcAmountToUse)
+      const gcUse = Math.max(0, Math.min(gcAmountToUse, giftCardInfo.remainingValue, formTotal));
+      const remainder = Math.max(0, formTotal - gcUse);
+      if (remainder === 0) {
         finalMethod = 'gift_card';
-        finalCash = 0; finalCard = 0; finalGc = formTotal;
+        finalCash = 0; finalCard = 0; finalGc = gcUse;
       } else {
-        // Partial: gift card covers giftCardInfo.remainingValue, rest is secondary
         finalMethod = 'mixed';
-        finalGc = giftCardInfo.remainingValue;
-        const remainder = Math.max(0, formTotal - finalGc);
+        finalGc = gcUse;
         if (gcSecondaryMethod === 'cash') { finalCash = remainder; finalCard = 0; }
         else { finalCard = remainder; finalCash = 0; }
       }
@@ -315,9 +313,9 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
       finalCash = amounts.cashAmount; finalCard = amounts.cardAmount; finalGc = amounts.giftCardAmount;
     }
 
-    // Redeem gift card if applicable
+    // Redeem gift card if applicable (normalize code to uppercase to match stored codes)
     if (form.giftCardCode && finalGc > 0) {
-      redeemGiftCard(form.giftCardCode, finalGc);
+      redeemGiftCard(form.giftCardCode.trim().toUpperCase(), finalGc);
     }
     addPayment({
       appointmentId: form.appointmentId,
@@ -355,6 +353,7 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
     setShowForm(false);
     setForm(EMPTY_FORM);
     setGiftCardInfo(null);
+    setGcAmountToUse(0);
   }
 
   const todayAppts = useMemo(() =>
@@ -628,7 +627,7 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
           <div className="w-full max-w-lg max-h-[92vh] overflow-y-auto rounded-2xl p-6" style={{ background: '#18181f', border: '1px solid var(--border)' }}>
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-semibold text-white">Nuovo incasso</h3>
-              <button onClick={() => { setShowForm(false); setGiftCardInfo(null); }} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}><X size={18} /></button>
+              <button onClick={() => { setShowForm(false); setGiftCardInfo(null); setGcAmountToUse(0); }} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}><X size={18} /></button>
             </div>
             <div className="space-y-3">
               {/* Link to appointment */}
@@ -731,7 +730,7 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
                 <label style={labelStyle}>Metodo di pagamento</label>
                 <div className="flex gap-2 flex-wrap">
                   {(Object.keys(PAYMENT_METHOD_LABELS) as PaymentMethod[]).map(m => (
-                    <button key={m} onClick={() => { setForm(p => ({ ...p, paymentMethod: m })); setGiftCardInfo(null); }}
+                    <button key={m} onClick={() => { setForm(p => ({ ...p, paymentMethod: m })); setGiftCardInfo(null); setGcAmountToUse(0); }}
                       className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg"
                       style={{ background: form.paymentMethod === m ? 'rgba(99,102,241,0.2)' : 'var(--bg-input)', border: `1px solid ${form.paymentMethod === m ? 'rgba(99,102,241,0.5)' : 'var(--border)'}`, color: form.paymentMethod === m ? 'var(--accent-light)' : 'var(--muted)', cursor: 'pointer' }}>
                       {METHOD_ICONS[m]} {PAYMENT_METHOD_LABELS[m]}
@@ -754,7 +753,7 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
                   <div className="flex gap-2">
                     <input
                       value={form.giftCardCode}
-                      onChange={e => { setForm(p => ({ ...p, giftCardCode: e.target.value })); setGiftCardInfo(null); }}
+                      onChange={e => { setForm(p => ({ ...p, giftCardCode: e.target.value })); setGiftCardInfo(null); setGcAmountToUse(0); }}
                       placeholder="Es. GC-XXXX"
                       style={{ ...inputStyle, flex: 1 }}
                     />
@@ -768,31 +767,49 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
                       ❌ Codice non valido o gift card esaurita / disattivata.
                     </p>
                   )}
-                  {giftCardInfo?.found && giftCardInfo.remainingValue >= formTotal && (
-                    <p className="text-xs px-3 py-2 rounded-lg" style={{ background: 'rgba(34,197,94,0.08)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.25)' }}>
-                      ✅ Saldo disponibile: <strong>{formatCurrency(giftCardInfo.remainingValue)}</strong> — sufficiente per coprire il totale.
-                    </p>
-                  )}
-                  {giftCardInfo?.found && giftCardInfo.remainingValue < formTotal && (
-                    <div className="space-y-2">
-                      <p className="text-xs px-3 py-2 rounded-lg" style={{ background: 'rgba(245,158,11,0.1)', color: '#fbbf24', border: '1px solid rgba(245,158,11,0.25)' }}>
-                        ⚠️ Saldo insufficiente: <strong>{formatCurrency(giftCardInfo.remainingValue)}</strong> disponibili su <strong>{formatCurrency(formTotal)}</strong>.
-                        {' '}Mancano ancora <strong>{formatCurrency(formTotal - giftCardInfo.remainingValue)}</strong>.
-                      </p>
-                      <div>
-                        <label style={labelStyle}>Metodo aggiuntivo per il restante {formatCurrency(formTotal - giftCardInfo.remainingValue)}</label>
-                        <div className="flex gap-2">
-                          {(['cash', 'card'] as const).map(m => (
-                            <button key={m} onClick={() => setGcSecondaryMethod(m)}
-                              className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg"
-                              style={{ background: gcSecondaryMethod === m ? 'rgba(99,102,241,0.2)' : 'var(--bg-input)', border: `1px solid ${gcSecondaryMethod === m ? 'rgba(99,102,241,0.5)' : 'var(--border)'}`, color: gcSecondaryMethod === m ? 'var(--accent-light)' : 'var(--muted)', cursor: 'pointer' }}>
-                              {m === 'cash' ? <><Banknote size={12} /> Contanti</> : <><CreditCard size={12} /> Carta / POS</>}
-                            </button>
-                          ))}
+                  {giftCardInfo?.found && (() => {
+                    const maxUsable = Math.min(giftCardInfo.remainingValue, formTotal);
+                    const remainder = Math.max(0, formTotal - gcAmountToUse);
+                    return (
+                      <div className="space-y-2">
+                        <p className="text-xs px-3 py-2 rounded-lg" style={{ background: 'rgba(34,197,94,0.08)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.25)' }}>
+                          ✅ Gift card valida — Saldo disponibile: <strong>{formatCurrency(giftCardInfo.remainingValue)}</strong>
+                        </p>
+                        <div>
+                          <label style={labelStyle}>Importo da scalare dalla gift card (max {formatCurrency(maxUsable)})</label>
+                          <input
+                            type="number" min={0} max={maxUsable} step={0.01}
+                            value={gcAmountToUse}
+                            onChange={e => {
+                              const v = Math.max(0, Math.min(parseFloat(e.target.value) || 0, maxUsable));
+                              setGcAmountToUse(v);
+                              setForm(p => ({ ...p, giftCardAmount: v }));
+                            }}
+                            style={{ ...inputStyle }}
+                          />
                         </div>
+                        {remainder > 0 && (
+                          <div>
+                            <label style={labelStyle}>Metodo aggiuntivo per il restante {formatCurrency(remainder)}</label>
+                            <div className="flex gap-2">
+                              {(['cash', 'card'] as const).map(m => (
+                                <button key={m} onClick={() => setGcSecondaryMethod(m)}
+                                  className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg"
+                                  style={{ background: gcSecondaryMethod === m ? 'rgba(99,102,241,0.2)' : 'var(--bg-input)', border: `1px solid ${gcSecondaryMethod === m ? 'rgba(99,102,241,0.5)' : 'var(--border)'}`, color: gcSecondaryMethod === m ? 'var(--accent-light)' : 'var(--muted)', cursor: 'pointer' }}>
+                                  {m === 'cash' ? <><Banknote size={12} /> Contanti</> : <><CreditCard size={12} /> Carta / POS</>}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {remainder === 0 && gcAmountToUse > 0 && (
+                          <p className="text-xs px-3 py-2 rounded-lg" style={{ background: 'rgba(34,197,94,0.06)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.20)' }}>
+                            🎁 La gift card copre l&rsquo;intero importo.
+                          </p>
+                        )}
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
                 </div>
               )}
 
