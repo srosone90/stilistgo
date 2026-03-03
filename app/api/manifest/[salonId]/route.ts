@@ -46,19 +46,12 @@ export async function GET(
     background_color: '#0f0f13',
     categories: ['lifestyle', 'beauty'],
     icons: [
-      {
-        src: `${APP_URL}/icons/icon-192.png`,
-        sizes: '192x192',
-        type: 'image/png',
-        purpose: 'any maskable',
-      },
-      {
-        src: `${APP_URL}/icons/icon-512.png`,
-        sizes: '512x512',
-        type: 'image/png',
-        purpose: 'any maskable',
-      },
+      { src: `${APP_URL}/icons/icon-192.png`, sizes: '192x192', type: 'image/png', purpose: 'any' },
+      { src: `${APP_URL}/icons/icon-192.png`, sizes: '192x192', type: 'image/png', purpose: 'maskable' },
+      { src: `${APP_URL}/icons/icon-512.png`, sizes: '512x512', type: 'image/png', purpose: 'any' },
+      { src: `${APP_URL}/icons/icon-512.png`, sizes: '512x512', type: 'image/png', purpose: 'maskable' },
     ],
+    screenshots: [],
   };
 
   return new NextResponse(JSON.stringify(manifest), {
