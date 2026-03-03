@@ -157,7 +157,11 @@ export async function DELETE(req: NextRequest) {
 
   const db = getAdminDb();
   // Always delete admin_tenants record
-  await db.from('admin_tenants').delete().eq('user_id', user_id);
+  const { error: delErr } = await db.from('admin_tenants').delete().eq('user_id', user_id);
+  if (delErr) {
+    console.error('[DELETE /api/admin/tenants] DB error:', JSON.stringify(delErr));
+    return NextResponse.json({ error: delErr.message }, { status: 500 });
+  }
 
   // Optionally delete salon_data (full wipe)
   if (delete_data) {

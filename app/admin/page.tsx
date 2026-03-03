@@ -7,12 +7,12 @@ import {
   ShieldCheck, TrendingUp, AlertTriangle, CheckCircle2, XCircle, Clock,
   ChevronRight, Plus, Search, X, Save, RefreshCw, ToggleLeft, ToggleRight,
   Building2, Phone, Mail, MapPin, UserCog, Calendar as CalendarIcon, Trash2,
-  MessageSquare, Wifi, WifiOff, ArrowUpRight, Send,
+  MessageSquare, Wifi, WifiOff, ArrowUpRight, Send, Star, Zap, Check,
 } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type Section = 'overview' | 'tenants' | 'tickets' | 'broadcasts' | 'flags' | 'audit' | 'whatsapp';
+type Section = 'overview' | 'tenants' | 'tickets' | 'broadcasts' | 'flags' | 'audit' | 'whatsapp' | 'sales';
 
 interface Metrics {
   total: number; active: number; trial: number; suspended: number; cancelled: number;
@@ -80,6 +80,8 @@ const TK_STATUS: Record<string, { bg: string; text: string; label: string }> = {
   risolto:       { bg: 'rgba(34,197,94,0.1)',   text: '#4ade80', label: 'Risolto' },
   chiuso:        { bg: 'rgba(113,113,122,0.1)', text: '#71717a', label: 'Chiuso' },
 };
+
+const PLAN_PRICES: Record<string, number> = { trial: 0, starter: 25, pro: 49, business: 99 };
 
 const ACTION_LABELS: Record<string, string> = {
   tenant_updated: 'Tenant aggiornato', ticket_created: 'Ticket creato',
@@ -331,12 +333,22 @@ export default function AdminPage() {
   const deleteTenant = async () => {
     if (!selTenant) return;
     setDeletingTenant(true);
-    await af('/api/admin/tenants', { method: 'DELETE', body: JSON.stringify({ user_id: selTenant.user_id, delete_data: deleteDataToo }) });
-    setDeletingTenant(false);
-    setConfirmDeleteTenant(false);
-    setDeleteDataToo(false);
-    setSelTenant(null);
-    loadSection('tenants');
+    try {
+      const res = await af('/api/admin/tenants', { method: 'DELETE', body: JSON.stringify({ user_id: selTenant.user_id, delete_data: deleteDataToo }) });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(`Errore eliminazione: ${data.error ?? res.status}`);
+        return;
+      }
+      setConfirmDeleteTenant(false);
+      setDeleteDataToo(false);
+      setSelTenant(null);
+      loadSection('tenants');
+    } catch (err) {
+      alert(`Errore di rete: ${err}`);
+    } finally {
+      setDeletingTenant(false);
+    }
   };
 
   // ─── Ticket save ─────────────────────────────────────────────────────────
@@ -389,6 +401,7 @@ export default function AdminPage() {
     { id: 'flags', icon: <Flag size={18} />, label: 'Feature Flag' },
     { id: 'audit', icon: <ScrollText size={18} />, label: 'Audit Log' },
     { id: 'whatsapp', icon: <MessageSquare size={18} />, label: 'WhatsApp' },
+    { id: 'sales', icon: <Star size={18} />, label: 'Vendita 💰' },
   ];
 
   // ─── OVERVIEW ────────────────────────────────────────────────────────────
@@ -557,8 +570,12 @@ export default function AdminPage() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '11px', color: '#71717a', marginBottom: '4px' }}>Piano</label>
-                <select value={(e.plan ?? t.plan) as string} onChange={ev => set('plan', ev.target.value)} style={sel()}>
-                  {['trial','starter','pro','business'].map(p => <option key={p} value={p}>{p.charAt(0).toUpperCase()+p.slice(1)}</option>)}
+                <select value={(e.plan ?? t.plan) as string} onChange={ev => {
+                  const p = ev.target.value;
+                  set('plan', p);
+                  set('monthly_price', PLAN_PRICES[p] ?? 0);
+                }} style={sel()}>
+                  {['trial','starter','pro','business'].map(p => <option key={p} value={p}>{p.charAt(0).toUpperCase()+p.slice(1)} — €{PLAN_PRICES[p]}/mese</option>)}
                 </select>
               </div>
               <div>
@@ -1322,6 +1339,177 @@ export default function AdminPage() {
     );
   };
 
+  // ─── SALES / PRESENTAZIONE COMMERCIALE ────────────────────────────────────
+  const SalesSection = () => {
+    const PLANS = [
+      {
+        key: 'starter', label: 'Starter', price: 25, color: '#818cf8', gradient: 'linear-gradient(135deg,#6366f1,#818cf8)',
+        tagline: 'Per chi inizia a professionalizzarsi',
+        features: [
+          'Calendario appuntamenti illimitati',
+          'Gestione clienti (fino a 500)',
+          'Cassa e pagamenti (contanti, carta)',
+          'Schede cliente con storico',
+          'Gift card e buoni regalo',
+          'Abbonamenti e tessere fedeltà',
+          'Fino a 3 operatori',
+          'Assistenza via email',
+        ],
+        notIncluded: ['Analytics avanzata', 'App cliente', 'WhatsApp automation'],
+      },
+      {
+        key: 'pro', label: 'Pro', price: 49, color: '#c084fc', gradient: 'linear-gradient(135deg,#9333ea,#c084fc)',
+        tagline: 'Per saloni in crescita che vogliono più controllo',
+        badge: '⭐ Più scelto',
+        features: [
+          'Tutto di Starter +',
+          'Clienti illimitati',
+          'Fino a 10 operatori',
+          'Analytics e report avanzati',
+          'Gestione fornitori e magazzino',
+          'Report per operatore',
+          'Gamification (punti fedeltà, badge)',
+          'App cliente (prenotazione online)',
+          'Assistenza prioritaria',
+        ],
+        notIncluded: ['WhatsApp automation'],
+      },
+      {
+        key: 'business', label: 'Business', price: 99, color: '#4ade80', gradient: 'linear-gradient(135deg,#059669,#4ade80)',
+        tagline: 'Per saloni premium con automazione totale',
+        badge: '🚀 Premium',
+        features: [
+          'Tutto di Pro +',
+          'Operatori illimitati',
+          'WhatsApp automation (promemoria, follow-up)',
+          'Istanza UltraMsg dedicata inclusa',
+          'Messaggi automatici post-appuntamento',
+          'Riattivazione clienti dormienti',
+          'CSM dedicato',
+          'Onboarding guidato in sede',
+          'SLA risposta < 4h',
+        ],
+        notIncluded: [],
+      },
+    ];
+
+    const CHECKLIST = [
+      { step: '1', label: 'Mostra il gestionale live', sub: 'Apri il demo e fai vedere calendario + cassa' },
+      { step: '2', label: 'Chiedi quanti appuntamenti/giorno', sub: 'Aiuta a quantificare il tempo risparmiato' },
+      { step: '3', label: 'Mostra le gift card', sub: 'Entrate extra senza lavoro aggiuntivo' },
+      { step: '4', label: 'Proponi il piano giusto', sub: 'Starter per chi inizia, Pro per crescere, Business per automazione' },
+      { step: '5', label: 'Trial gratuito 14 giorni', sub: 'Nessun rischio — parte subito oggi' },
+      { step: '6', label: 'Registra e configura insieme', sub: 'Aggiungi il primo servizio e operatore' },
+    ];
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '32px', maxWidth: '960px' }}>
+        {/* Header */}
+        <div style={{ textAlign: 'center', padding: '20px 0 0' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '999px', padding: '4px 16px', marginBottom: '12px' }}>
+            <Zap size={13} style={{ color: '#fbbf24' }} />
+            <span style={{ color: '#fbbf24', fontSize: '12px', fontWeight: 600 }}>PRESENTAZIONE COMMERCIALE</span>
+          </div>
+          <h2 style={{ color: '#f4f4f5', fontSize: '28px', fontWeight: 800, margin: '0 0 8px' }}>Stylistgo — Gestionale per saloni</h2>
+          <p style={{ color: '#71717a', fontSize: '15px', margin: 0 }}>Mostra questa pagina al cliente durante la visita</p>
+        </div>
+
+        {/* Piano cards */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+          {PLANS.map(plan => (
+            <div key={plan.key} style={{ background: '#1c1c27', border: `1px solid ${plan.color}40`, borderRadius: '20px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px', position: 'relative', overflow: 'hidden' }}>
+              {plan.badge && (
+                <div style={{ position: 'absolute', top: '14px', right: '14px', background: plan.gradient, borderRadius: '999px', padding: '3px 10px', fontSize: '10px', color: 'white', fontWeight: 700 }}>{plan.badge}</div>
+              )}
+              {/* Price */}
+              <div>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 700, color: plan.color, textTransform: 'uppercase', letterSpacing: '1px' }}>{plan.label}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+                  <span style={{ fontSize: '36px', fontWeight: 800, color: '#f4f4f5' }}>€{plan.price}</span>
+                  <span style={{ fontSize: '13px', color: '#71717a' }}>/mese</span>
+                </div>
+                <p style={{ color: '#a1a1aa', fontSize: '12px', margin: '4px 0 0', lineHeight: 1.4 }}>{plan.tagline}</p>
+              </div>
+
+              {/* Features */}
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {plan.features.map(f => (
+                  <div key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                    <Check size={13} style={{ color: plan.color, flexShrink: 0, marginTop: '2px' }} />
+                    <span style={{ color: '#d4d4d8', fontSize: '12px', lineHeight: 1.4 }}>{f}</span>
+                  </div>
+                ))}
+                {plan.notIncluded.map(f => (
+                  <div key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', opacity: 0.3 }}>
+                    <X size={13} style={{ color: '#71717a', flexShrink: 0, marginTop: '2px' }} />
+                    <span style={{ color: '#71717a', fontSize: '12px', lineHeight: 1.4 }}>{f}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* CTA */}
+              <button
+                onClick={() => { changeSection('tenants'); }}
+                style={{ width: '100%', padding: '11px', borderRadius: '12px', border: 'none', background: plan.gradient, color: 'white', fontWeight: 700, cursor: 'pointer', fontSize: '13px' }}>
+                Attiva {plan.label}
+              </button>
+            </div>
+          ))}
+        </div>
+
+        {/* Trial banner */}
+        <div style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: '16px', padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
+          <div>
+            <p style={{ color: '#fbbf24', fontWeight: 700, fontSize: '16px', margin: '0 0 4px' }}>🎁 Prova gratis 14 giorni</p>
+            <p style={{ color: '#a1a1aa', fontSize: '13px', margin: 0 }}>Nessuna carta di credito richiesta. Accesso completo al piano Pro per 14 giorni. Poi decidi tu.</p>
+          </div>
+          <div style={{ background: 'linear-gradient(135deg,#f59e0b,#ef4444)', borderRadius: '12px', padding: '10px 20px', color: 'white', fontWeight: 700, fontSize: '14px', whiteSpace: 'nowrap' }}>
+            Inizia il trial →
+          </div>
+        </div>
+
+        {/* Checklist di vendita */}
+        <div style={card()}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
+            <Star size={16} style={{ color: '#fbbf24' }} />
+            <p style={{ color: '#f4f4f5', fontSize: '15px', fontWeight: 700, margin: 0 }}>Script di vendita — segui questi passi dal vivo</p>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {CHECKLIST.map(item => (
+              <div key={item.step} style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', padding: '12px', background: '#12121a', borderRadius: '12px' }}>
+                <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'linear-gradient(135deg,#f59e0b,#ef4444)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontWeight: 700, fontSize: '12px', color: 'white' }}>{item.step}</div>
+                <div>
+                  <p style={{ color: '#f4f4f5', fontWeight: 600, fontSize: '13px', margin: '0 0 2px' }}>{item.label}</p>
+                  <p style={{ color: '#71717a', fontSize: '11px', margin: 0 }}>{item.sub}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ROI estimate */}
+        <div style={card()}>
+          <p style={{ color: '#71717a', fontSize: '12px', margin: '0 0 14px' }}>💡 Aiuta il cliente a calcolare il ROI</p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '12px' }}>
+            {[
+              { label: 'Tempo risparmiato', value: '~3h/settimana', sub: 'No più agenda carta, no dimenticanze', color: '#818cf8' },
+              { label: 'Clienti recuperati', value: '+15-20%', sub: 'Promemoria automatici riducono i no-show', color: '#4ade80' },
+              { label: 'Entrate extra gift card', value: '+€200-500/mese', sub: 'I clienti regalano, tu incassi subito', color: '#fbbf24' },
+            ].map(kpi => (
+              <div key={kpi.label} style={{ background: '#12121a', borderRadius: '12px', padding: '14px', textAlign: 'center' }}>
+                <p style={{ color: kpi.color, fontSize: '20px', fontWeight: 800, margin: '0 0 4px' }}>{kpi.value}</p>
+                <p style={{ color: '#f4f4f5', fontSize: '12px', fontWeight: 600, margin: '0 0 4px' }}>{kpi.label}</p>
+                <p style={{ color: '#52525b', fontSize: '10px', margin: 0, lineHeight: 1.4 }}>{kpi.sub}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // ─── LAYOUT ───────────────────────────────────────────────────────────────
   return (
     <div style={{ display: 'flex', height: '100vh', background: '#0f0f13', overflow: 'hidden' }}>
@@ -1380,6 +1568,7 @@ export default function AdminPage() {
             {section === 'flags'       && FlagsSection()}
             {section === 'audit'       && AuditSection()}
             {section === 'whatsapp'    && WhatsAppSection()}
+            {section === 'sales'        && SalesSection()}
           </>
         )}
       </div>
