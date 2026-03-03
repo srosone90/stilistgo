@@ -628,10 +628,20 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
               <h3 className="font-semibold text-white">{editAppt ? 'Modifica Appuntamento' : 'Nuovo Appuntamento'}</h3>
               <div className="flex gap-2 items-center">
                 {editAppt && (
-                  <select value={editAppt.status} onChange={e => { changeAppointmentStatus(editAppt.id, e.target.value as AppointmentStatus); setEditAppt(prev => prev ? { ...prev, status: e.target.value as AppointmentStatus } : null); }}
-                    style={{ ...inputStyle, width: 'auto', padding: '4px 8px', fontSize: '12px' }}>
-                    {(Object.keys(STATUS_LABELS) as AppointmentStatus[]).map(s => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
-                  </select>
+                  <>
+                    <select value={editAppt.status} onChange={e => { changeAppointmentStatus(editAppt.id, e.target.value as AppointmentStatus); setEditAppt(prev => prev ? { ...prev, status: e.target.value as AppointmentStatus } : null); }}
+                      style={{ ...inputStyle, width: 'auto', padding: '4px 8px', fontSize: '12px' }}>
+                      {(Object.keys(STATUS_LABELS) as AppointmentStatus[]).map(s => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
+                    </select>
+                    {editAppt.status !== 'no-show' && (
+                      <button
+                        title="Segna come No-show"
+                        onClick={() => { changeAppointmentStatus(editAppt.id, 'no-show'); setEditAppt(prev => prev ? { ...prev, status: 'no-show' } : null); }}
+                        style={{ background: '#ef4444', border: 'none', color: '#fff', borderRadius: '6px', padding: '4px 8px', fontSize: '11px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                        🚫 No-show
+                      </button>
+                    )}
+                  </>
                 )}
                 <button onClick={() => setShowForm(false)} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}><X size={18} /></button>
               </div>

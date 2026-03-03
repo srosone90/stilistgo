@@ -17,7 +17,7 @@ const btnPrimary: React.CSSProperties = { background: 'rgba(99,102,241,0.2)', bo
 const EMPTY_PRODUCT: Omit<Product, 'id' | 'createdAt'> = {
   name: '', brand: '', category: '', unit: 'pz',
   purchasePrice: 0, salePrice: 0, stock: 0, minStock: 5,
-  isForSale: false, active: true,
+  isForSale: false, active: true, supplierId: '',
 };
 
 const EMPTY_MOVEMENT: Omit<StockMovement, 'id' | 'createdAt'> = {
@@ -25,7 +25,7 @@ const EMPTY_MOVEMENT: Omit<StockMovement, 'id' | 'createdAt'> = {
 };
 
 export default function InventoryView({ newTrigger }: { newTrigger?: number }) {
-  const { products, addProduct, updateProduct, deleteProduct, stockMovements, addStockMovement, operators } = useSalon();
+  const { products, addProduct, updateProduct, deleteProduct, stockMovements, addStockMovement, operators, suppliers } = useSalon();
   const { addEntry } = useApp();
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -62,7 +62,7 @@ export default function InventoryView({ newTrigger }: { newTrigger?: number }) {
   function openEdit(p: Product) {
     setEditProd(p);
     setIsNewCategory(false);
-    setForm({ name: p.name, brand: p.brand, category: p.category, unit: p.unit, purchasePrice: p.purchasePrice, salePrice: p.salePrice, stock: p.stock, minStock: p.minStock, isForSale: p.isForSale, active: p.active });
+    setForm({ name: p.name, brand: p.brand, category: p.category, unit: p.unit, purchasePrice: p.purchasePrice, salePrice: p.salePrice, stock: p.stock, minStock: p.minStock, isForSale: p.isForSale, active: p.active, supplierId: p.supplierId ?? '' });
     setShowProdForm(true);
   }
 
@@ -303,6 +303,16 @@ export default function InventoryView({ newTrigger }: { newTrigger?: number }) {
               <div><label style={labelStyle}>Soglia minima riordino</label><input type="number" min={0} value={form.minStock} onChange={e => setForm(p => ({ ...p, minStock: Number(e.target.value) }))} style={inputStyle} /></div>
               <div><label style={labelStyle}>Prezzo acquisto (€)</label><input type="number" min={0} step={0.01} value={form.purchasePrice} onChange={e => setForm(p => ({ ...p, purchasePrice: Number(e.target.value) }))} style={inputStyle} /></div>
               <div><label style={labelStyle}>Prezzo vendita (€)</label><input type="number" min={0} step={0.01} value={form.salePrice} onChange={e => setForm(p => ({ ...p, salePrice: Number(e.target.value) }))} style={inputStyle} /></div>
+              {/* Supplier */}
+              {suppliers.length > 0 && (
+                <div className="col-span-2">
+                  <label style={labelStyle}>Fornitore</label>
+                  <select value={form.supplierId ?? ''} onChange={e => setForm(p => ({ ...p, supplierId: e.target.value || undefined }))} style={inputStyle}>
+                    <option value="">— Nessun fornitore —</option>
+                    {suppliers.filter(s => s.active).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                </div>
+              )}
               <div className="col-span-2 flex gap-4">
                 <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: 'var(--text-2)' }}>
                   <input type="checkbox" checked={form.isForSale} onChange={e => setForm(p => ({ ...p, isForSale: e.target.checked }))} />

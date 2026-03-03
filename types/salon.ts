@@ -16,6 +16,9 @@ export interface Client {
   createdAt: string;
 }
 
+export type HairType = 'lisci' | 'mossi' | 'ricci' | 'crespi' | 'altro';
+export type HairCondition = 'sani' | 'secchi' | 'grassi' | 'colorati' | 'trattati' | 'rovinati';
+
 export interface TechnicalCard {
   id: string;
   clientId: string;
@@ -29,6 +32,13 @@ export interface TechnicalCard {
   posaDuration: number; // minutes
   result: string;
   notes: string;
+  // Enhanced fields
+  hairType?: HairType;
+  hairCondition?: HairCondition;
+  hairLength?: 'corti' | 'medi' | 'lunghi';
+  photosBefore?: string[]; // base64 data URLs
+  photosAfter?: string[];  // base64 data URLs
+  appointmentId?: string;
   createdAt: string;
 }
 
@@ -48,6 +58,11 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
   'Taglio', 'Colore', 'Trattamento', 'Piega', 'Estetica', 'Nail', 'Sposa', 'Altro',
 ];
 
+export interface ServiceProductUsage {
+  productId: string;
+  qty: number; // quantity used per service
+}
+
 export interface Service {
   id: string;
   name: string;
@@ -57,6 +72,7 @@ export interface Service {
   description: string;
   operatorIds: string[]; // empty = all operators
   active: boolean;
+  productUsage?: ServiceProductUsage[]; // auto-deduct from stock when service is rendered
   createdAt: string;
 }
 
@@ -206,6 +222,7 @@ export interface Product {
   minStock: number;
   isForSale: boolean;
   active: boolean;
+  supplierId?: string; // reference to Supplier
   createdAt: string;
 }
 
@@ -231,6 +248,10 @@ export interface GiftCard {
   remainingValue: number;
   expiryDate: string;
   isActive: boolean;
+  purchasedByOperatorId?: string;
+  sentViaWhatsApp?: boolean;
+  recipientPhone?: string; // phone to send the gift card to (if different from clientId)
+  message?: string; // personal message
   createdAt: string;
 }
 
@@ -344,11 +365,13 @@ export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
 };
 
 export interface PaymentItem {
-  serviceId?: string;    // service id (if service)
-  productId?: string;   // product id (if product)
-  serviceName: string;  // name (service or product label)
+  serviceId?: string;       // service id (if service)
+  productId?: string;       // product id (if product)
+  subscriptionId?: string;  // subscription id (if session redeemed)
+  serviceName: string;      // name (service or product label)
   price: number;
-  isProduct?: boolean;  // true = inventory product sale
+  isProduct?: boolean;      // true = inventory product sale
+  isSubscriptionSession?: boolean; // true = session redeemed from subscription
 }
 
 export interface Payment {
@@ -368,6 +391,7 @@ export interface Payment {
   cardAmount: number;
   giftCardCode: string;
   giftCardAmount: number;
+  subscriptionId?: string;   // if paid/redeemed via subscription
   notes: string;
   createdAt: string;
 }
@@ -408,6 +432,41 @@ export const DEFAULT_GAMIFICATION_CONFIG: GamificationConfig = {
   silverThreshold: 1500,
   goldThreshold: 3000,
 };
+
+// ─── Suppliers ────────────────────────────────────────────────────────────────
+
+export interface Supplier {
+  id: string;
+  name: string;
+  contactName: string;
+  phone: string;
+  email: string;
+  address: string;
+  notes: string;
+  active: boolean;
+  createdAt: string;
+}
+
+// ─── Client Subscriptions ─────────────────────────────────────────────────────
+
+export type SubscriptionStatus = 'active' | 'expired' | 'exhausted' | 'cancelled';
+
+export interface ClientSubscription {
+  id: string;
+  clientId: string;
+  clientName: string;
+  name: string;           // e.g. "Pacchetto 10 lavaggi"
+  serviceIds: string[];   // which services can be redeemed
+  totalSessions: number;
+  usedSessions: number;
+  price: number;          // purchase price
+  purchaseDate: string;   // YYYY-MM-DD
+  expiryDate: string;     // YYYY-MM-DD
+  status: SubscriptionStatus;
+  purchasedByOperatorId?: string;
+  notes: string;
+  createdAt: string;
+}
 
 // Default schedule helper
 export function defaultSchedule(): WorkShift[] {

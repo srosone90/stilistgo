@@ -4,6 +4,7 @@ import {
   GiftCard, SalonConfig, DEFAULT_SALON_CONFIG, defaultSchedule,
   OPERATOR_COLORS, Payment, CashSession,
   GamificationConfig, DEFAULT_GAMIFICATION_CONFIG,
+  Supplier, ClientSubscription,
 } from '@/types/salon';
 
 // ─── Generic helpers ──────────────────────────────────────────────────────────
@@ -58,6 +59,8 @@ const K = () => ({
   cashSessions:      `stylistgo_${_uid}_cash_sessions`,
   activeOperatorId:  `stylistgo_${_uid}_active_operator`,
   gamificationConfig:`stylistgo_${_uid}_gamification`,
+  suppliers:         `stylistgo_${_uid}_suppliers`,
+  subscriptions:     `stylistgo_${_uid}_subscriptions`,
   savedAt:           `stylistgo_${_uid}_saved_at`,
 });
 
@@ -196,3 +199,13 @@ export function storageGetGamificationConfig(): GamificationConfig {
 export function storageSaveGamificationConfig(data: GamificationConfig): void {
   if (typeof window !== 'undefined') localStorage.setItem(K().gamificationConfig, JSON.stringify(data));
 }
+
+// ─── Suppliers ────────────────────────────────────────────────────────────────
+
+export function storageGetSuppliers(): Supplier[] { return getList<Supplier>(K().suppliers); }
+export function storageSaveSuppliers(data: Supplier[]): void { saveList(K().suppliers, data); }
+
+// ─── Client Subscriptions ─────────────────────────────────────────────────────
+
+export function storageGetSubscriptions(): ClientSubscription[] { return getList<ClientSubscription>(K().subscriptions); }
+export function storageSaveSubscriptions(data: ClientSubscription[]): void { saveList(K().subscriptions, data); }

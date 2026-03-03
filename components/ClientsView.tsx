@@ -2,10 +2,10 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useSalon } from '@/context/SalonContext';
-import { Client, TechnicalCard } from '@/types/salon';
+import { Client, TechnicalCard, HairType, HairCondition } from '@/types/salon';
 import { salonGenerateId } from '@/lib/salonStorage';
 import { format, parseISO, differenceInDays } from 'date-fns';
-import { UserPlus, Search, Trash2, ChevronDown, ChevronUp, X, Star, AlertTriangle, FlaskConical, Clock } from 'lucide-react';
+import { UserPlus, Search, Trash2, ChevronDown, ChevronUp, X, Star, AlertTriangle, FlaskConical, Clock, Camera, ImagePlus } from 'lucide-react';
 
 const card: React.CSSProperties = { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '16px', padding: '20px' };
 const inputStyle: React.CSSProperties = { background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '10px', padding: '9px 13px', color: 'var(--text)', fontSize: '13px', outline: 'none', width: '100%' };
@@ -22,6 +22,8 @@ const EMPTY_CARD: Omit<TechnicalCard, 'id' | 'createdAt'> = {
   clientId: '', operatorId: '', date: format(new Date(), 'yyyy-MM-dd'),
   serviceDescription: '', brand: '', formula: '', oxidant: '', oxidantPct: '',
   posaDuration: 0, result: '', notes: '',
+  hairType: undefined, hairCondition: undefined, hairLength: undefined,
+  photosBefore: [], photosAfter: [], appointmentId: '',
 };
 
 export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
@@ -242,8 +244,36 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
                       {tc.oxidant && <Row label="Ossidante" value={`${tc.oxidant} ${tc.oxidantPct}%`} />}
                       {tc.posaDuration > 0 && <Row label="Tempo posa" value={`${tc.posaDuration} min`} />}
                       {tc.result && <Row label="Risultato" value={tc.result} />}
+                      {tc.hairType && <Row label="Tipo capello" value={tc.hairType} />}
+                      {tc.hairCondition && <Row label="Condizione" value={tc.hairCondition} />}
+                      {tc.hairLength && <Row label="Lunghezza" value={tc.hairLength} />}
                     </div>
                     {tc.notes && <p className="text-xs mt-2" style={{ color: 'var(--muted)' }}>{tc.notes}</p>}
+                    {/* Photos */}
+                    {((tc.photosBefore?.length ?? 0) > 0 || (tc.photosAfter?.length ?? 0) > 0) && (
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        {tc.photosBefore && tc.photosBefore.length > 0 && (
+                          <div>
+                            <p className="text-xs mb-1" style={{ color: 'var(--muted)' }}>Prima</p>
+                            <div className="flex flex-wrap gap-1">
+                              {tc.photosBefore.map((src, i) => (
+                                <img key={i} src={src} alt="prima" className="w-16 h-16 rounded-lg object-cover cursor-pointer hover:opacity-80" onClick={() => window.open(src, '_blank')} />
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {tc.photosAfter && tc.photosAfter.length > 0 && (
+                          <div>
+                            <p className="text-xs mb-1" style={{ color: 'var(--muted)' }}>Dopo</p>
+                            <div className="flex flex-wrap gap-1">
+                              {tc.photosAfter.map((src, i) => (
+                                <img key={i} src={src} alt="dopo" className="w-16 h-16 rounded-lg object-cover cursor-pointer hover:opacity-80" onClick={() => window.open(src, '_blank')} />
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -314,7 +344,75 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
             <Field label="Percentuale ossidante"><input value={cardForm.oxidantPct} onChange={e => setCardForm(p => ({ ...p, oxidantPct: e.target.value }))} style={inputStyle} /></Field>
             <Field label="Tempo di posa (min)"><input type="number" min={0} value={cardForm.posaDuration} onChange={e => setCardForm(p => ({ ...p, posaDuration: Number(e.target.value) }))} style={inputStyle} /></Field>
             <Field label="Risultato"><input value={cardForm.result} onChange={e => setCardForm(p => ({ ...p, result: e.target.value }))} style={inputStyle} /></Field>
+            {/* Hair profile */}
+            <Field label="Tipo capello">
+              <select value={cardForm.hairType ?? ''} onChange={e => setCardForm(p => ({ ...p, hairType: e.target.value as HairType || undefined }))} style={inputStyle}>
+                <option value="">—</option>
+                {(['lisci','mossi','ricci','crespi','altro'] as HairType[]).map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </Field>
+            <Field label="Condizione capello">
+              <select value={cardForm.hairCondition ?? ''} onChange={e => setCardForm(p => ({ ...p, hairCondition: e.target.value as HairCondition || undefined }))} style={inputStyle}>
+                <option value="">—</option>
+                {(['sani','secchi','grassi','colorati','trattati','rovinati'] as HairCondition[]).map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </Field>
+            <Field label="Lunghezza capello">
+              <select value={cardForm.hairLength ?? ''} onChange={e => setCardForm(p => ({ ...p, hairLength: e.target.value as 'corti'|'medi'|'lunghi' || undefined }))} style={inputStyle}>
+                <option value="">—</option>
+                <option value="corti">Corti</option>
+                <option value="medi">Medi</option>
+                <option value="lunghi">Lunghi</option>
+              </select>
+            </Field>
             <div className="col-span-2"><Field label="Note"><textarea rows={2} value={cardForm.notes} onChange={e => setCardForm(p => ({ ...p, notes: e.target.value }))} style={{ ...inputStyle, resize: 'vertical' }} /></Field></div>
+            {/* Photo upload */}
+            <div className="col-span-2">
+              <label className="block text-xs mb-2" style={{ color: 'var(--muted)' }}>Foto PRIMA (max 3)</label>
+              <div className="flex flex-wrap gap-2 items-center">
+                {(cardForm.photosBefore ?? []).map((src, i) => (
+                  <div key={i} className="relative w-16 h-16">
+                    <img src={src} alt="prima" className="w-16 h-16 rounded-lg object-cover" />
+                    <button type="button" onClick={() => setCardForm(p => ({ ...p, photosBefore: p.photosBefore?.filter((_, j) => j !== i) }))}
+                      className="absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-white text-xs"
+                      style={{ background: '#ef4444' }}>×</button>
+                  </div>
+                ))}
+                {(cardForm.photosBefore?.length ?? 0) < 3 && (
+                  <label className="w-16 h-16 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:opacity-70"
+                    style={{ border: '2px dashed var(--border)', color: 'var(--muted)' }}>
+                    <ImagePlus size={18} /><span className="text-xs mt-0.5">Prima</span>
+                    <input type="file" accept="image/*" className="hidden" onChange={e => {
+                      const f = e.target.files?.[0]; if (!f) return;
+                      const r = new FileReader(); r.onload = ev => { const d = ev.target?.result as string; setCardForm(p => ({ ...p, photosBefore: [...(p.photosBefore ?? []), d] })); }; r.readAsDataURL(f);
+                    }} />
+                  </label>
+                )}
+              </div>
+            </div>
+            <div className="col-span-2">
+              <label className="block text-xs mb-2" style={{ color: 'var(--muted)' }}>Foto DOPO (max 3)</label>
+              <div className="flex flex-wrap gap-2 items-center">
+                {(cardForm.photosAfter ?? []).map((src, i) => (
+                  <div key={i} className="relative w-16 h-16">
+                    <img src={src} alt="dopo" className="w-16 h-16 rounded-lg object-cover" />
+                    <button type="button" onClick={() => setCardForm(p => ({ ...p, photosAfter: p.photosAfter?.filter((_, j) => j !== i) }))}
+                      className="absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-white text-xs"
+                      style={{ background: '#ef4444' }}>×</button>
+                  </div>
+                ))}
+                {(cardForm.photosAfter?.length ?? 0) < 3 && (
+                  <label className="w-16 h-16 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:opacity-70"
+                    style={{ border: '2px dashed var(--border)', color: 'var(--muted)' }}>
+                    <ImagePlus size={18} /><span className="text-xs mt-0.5">Dopo</span>
+                    <input type="file" accept="image/*" className="hidden" onChange={e => {
+                      const f = e.target.files?.[0]; if (!f) return;
+                      const r = new FileReader(); r.onload = ev => { const d = ev.target?.result as string; setCardForm(p => ({ ...p, photosAfter: [...(p.photosAfter ?? []), d] })); }; r.readAsDataURL(f);
+                    }} />
+                  </label>
+                )}
+              </div>
+            </div>
           </div>
           <div className="flex justify-end gap-2 mt-4">
             <button onClick={() => setShowCardForm(false)} style={btnDanger}>Annulla</button>

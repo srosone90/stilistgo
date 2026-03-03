@@ -18,15 +18,19 @@ import GamificationView from '@/components/GamificationView';
 import LoyaltyView from '@/components/LoyaltyView';
 import OnlineBookingsView from '@/components/OnlineBookingsView';
 import AutomationsView from '@/components/AutomationsView';
+import ReportOperatoriView from '@/components/ReportOperatoriView';
+import FornitoriView from '@/components/FornitoriView';
+import AbbonamentiView from '@/components/AbbonamentiView';
+import GiftCardsView from '@/components/GiftCardsView';
 import OperatorLockScreen from '@/components/OperatorLockScreen';
 import { useApp } from '@/context/AppContext';
 import { useSalon } from '@/context/SalonContext';
 import { getCurrentUser, signOut } from '@/lib/supabase';
 import { DEFAULT_OPERATOR_PERMISSIONS, OperatorPermissions } from '@/types/salon';
 import { PLAN_FEATURES, PlanFeatures, VIEW_TO_FEATURE, UPGRADE_TEXT } from '@/lib/planGate';
-import { Plus, Loader2, CalendarDays, Users, Sparkles, UserCog, Package, Banknote, Trophy, Star, Globe, LogOut, Lock, MessageSquare } from 'lucide-react';
+import { Plus, Loader2, CalendarDays, Users, Sparkles, UserCog, Package, Banknote, Trophy, Star, Globe, LogOut, Lock, MessageSquare, BarChart3, Building2, CreditCard, Gift } from 'lucide-react';
 
-type View = 'dashboard' | 'tabella' | 'analisi' | 'impostazioni' | 'calendar' | 'clients' | 'services' | 'staff' | 'inventory' | 'cash' | 'gamification' | 'loyalty' | 'bookings' | 'automazioni';
+type View = 'dashboard' | 'tabella' | 'analisi' | 'impostazioni' | 'calendar' | 'clients' | 'services' | 'staff' | 'inventory' | 'cash' | 'gamification' | 'loyalty' | 'bookings' | 'automazioni' | 'report-operatori' | 'fornitori' | 'abbonamenti' | 'gift-cards';
 
 export default function Home() {
   const router = useRouter();
@@ -61,6 +65,8 @@ export default function Home() {
       services: effectivePerms.services, staff: effectivePerms.staff,
       inventory: effectivePerms.inventory, cash: effectivePerms.cash,
       gamification: true, loyalty: true, bookings: effectivePerms.accounting, automazioni: true,
+      'report-operatori': effectivePerms.accounting, fornitori: effectivePerms.inventory,
+      abbonamenti: effectivePerms.cash, 'gift-cards': effectivePerms.cash,
     };
     if (!viewPermsMap[view]) {
       const fallback = (Object.keys(viewPermsMap) as View[]).find(v => viewPermsMap[v]);
@@ -136,7 +142,11 @@ export default function Home() {
     gamification: { label: 'Gamification',     icon: <Trophy size={20} />,    action: () => {} },
     loyalty:      { label: 'Fidelizzazione',    icon: <Star size={20} />,      action: () => {} },
     bookings:     { label: 'Prenotazioni',      icon: <Globe size={20} />,         action: () => {} },
-    automazioni:  { label: 'Automazioni',         icon: <MessageSquare size={20} />, action: () => {} },
+    automazioni:            { label: 'Automazioni',         icon: <MessageSquare size={20} />, action: () => {} },
+    'report-operatori':    { label: 'Report Operatori',    icon: <BarChart3 size={20} />,     action: () => {} },
+    fornitori:             { label: 'Nuovo Fornitore',     icon: <Building2 size={20} />,    action: () => setFabTrigger(t => t + 1) },
+    abbonamenti:           { label: 'Nuovo Abbonamento',   icon: <CreditCard size={20} />,   action: () => setFabTrigger(t => t + 1) },
+    'gift-cards':          { label: 'Nuova Gift Card',     icon: <Gift size={20} />,         action: () => setFabTrigger(t => t + 1) },
   };
 
   const renderView = () => {
@@ -159,7 +169,11 @@ export default function Home() {
       case 'gamification': return <GamificationView />;
       case 'loyalty':      return <LoyaltyView />;
       case 'bookings':     return effectivePerms.accounting ? <OnlineBookingsView /> : AccessDenied;
-      case 'automazioni':  return <AutomationsView />;
+      case 'automazioni':       return <AutomationsView />;
+      case 'report-operatori': return effectivePerms.accounting ? <ReportOperatoriView /> : AccessDenied;
+      case 'fornitori':        return effectivePerms.inventory  ? <FornitoriView newTrigger={fabTrigger} /> : AccessDenied;
+      case 'abbonamenti':      return effectivePerms.cash       ? <AbbonamentiView newTrigger={fabTrigger} /> : AccessDenied;
+      case 'gift-cards':       return effectivePerms.cash       ? <GiftCardsView newTrigger={fabTrigger} /> : AccessDenied;
     }
   };
 

@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useSalon } from '@/context/SalonContext';
-import { Service, ServiceCategory, SERVICE_CATEGORIES } from '@/types/salon';
+import { Service, ServiceCategory, SERVICE_CATEGORIES, ServiceProductUsage } from '@/types/salon';
 import { formatCurrency } from '@/lib/calculations';
 import { Plus, X, Pencil, Trash2 } from 'lucide-react';
 
@@ -13,7 +13,7 @@ const btnPrimary: React.CSSProperties = { background: 'rgba(99,102,241,0.2)', bo
 
 const EMPTY_SERVICE: Omit<Service, 'id' | 'createdAt'> = {
   name: '', category: 'Taglio', duration: 30, price: 0,
-  description: '', operatorIds: [], active: true,
+  description: '', operatorIds: [], active: true, productUsage: [],
 };
 
 const CAT_COLORS: Record<ServiceCategory, string> = {
@@ -23,7 +23,7 @@ const CAT_COLORS: Record<ServiceCategory, string> = {
 };
 
 export default function ServicesView({ newTrigger }: { newTrigger?: number }) {
-  const { services, addService, updateService, deleteService, operators } = useSalon();
+  const { services, addService, updateService, deleteService, operators, products } = useSalon();
   const [showForm, setShowForm] = useState(false);
   const [editSvc, setEditSvc] = useState<Service | null>(null);
   const [form, setForm] = useState<Omit<Service, 'id' | 'createdAt'>>(EMPTY_SERVICE);
@@ -47,7 +47,7 @@ export default function ServicesView({ newTrigger }: { newTrigger?: number }) {
 
   function openEdit(s: Service) {
     setEditSvc(s);
-    setForm({ name: s.name, category: s.category, duration: s.duration, price: s.price, description: s.description, operatorIds: [...s.operatorIds], active: s.active });
+    setForm({ name: s.name, category: s.category, duration: s.duration, price: s.price, description: s.description, operatorIds: [...s.operatorIds], active: s.active, productUsage: [...(s.productUsage ?? [])] });
     setShowForm(true);
   }
 
@@ -181,6 +181,39 @@ export default function ServicesView({ newTrigger }: { newTrigger?: number }) {
                       {o.name}
                     </button>
                   ))}
+                </div>
+              </div>
+              {/* Product usage section */}
+              <div className="col-span-2">
+                <label style={labelStyle}>Prodotti usati per questo servizio (scalati automaticamente) </label>
+                <div className="space-y-2 mt-1">
+                  {(form.productUsage ?? []).map((usage, idx) => {
+                    const prod = products.find(p => p.id === usage.productId);
+                    return (
+                      <div key={idx} className="flex items-center gap-2">
+                        <select
+                          value={usage.productId}
+                          onChange={e => setForm(f => { const u = [...(f.productUsage ?? [])]; u[idx] = { ...u[idx], productId: e.target.value }; return { ...f, productUsage: u }; })}
+                          style={{ ...inputStyle, flex: 1 }}>
+                          <option value="">— Seleziona prodotto —</option>
+                          {products.filter(p => p.active).map(p => <option key={p.id} value={p.id}>{p.name} ({p.brand})</option>)}
+                        </select>
+                        <input type="number" min={0.01} step={0.01}
+                          value={usage.qty}
+                          onChange={e => setForm(f => { const u = [...(f.productUsage ?? [])]; u[idx] = { ...u[idx], qty: parseFloat(e.target.value) || 0 }; return { ...f, productUsage: u }; })}
+                          style={{ ...inputStyle, width: '80px' }}
+                          placeholder="qty" />
+                        {prod && <span style={{ fontSize: '11px', color: 'var(--muted)' }}>{prod.unit}</span>}
+                        <button type="button" onClick={() => setForm(f => ({ ...f, productUsage: (f.productUsage ?? []).filter((_, i) => i !== idx) }))}
+                          style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }}>×</button>
+                      </div>
+                    );
+                  })}
+                  <button type="button"
+                    onClick={() => setForm(f => ({ ...f, productUsage: [...(f.productUsage ?? []), { productId: '', qty: 1 }] }))}
+                    style={{ ...btnPrimary, fontSize: '12px', padding: '6px 12px' }}>
+                    <Plus size={12} /> Aggiungi prodotto
+                  </button>
                 </div>
               </div>
             </div>

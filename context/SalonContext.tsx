@@ -7,6 +7,7 @@ import {
   Product, StockMovement, GiftCard, SalonConfig, AppointmentHistoryEntry,
   Payment, CashSession, GamificationConfig, DEFAULT_GAMIFICATION_CONFIG, DEFAULT_SALON_CONFIG,
   WhatsAppMessage, WhatsAppConfig, DEFAULT_WHATSAPP_CONFIG,
+  Supplier, ClientSubscription, SubscriptionStatus,
 } from '@/types/salon';
 import {
   storageGetClients, storageSaveClients,
@@ -24,6 +25,8 @@ import {
   storageGetCashSessions, storageSaveCashSessions,
   storageGetActiveOperatorId, storageSaveActiveOperatorId,
   storageGetGamificationConfig, storageSaveGamificationConfig,
+  storageGetSuppliers, storageSaveSuppliers,
+  storageGetSubscriptions, storageSaveSubscriptions,
   salonGenerateId, setStorageUserId,
   getLocalSavedAt, setLocalSavedAt,
 } from '@/lib/salonStorage';
@@ -116,6 +119,19 @@ interface SalonContextValue {
   // WhatsApp message log
   whatsappMessages: WhatsAppMessage[];
   addWhatsAppMessage: (m: WhatsAppMessage) => void;
+
+  // Suppliers
+  suppliers: Supplier[];
+  addSupplier: (s: Omit<Supplier, 'id' | 'createdAt'>) => string;
+  updateSupplier: (s: Supplier) => void;
+  deleteSupplier: (id: string) => void;
+
+  // Client Subscriptions
+  subscriptions: ClientSubscription[];
+  addSubscription: (s: Omit<ClientSubscription, 'id' | 'createdAt'>) => string;
+  updateSubscription: (s: ClientSubscription) => void;
+  deleteSubscription: (id: string) => void;
+  useSubscriptionSession: (subscriptionId: string) => boolean; // returns false if no sessions left
 }
 
 const SalonContext = createContext<SalonContextValue | null>(null);
@@ -137,6 +153,8 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
   const [cashSessions, setCashSessions] = useState<CashSession[]>([]);
   const [whatsappMessages, setWhatsappMessages] = useState<WhatsAppMessage[]>([]);
   const [activeOperatorId, setActiveOperatorIdState] = useState<string | null>(null);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [subscriptions, setSubscriptions] = useState<ClientSubscription[]>([]);
   const [salonLoading, setSalonLoading] = useState(true);
   const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cloudLoadAttempted = useRef(false);
@@ -169,6 +187,8 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
       setPayments(storageGetPayments());
       setCashSessions(storageGetCashSessions());
       setActiveOperatorIdState(storageGetActiveOperatorId());
+      setSuppliers(storageGetSuppliers());
+      setSubscriptions(storageGetSubscriptions());
       setSalonLoading(false);
     };
     init();
@@ -201,6 +221,9 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
         if (arr<Payment>(cloudState.payments))                 { setPayments(cloudState.payments as Payment[]); storageSavePayments(cloudState.payments as Payment[]); }
         if (arr<CashSession>(cloudState.cashSessions))         { setCashSessions(cloudState.cashSessions as CashSession[]); storageSaveCashSessions(cloudState.cashSessions as CashSession[]); }
         if (arr<WhatsAppMessage>((cloudState as Record<string, unknown>).whatsappMessages)) { setWhatsappMessages((cloudState as Record<string, unknown>).whatsappMessages as WhatsAppMessage[]); }
+        const cs = cloudState as Record<string, unknown>;
+        if (arr<Supplier>(cs.suppliers))             { setSuppliers(cs.suppliers as Supplier[]); storageSaveSuppliers(cs.suppliers as Supplier[]); }
+        if (arr<ClientSubscription>(cs.subscriptions)) { setSubscriptions(cs.subscriptions as ClientSubscription[]); storageSaveSubscriptions(cs.subscriptions as ClientSubscription[]); }
         // For object fields (salonConfig, gamificationConfig) compare timestamps:
         // only apply cloud data if cloud saved it MORE RECENTLY than our last local save.
         const cloudSavedAt = (cloudState._savedAt as number) ?? 0;
@@ -346,6 +369,7 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
           clients, technicalCards, services, operators, absences, appointments,
           waitingList, products, stockMovements, giftCards, payments,
           cashSessions, salonConfig, gamificationConfig, whatsappMessages,
+          suppliers, subscriptions,
           _savedAt: savedAt,
         });
       } catch { /* ignore */ }
@@ -357,7 +381,8 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clients, technicalCards, services, operators, absences, appointments,
       waitingList, products, stockMovements, giftCards, payments,
-      cashSessions, salonConfig, gamificationConfig, whatsappMessages]);
+      cashSessions, salonConfig, gamificationConfig, whatsappMessages,
+      suppliers, subscriptions]);
 
   // Keep latestStateRef in sync so the flush-on-hide effect has fresh data
   useEffect(() => {
@@ -365,11 +390,13 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
       clients, technicalCards, services, operators, absences, appointments,
       waitingList, products, stockMovements, giftCards, payments,
       cashSessions, salonConfig, gamificationConfig, whatsappMessages,
+      suppliers, subscriptions,
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clients, technicalCards, services, operators, absences, appointments,
       waitingList, products, stockMovements, giftCards, payments,
-      cashSessions, salonConfig, gamificationConfig, whatsappMessages]);
+      cashSessions, salonConfig, gamificationConfig, whatsappMessages,
+      suppliers, subscriptions]);
 
   // ─── Flush to cloud immediately when tab is hidden or page is unloading ───
   // This fires BEFORE window.location.href navigations complete, ensuring
@@ -624,7 +651,46 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
         return n;
       });
     }
-  }, []);
+    // Auto-deduct products linked to services (Collegamento Prodotti → Servizi)
+    const serviceIdsInPayment = p.items.filter(i => i.serviceId && !i.isProduct).map(i => i.serviceId!);
+    if (serviceIdsInPayment.length > 0) {
+      const snap = latestStateRef.current;
+      const servicesList = (snap.services as Service[] | undefined) ?? [];
+      const date = p.date || new Date().toISOString().slice(0, 10);
+      const deductions: { productId: string; qty: number }[] = [];
+      for (const svcId of serviceIdsInPayment) {
+        const svc = servicesList.find(s => s.id === svcId);
+        if (svc?.productUsage?.length) {
+          for (const usage of svc.productUsage) {
+            const existing = deductions.find(d => d.productId === usage.productId);
+            if (existing) existing.qty += usage.qty;
+            else deductions.push({ productId: usage.productId, qty: usage.qty });
+          }
+        }
+      }
+      if (deductions.length > 0) {
+        const movements: StockMovement[] = deductions.map(d => ({
+          id: salonGenerateId(), productId: d.productId,
+          type: 'internal_use' as const,
+          quantity: -d.qty, date,
+          notes: `Uso automatico da servizio (pagamento ${full.id.slice(-6)})`,
+          operatorId: p.operatorId,
+          createdAt: new Date().toISOString(),
+        }));
+        setStockMovements(prev => { const n = [...prev, ...movements]; storageSaveStockMovements(n); return n; });
+        setProducts(prev => {
+          let updated = [...prev];
+          for (const d of deductions) {
+            updated = updated.map(pr => pr.id === d.productId
+              ? { ...pr, stock: Math.max(0, pr.stock - d.qty) }
+              : pr);
+          }
+          storageSaveProducts(updated);
+          return updated;
+        });
+      }
+    }
+  }, []); // latestStateRef is a ref — no dep needed
 
   const deletePayment = useCallback((id: string) => {
     setPayments(prev => { const n = prev.filter(x => x.id !== id); storageSavePayments(n); return n; });
@@ -674,6 +740,53 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
     setWhatsappMessages(prev => [...prev, m].slice(-200)); // keep last 200
   }, []);
 
+  // ─── Suppliers ────────────────────────────────────────────────────────────
+
+  const addSupplier = useCallback((s: Omit<Supplier, 'id' | 'createdAt'>): string => {
+    const full: Supplier = { ...s, id: salonGenerateId(), createdAt: new Date().toISOString() };
+    setSuppliers(prev => { const n = [...prev, full]; storageSaveSuppliers(n); return n; });
+    return full.id;
+  }, []);
+
+  const updateSupplier = useCallback((s: Supplier) => {
+    setSuppliers(prev => { const n = prev.map(x => x.id === s.id ? s : x); storageSaveSuppliers(n); return n; });
+  }, []);
+
+  const deleteSupplier = useCallback((id: string) => {
+    setSuppliers(prev => { const n = prev.filter(x => x.id !== id); storageSaveSuppliers(n); return n; });
+  }, []);
+
+  // ─── Client Subscriptions ─────────────────────────────────────────────────
+
+  const addSubscription = useCallback((s: Omit<ClientSubscription, 'id' | 'createdAt'>): string => {
+    const full: ClientSubscription = { ...s, id: salonGenerateId(), createdAt: new Date().toISOString() };
+    setSubscriptions(prev => { const n = [...prev, full]; storageSaveSubscriptions(n); return n; });
+    return full.id;
+  }, []);
+
+  const updateSubscription = useCallback((s: ClientSubscription) => {
+    setSubscriptions(prev => { const n = prev.map(x => x.id === s.id ? s : x); storageSaveSubscriptions(n); return n; });
+  }, []);
+
+  const deleteSubscription = useCallback((id: string) => {
+    setSubscriptions(prev => { const n = prev.filter(x => x.id !== id); storageSaveSubscriptions(n); return n; });
+  }, []);
+
+  const useSubscriptionSession = useCallback((subscriptionId: string): boolean => {
+    let success = false;
+    setSubscriptions(prev => {
+      const sub = prev.find(x => x.id === subscriptionId);
+      if (!sub || sub.usedSessions >= sub.totalSessions || sub.status !== 'active') return prev;
+      const usedSessions = sub.usedSessions + 1;
+      const status: SubscriptionStatus = usedSessions >= sub.totalSessions ? 'exhausted' : sub.status;
+      const updated = prev.map(x => x.id === subscriptionId ? { ...x, usedSessions, status } : x);
+      storageSaveSubscriptions(updated);
+      success = true;
+      return updated;
+    });
+    return success;
+  }, []);
+
   return (
     <SalonContext.Provider value={{
       clients, technicalCards, services, operators, absences,
@@ -694,6 +807,8 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
       activeOperatorId, setActiveOperatorId, verifyOperatorPin,
       gamificationConfig, updateGamificationConfig,
       whatsappMessages, addWhatsAppMessage,
+      suppliers, addSupplier, updateSupplier, deleteSupplier,
+      subscriptions, addSubscription, updateSubscription, deleteSubscription, useSubscriptionSession,
     }}>
       {children}
     </SalonContext.Provider>
