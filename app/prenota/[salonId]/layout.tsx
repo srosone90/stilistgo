@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
+import type { ReactNode } from 'react';
 
-// Metadata is mostly overridden by the dynamic manifest,
-// but we still provide fallback values for web crawlers.
 export const metadata: Metadata = {
   title: 'Prenota',
   description: 'Prenota il tuo appuntamento',
@@ -12,9 +11,6 @@ export const metadata: Metadata = {
   },
 };
 
-export default function PrenotaLayout({ children, params }: {
-  children: React.ReactNode;
-  params: Promise<{ salonId: string }>;
-}) {
-  return children;
+export default function PrenotaLayout({ children }: { children: ReactNode }) {
+  return <>{children}</>;
 }
