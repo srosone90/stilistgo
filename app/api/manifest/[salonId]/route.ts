@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 const DEFAULT_COLOR = '#c084fc';
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://stilistgo.netlify.app';
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://stylistgo.netlify.app';
 
 export async function GET(
   _req: NextRequest,

@@ -87,7 +87,7 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
         waCfg?.ultraMsgInstanceId && waCfg?.ultraMsgToken &&
         form.phone.trim() && currentSalonId
       ) {
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://stilistgo.netlify.app';
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://stylistgo.netlify.app';
         const salonName = salonConfig.salonName ?? 'il tuo salone';
         const clientName = `${form.firstName} ${form.lastName}`.trim();
         // Fire-and-forget: generate token then send

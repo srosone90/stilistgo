@@ -10,7 +10,7 @@ import {
   Link2, ExternalLink, UserPlus,
 } from 'lucide-react';
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://stilistgo.netlify.app';
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://stylistgo.netlify.app';
 
 // ─── Shared UI helpers ────────────────────────────────────────────────────────
 
