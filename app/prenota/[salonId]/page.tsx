@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, use } from 'react';
-import { CheckCircle2, Clock, Scissors, ArrowLeft, Calendar, User, Download, Share, Sparkles, MapPin } from 'lucide-react';
+import { CheckCircle2, Clock, Scissors, ArrowLeft, Calendar, User, Download, Sparkles, MapPin } from 'lucide-react';
 
 // ── Types ──────────────────────────────────────────────────────────
 interface SalonService { id: string; name: string; duration: number; price: number; category: string; }
@@ -53,64 +53,7 @@ function ProgressBar({ step, accent }: { step: string; accent: string }) {
   );
 }
 
-// ── Install bottom sheet ───────────────────────────────────────────
-function InstallSheet({ accent, onClose }: { accent: string; onClose: () => void }) {
-  const rgb = hexToRgb(accent);
-  return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 9999,
-      background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
-      display: 'flex', alignItems: 'flex-end',
-    }} onClick={onClose}>
-      <div
-        onClick={e => e.stopPropagation()}
-        style={{
-          width: '100%', background: '#1a1a24',
-          borderTop: `1px solid rgba(${rgb},0.3)`,
-          borderRadius: '24px 24px 0 0', padding: '8px 24px 40px',
-          boxShadow: `0 -16px 60px rgba(${rgb},0.2)`,
-        }}
-      >
-        <div style={{ width: 40, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.2)', margin: '12px auto 20px' }} />
-        <div style={{ textAlign: 'center', marginBottom: 20 }}>
-          <div style={{ fontSize: 40, marginBottom: 8 }}>📲</div>
-          <p style={{ color: 'white', fontWeight: 800, fontSize: 18, margin: '0 0 6px' }}>Aggiungi alla schermata Home</p>
-          <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: 14, margin: 0, lineHeight: 1.5 }}>
-            Accedi all&apos;app direttamente dall&apos;icona, senza aprire il browser
-          </p>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 14, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span style={{ fontSize: 20 }}>🍎</span>
-            <div>
-              <p style={{ color: 'white', fontSize: 13, fontWeight: 600, margin: 0 }}>iPhone / iPad</p>
-              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, margin: 0 }}>
-                Tocca <Share size={12} style={{ display: 'inline', verticalAlign: 'middle' }} /> in basso → &ldquo;Aggiungi a schermata Home&rdquo;
-              </p>
-            </div>
-          </div>
-          <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 14, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span style={{ fontSize: 20 }}>🤖</span>
-            <div>
-              <p style={{ color: 'white', fontSize: 13, fontWeight: 600, margin: 0 }}>Android</p>
-              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, margin: 0 }}>Tocca ⋮ in alto → &ldquo;Aggiungi a schermata Home&rdquo;</p>
-            </div>
-          </div>
-        </div>
-        <button
-          onClick={onClose}
-          style={{
-            width: '100%', marginTop: 16, padding: '14px', borderRadius: 16, border: 'none',
-            background: `linear-gradient(135deg, rgba(${rgb},0.9), rgba(${rgb},0.7))`,
-            color: 'white', fontSize: 16, fontWeight: 700, cursor: 'pointer',
-          }}
-        >
-          Capito!
-        </button>
-      </div>
-    </div>
-  );
-}
+
 
 // ── Main ───────────────────────────────────────────────────────────
 export default function PrenotaPWAPage({ params }: { params: Promise<{ salonId: string }> }) {
@@ -139,7 +82,6 @@ export default function PrenotaPWAPage({ params }: { params: Promise<{ salonId: 
   const [manualPhone, setManualPhone] = useState('');
   const [manualEmail, setManualEmail] = useState('');
 
-  const [showInstallSheet, setShowInstallSheet] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<Event | null>(null);
   const [isStandalone, setIsStandalone] = useState(false);
 
@@ -324,12 +266,9 @@ export default function PrenotaPWAPage({ params }: { params: Promise<{ salonId: 
           </span>
         </button>
 
-        {!isStandalone && (
+        {!isStandalone && deferredPrompt && (
           <button
-            onClick={() => {
-              if (deferredPrompt) { (deferredPrompt as unknown as { prompt: () => void }).prompt(); setDeferredPrompt(null); }
-              else setShowInstallSheet(true);
-            }}
+            onClick={() => { (deferredPrompt as unknown as { prompt: () => void }).prompt(); setDeferredPrompt(null); }}
             style={{
               width: '100%', padding: '13px', borderRadius: 16, cursor: 'pointer',
               background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
@@ -337,7 +276,7 @@ export default function PrenotaPWAPage({ params }: { params: Promise<{ salonId: 
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
             }}
           >
-            <Download size={15} /> Aggiungi alla schermata Home
+            <Download size={15} /> Installa l&apos;app
           </button>
         )}
 
@@ -360,7 +299,7 @@ export default function PrenotaPWAPage({ params }: { params: Promise<{ salonId: 
         )}
       </div>
 
-      {showInstallSheet && <InstallSheet accent={accent} onClose={() => setShowInstallSheet(false)} />}
+
     </div>
   );
 
