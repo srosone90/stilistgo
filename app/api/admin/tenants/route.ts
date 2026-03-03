@@ -116,13 +116,24 @@ export async function PATCH(req: NextRequest) {
   if (!user_id) return NextResponse.json({ error: 'user_id required' }, { status: 400 });
 
   const db = getAdminDb();
-  // Strip computed/read-only fields that don't belong in admin_tenants
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { clients_count, appointments_count, operators_count, services_count, last_sync, phone, vat_number, online_bookings_30d, ...safe } = patch;
 
-  const { error } = await db.from('admin_tenants').upsert({ user_id, ...safe }, { onConflict: 'user_id' });
+  // Whitelist only columns that exist in admin_tenants — prevents any unknown field from causing a DB error
+  const ALLOWED: (keyof typeof patch)[] = [
+    'email', 'full_name', 'salon_name', 'plan', 'monthly_price',
+    'trial_ends_at', 'status', 'region', 'sector', 'notes', 'csm',
+    'registered_at', 'last_seen_at', 'is_admin',
+  ];
+  const safe: Record<string, unknown> = {};
+  for (const key of ALLOWED) {
+    if (key in patch) safe[key] = patch[key];
+  }
+
+  const { error } = await db.from('admin_tenants')
+    .update(safe)
+    .eq('user_id', user_id);
+
   if (error) {
-    console.error('[PATCH /api/admin/tenants] upsert error:', error);
+    console.error('[PATCH /api/admin/tenants] DB error:', JSON.stringify(error));
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 

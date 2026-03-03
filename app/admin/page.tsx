@@ -65,11 +65,10 @@ const STATUS: Record<string, { bg: string; text: string; border: string; label: 
   cancelled: { bg: 'rgba(113,113,122,0.1)', text: '#71717a', border: 'rgba(113,113,122,0.2)', label: 'Cancellato' },
 };
 const PLAN: Record<string, { bg: string; text: string; label: string }> = {
-  trial:      { bg: 'rgba(245,158,11,0.1)',  text: '#fbbf24', label: 'Trial' },
-  starter:    { bg: 'rgba(99,102,241,0.1)',  text: '#818cf8', label: 'Starter' },
-  pro:        { bg: 'rgba(168,85,247,0.1)',  text: '#c084fc', label: 'Pro' },
-  business:   { bg: 'rgba(34,197,94,0.1)',   text: '#4ade80', label: 'Business' },
-  enterprise: { bg: 'rgba(20,184,166,0.1)',  text: '#2dd4bf', label: 'Enterprise' },
+  trial:    { bg: 'rgba(245,158,11,0.1)',  text: '#fbbf24', label: 'Trial' },
+  starter:  { bg: 'rgba(99,102,241,0.1)',  text: '#818cf8', label: 'Starter' },
+  pro:      { bg: 'rgba(168,85,247,0.1)',  text: '#c084fc', label: 'Pro' },
+  business: { bg: 'rgba(34,197,94,0.1)',   text: '#4ade80', label: 'Business' },
 };
 const PRIO: Record<string, { text: string; label: string }> = {
   bassa: { text: '#71717a', label: 'Bassa' }, normale: { text: '#818cf8', label: 'Normale' },
@@ -312,10 +311,20 @@ export default function AdminPage() {
   const saveTenant = async () => {
     if (!selTenant) return;
     setSavingTenant(true);
-    await af('/api/admin/tenants', { method: 'PATCH', body: JSON.stringify({ user_id: selTenant.user_id, ...editTenant }) });
-    setSavingTenant(false);
-    setSelTenant(null);
-    loadSection('tenants');
+    try {
+      const res = await af('/api/admin/tenants', { method: 'PATCH', body: JSON.stringify({ user_id: selTenant.user_id, ...editTenant }) });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(`Errore salvataggio: ${data.error ?? res.status}`);
+        return;
+      }
+      setSelTenant(null);
+      loadSection('tenants');
+    } catch (err) {
+      alert(`Errore di rete: ${err}`);
+    } finally {
+      setSavingTenant(false);
+    }
   };
 
   // ─── Tenant delete ────────────────────────────────────────────────────────
