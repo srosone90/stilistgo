@@ -7,7 +7,7 @@ import type { WhatsAppConfig } from '@/types/salon';
 import { getCurrentUser } from '@/lib/supabase';
 import {
   MessageSquare, Wifi, WifiOff, RefreshCw,
-  CheckCircle2, XCircle, Bell, Cake, ThumbsUp, Star, CalendarCheck, Pencil, ChevronUp,
+  CheckCircle2, XCircle, Bell, Cake, ThumbsUp, Star, CalendarCheck, Pencil, ChevronUp, Smartphone,
 } from 'lucide-react';
 
 // ── Style helpers ──────────────────────────────────────────────────────────
@@ -456,7 +456,6 @@ export default function AutomationsView() {
           templateValue={cfg.loyaltyMsg ?? ''}
           onTemplateChange={v => patch({ loyaltyMsg: v })}
           vars={['nome', 'punti', 'salone']}
-          last
         />
         {cfg.loyaltyEnabled && cfg.enabled && (
           <div style={{ paddingLeft: 44, paddingBottom: 12 }}>
@@ -471,6 +470,18 @@ export default function AutomationsView() {
             </label>
           </div>
         )}
+        <p style={{ color: 'var(--text-3)', fontWeight: 600, fontSize: 11, margin: '14px 0 4px', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+          Acquisizione clienti
+        </p>
+        <AutomationRow
+          checked={cfg.newClientAppLinkEnabled ?? false} onChange={v => patch({ newClientAppLinkEnabled: v })}
+          label="Invia link app a nuova cliente" description="Subito quando aggiungi una nuova cliente"
+          disabled={!cfg.enabled} icon={<Smartphone size={15} style={{ color: '#c084fc' }} />}
+          templateValue={cfg.newClientAppLinkMsg ?? ''}
+          onTemplateChange={v => patch({ newClientAppLinkMsg: v })}
+          vars={['nome', 'salone', 'link']}
+          last
+        />
       </div>
 
       {/* ── Log messaggi ── */}

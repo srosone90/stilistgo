@@ -4,6 +4,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useSalon } from '@/context/SalonContext';
 import { Client, TechnicalCard, HairType, HairCondition } from '@/types/salon';
 import { salonGenerateId } from '@/lib/salonStorage';
+import { getCurrentUser } from '@/lib/supabase';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { UserPlus, Search, Trash2, ChevronDown, ChevronUp, X, Star, AlertTriangle, FlaskConical, Clock, Camera, ImagePlus } from 'lucide-react';
 
@@ -32,6 +33,8 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [currentSalonId, setCurrentSalonId] = useState('');
+  useEffect(() => { getCurrentUser().then(u => { if (u) setCurrentSalonId(u.id); }); }, []);
 
   useEffect(() => { if (newTrigger && newTrigger > 0) { setShowForm(true); setEditingClient(null); setForm(EMPTY_CLIENT); } }, [newTrigger]);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
@@ -77,6 +80,45 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
       updateClient({ ...editingClient, ...form });
     } else {
       addClient({ ...form, gdprDate: form.gdprConsent ? new Date().toISOString() : '' });
+      // Auto-send app install link if automation enabled and client has a phone
+      const waCfg = salonConfig.whatsapp;
+      if (
+        waCfg?.enabled && waCfg?.newClientAppLinkEnabled &&
+        waCfg?.ultraMsgInstanceId && waCfg?.ultraMsgToken &&
+        form.phone.trim() && currentSalonId
+      ) {
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://stilistgo.netlify.app';
+        const salonName = salonConfig.salonName ?? 'il tuo salone';
+        const clientName = `${form.firstName} ${form.lastName}`.trim();
+        // Fire-and-forget: generate token then send
+        fetch('/api/client-token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ salonId: currentSalonId, clientPhone: form.phone.trim(), clientName, clientEmail: form.email }),
+        })
+          .then(r => r.json())
+          .then(d => {
+            if (!d.token) return;
+            const link = `${appUrl}/prenota/${currentSalonId}?t=${d.token}`;
+            const template = waCfg.newClientAppLinkMsg
+              ?? `Ciao {nome}! 🎉 Scarica l'app di {salone} e prenota direttamente dal tuo telefono: {link}`;
+            const message = template
+              .replace(/{nome}/g, clientName)
+              .replace(/{salone}/g, salonName)
+              .replace(/{link}/g, link);
+            return fetch('/api/ultramsg/send', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                instanceId: waCfg.ultraMsgInstanceId,
+                token: waCfg.ultraMsgToken,
+                to: form.phone.trim(),
+                message,
+              }),
+            });
+          })
+          .catch(() => { /* silently ignore */ });
+      }
     }
     setShowForm(false);
   }

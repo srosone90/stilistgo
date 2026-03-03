@@ -6,8 +6,10 @@ import { ClientAppConfig } from '@/types/salon';
 import { getCurrentUser } from '@/lib/supabase';
 import {
   Smartphone, Copy, Check, Palette, Settings2, MessageSquare,
-  MapPin, Phone, Instagram, Facebook, Clock, Eye, Lock, Info,
+  MapPin, Phone, Instagram, Facebook, Clock, Eye, Lock, Info, Link2, ExternalLink, UserPlus,
 } from 'lucide-react';
+
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://stilistgo.netlify.app';
 
 // ─── Shared UI helpers ────────────────────────────────────────────────────────
 
@@ -88,8 +90,31 @@ export default function ClientAppView() {
 
   const [salonId, setSalonId] = useState('');
   const [idCopied, setIdCopied] = useState(false);
+  const [baseLinkCopied, setBaseLinkCopied] = useState(false);
+  const [clientPhone, setClientPhone] = useState('');
+  const [clientNameInput, setClientNameInput] = useState('');
+  const [generatedLink, setGeneratedLink] = useState('');
+  const [generatingLink, setGeneratingLink] = useState(false);
+  const [clientLinkCopied, setClientLinkCopied] = useState(false);
   useEffect(() => { getCurrentUser().then(u => { if (u) setSalonId(u.id); }); }, []);
   function copySalonId() { navigator.clipboard.writeText(salonId); setIdCopied(true); setTimeout(() => setIdCopied(false), 2000); }
+  const baseInstallUrl = salonId ? `${APP_URL}/prenota/${salonId}` : '';
+  function copyBaseLink() { navigator.clipboard.writeText(baseInstallUrl); setBaseLinkCopied(true); setTimeout(() => setBaseLinkCopied(false), 2000); }
+  async function generateClientLink() {
+    if (!clientPhone.trim() || !clientNameInput.trim() || !salonId) return;
+    setGeneratingLink(true);
+    try {
+      const res = await fetch('/api/client-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ salonId, clientPhone: clientPhone.trim(), clientName: clientNameInput.trim() }),
+      });
+      const d = await res.json();
+      if (d.token) setGeneratedLink(`${baseInstallUrl}?t=${d.token}`);
+    } catch { /* ignore */ }
+    setGeneratingLink(false);
+  }
+  function copyClientLink() { navigator.clipboard.writeText(generatedLink); setClientLinkCopied(true); setTimeout(() => setClientLinkCopied(false), 2000); }
 
   // ── Branding ──────────────────────────────────────────────────────────────
   const [branding, setBranding] = useState({
@@ -179,9 +204,7 @@ export default function ClientAppView() {
       {/* ── SALON ID ─────────────────────────────────────────────────────── */}
       <Section title="Collegamento App" icon={<Info size={16} />}>
         <p className="text-sm mb-3" style={{ color: 'var(--muted)' }}>
-          Copia questo ID e incollalo nel file <code style={{ color: 'var(--accent-light)', fontSize: 12 }}>client-app/.env</code> come valore di{' '}
-          <code style={{ color: 'var(--accent-light)', fontSize: 12 }}>EXPO_PUBLIC_SALON_ID</code>.
-          Senza questo l&apos;app non sa a quale salone collegarsi.
+          ID univoco del tuo salone — necessario per collegare l&apos;app.
         </p>
         <div style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 14px' }}
           className="flex items-center gap-3">
@@ -193,9 +216,94 @@ export default function ClientAppView() {
             {idCopied ? <Check size={16} /> : <Copy size={16} />}
           </button>
         </div>
-        <p className="text-xs mt-2" style={{ color: 'var(--border-light)' }}>
-          Dopo aver aggiornato il file .env, riavvia l&apos;app con <code>npx expo start</code> o rifai il build.
+      </Section>
+
+      {/* ── INSTALL LINK ──────────────────────────────────────────────────── */}
+      <Section title="Link Installazione App" icon={<Link2 size={16} />}>
+        {/* Base URL */}
+        <p className="text-sm mb-3" style={{ color: 'var(--muted)' }}>
+          Questo link apre l&apos;app nel browser e permette di aggiungerla alla schermata Home (PWA).
+          Puoi condividerlo ovunque — su Instagram, nei messaggi, sul sito web.
         </p>
+        <div style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 14px', marginBottom: 12 }}
+          className="flex items-center gap-3">
+          <p className="text-xs font-mono flex-1 break-all" style={{ color: 'var(--accent-light)' }}>
+            {baseInstallUrl || '—'}
+          </p>
+          <button onClick={copyBaseLink} title="Copia link"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: baseLinkCopied ? '#22c55e' : 'var(--muted)', flexShrink: 0 }}>
+            {baseLinkCopied ? <Check size={16} /> : <Copy size={16} />}
+          </button>
+          {baseInstallUrl && (
+            <a href={baseInstallUrl} target="_blank" rel="noreferrer"
+              style={{ color: 'var(--muted)', flexShrink: 0 }}>
+              <ExternalLink size={15} />
+            </a>
+          )}
+        </div>
+
+        {/* Per-client link */}
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16, marginTop: 4 }}>
+          <div className="flex items-center gap-2 mb-2">
+            <UserPlus size={14} style={{ color: 'var(--accent-light)' }} />
+            <p className="text-sm font-semibold text-white">Link personalizzato per cliente</p>
+          </div>
+          <p className="text-xs mb-3" style={{ color: 'var(--muted)' }}>
+            Genera un link che riconosce automaticamente la cliente — niente registrazione, apre direttamente il suo profilo.
+          </p>
+          <div className="flex gap-2 mb-2">
+            <input
+              style={{ ...inputStyle, flex: 1 }}
+              placeholder="Nome cliente"
+              value={clientNameInput}
+              onChange={e => { setClientNameInput(e.target.value); setGeneratedLink(''); }}
+            />
+            <input
+              style={{ ...inputStyle, flex: 1 }}
+              placeholder="Telefono (es. 393331234567)"
+              value={clientPhone}
+              onChange={e => { setClientPhone(e.target.value); setGeneratedLink(''); }}
+              type="tel"
+            />
+          </div>
+          <button
+            onClick={generateClientLink}
+            disabled={generatingLink || !clientPhone.trim() || !clientNameInput.trim()}
+            style={{
+              background: 'rgba(99,102,241,0.8)', border: 'none', borderRadius: 10,
+              padding: '8px 18px', color: 'white', fontSize: 13, fontWeight: 600,
+              cursor: generatingLink || !clientPhone.trim() || !clientNameInput.trim() ? 'not-allowed' : 'pointer',
+              opacity: generatingLink || !clientPhone.trim() || !clientNameInput.trim() ? 0.5 : 1,
+            }}
+          >
+            {generatingLink ? 'Generazione…' : '🔗 Genera link'}
+          </button>
+
+          {generatedLink && (
+            <div style={{ marginTop: 12, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 14px' }}
+              className="flex items-center gap-3">
+              <p className="text-xs font-mono flex-1 break-all" style={{ color: '#22c55e' }}>
+                {generatedLink}
+              </p>
+              <button onClick={copyClientLink} title="Copia link"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: clientLinkCopied ? '#22c55e' : 'var(--muted)', flexShrink: 0 }}>
+                {clientLinkCopied ? <Check size={16} /> : <Copy size={16} />}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Instructions */}
+        <div style={{ marginTop: 16, borderTop: '1px solid var(--border)', paddingTop: 14 }}>
+          <p className="text-xs font-semibold mb-2" style={{ color: 'var(--muted)' }}>Come funziona l&apos;installazione</p>
+          <ol className="text-xs space-y-1" style={{ color: 'var(--border-light)', paddingLeft: 18 }}>
+            <li>La cliente riceve il link (via WhatsApp o SMS)</li>
+            <li>Apre il link nel browser del telefono</li>
+            <li>iPhone: tocca <strong>Condividi</strong> → &quot;Aggiungi a schermata Home&quot;</li>
+            <li>Android: tocca <strong>⋮</strong> → &quot;Aggiungi a schermata Home&quot;</li>
+            <li>L&apos;app appare sull&apos;Home come qualsiasi altra app 🎉</li>
+          </ol>
+        </div>
       </Section>
 
       {/* ── BRANDING ─────────────────────────────────────────────────────── */}
