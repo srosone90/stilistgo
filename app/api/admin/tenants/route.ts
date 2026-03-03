@@ -116,11 +116,15 @@ export async function PATCH(req: NextRequest) {
   if (!user_id) return NextResponse.json({ error: 'user_id required' }, { status: 400 });
 
   const db = getAdminDb();
-  // Strip computed fields that don't belong in admin_tenants
+  // Strip computed/read-only fields that don't belong in admin_tenants
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { clients_count, appointments_count, operators_count, services_count, last_sync, phone, vat_number, ...safe } = patch;
+  const { clients_count, appointments_count, operators_count, services_count, last_sync, phone, vat_number, online_bookings_30d, ...safe } = patch;
 
-  await db.from('admin_tenants').upsert({ user_id, ...safe }, { onConflict: 'user_id' });
+  const { error } = await db.from('admin_tenants').upsert({ user_id, ...safe }, { onConflict: 'user_id' });
+  if (error) {
+    console.error('[PATCH /api/admin/tenants] upsert error:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 
   // Audit
   await db.from('admin_audit_log').insert({
