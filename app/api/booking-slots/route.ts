@@ -54,9 +54,9 @@ export async function GET(req: NextRequest) {
     const ALL_SLOTS = buildSlots(openTime, closeTime);
 
     // ── Services ────────────────────────────────────────────────────────────
-    const rawServices = state?.services as { id: string; name: string; duration: number; category: string; active: boolean }[] | null;
+    const rawServices = state?.services as { id: string; name: string; duration: number; price: number; category: string; active: boolean }[] | null;
     const services = (rawServices ?? []).filter(s => s.active).map(s => ({
-      id: s.id, name: s.name, duration: s.duration, category: s.category,
+      id: s.id, name: s.name, duration: s.duration, price: s.price ?? 0, category: s.category,
     }));
 
     // ── Operators ───────────────────────────────────────────────────────────
@@ -65,8 +65,11 @@ export async function GET(req: NextRequest) {
       id: o.id, name: o.name, color: o.color,
     }));
 
+    // ── Client App Config ────────────────────────────────────────────────────
+    const clientAppConfig = (state?.clientAppConfig ?? {}) as Record<string, unknown>;
+
     if (!date) {
-      return NextResponse.json({ available: ALL_SLOTS, salonName, services, operators });
+      return NextResponse.json({ available: ALL_SLOTS, salonName, services, operators, clientAppConfig });
     }
 
     // ── Filter slots by date (and optionally by operator) ───────────────────
@@ -110,9 +113,9 @@ export async function GET(req: NextRequest) {
       return !blockedByConfirmed && !blockedByPending;
     });
 
-    return NextResponse.json({ available, salonName, services, operators });
+    return NextResponse.json({ available, salonName, services, operators, clientAppConfig });
   } catch {
-    return NextResponse.json({ available: fallbackSlots, salonName: '', services: [], operators: [] });
+    return NextResponse.json({ available: fallbackSlots, salonName: '', services: [], operators: [], clientAppConfig: {} });
   }
 }
 

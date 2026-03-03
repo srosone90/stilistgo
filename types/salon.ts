@@ -468,6 +468,53 @@ export interface ClientSubscription {
   createdAt: string;
 }
 
+// ─── Client App Configuration ─────────────────────────────────────────────────
+
+export interface ClientAppConfig {
+  /** Welcome message shown on the home screen of the client app */
+  welcomeMessage: string;
+  /** Short description of the salon shown in the app */
+  aboutText: string;
+  /** Primary accent color (hex) used throughout the client app */
+  accentColor: string;
+  /** Whether to show service prices in the app */
+  showPrices: boolean;
+  /** Whether clients must be logged-in to book */
+  requireLoginForBooking: boolean;
+  /** How many days ahead clients can book (e.g. 90) */
+  maxAdvanceDays: number;
+  /** Minimum hours notice required before a booking (e.g. 2) */
+  minAdvanceHours: number;
+  /** Contact phone shown in the app (can differ from salonConfig.phone) */
+  contactPhone: string;
+  /** Contact address shown in the app */
+  contactAddress: string;
+  /** Instagram handle without @ (e.g. "leribelle.salon") */
+  instagramHandle: string;
+  /** Facebook page URL */
+  facebookUrl: string;
+  /** Cancellation policy text shown during booking confirmation */
+  cancellationPolicy: string;
+  /** Message shown to the client after a successful booking */
+  bookingConfirmationMessage: string;
+}
+
+export const DEFAULT_CLIENT_APP_CONFIG: ClientAppConfig = {
+  welcomeMessage: 'Benvenuta! 💇‍♀️',
+  aboutText: '',
+  accentColor: '#c084fc',
+  showPrices: true,
+  requireLoginForBooking: true,
+  maxAdvanceDays: 90,
+  minAdvanceHours: 2,
+  contactPhone: '',
+  contactAddress: '',
+  instagramHandle: '',
+  facebookUrl: '',
+  cancellationPolicy: 'Per cancellare o modificare l\'appuntamento si prega di avvisare almeno 24 ore prima.',
+  bookingConfirmationMessage: 'Prenotazione confermata! Ti aspettiamo. 🌸',
+};
+
 // Default schedule helper
 export function defaultSchedule(): WorkShift[] {
   return Array.from({ length: 7 }, (_, i) => ({

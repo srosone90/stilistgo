@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { LayoutDashboard, Table2, BarChart3, Settings, Scissors, Wifi, WifiOff, LogOut, CalendarDays, Users, Sparkles, UserCog, Package, Banknote, UserCircle, X, Lock, LogIn, Trophy, Star, Globe, Moon, Sun, MessageSquare, Building2, CreditCard, Gift } from 'lucide-react';
+import { LayoutDashboard, Table2, BarChart3, Settings, Scissors, Wifi, WifiOff, LogOut, CalendarDays, Users, Sparkles, UserCog, Package, Banknote, UserCircle, X, Lock, LogIn, Trophy, Star, Globe, Moon, Sun, MessageSquare, Building2, CreditCard, Gift, Smartphone } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { getCurrentUser, signOut } from '@/lib/supabase';
 import { useSalon } from '@/context/SalonContext';
@@ -53,6 +53,7 @@ const navGroups: { label: string; items: NavItem[] }[] = [
     items: [
       { id: 'bookings',    label: 'Prenotazioni Online', icon: <Globe size={18} /> },
       { id: 'automazioni', label: 'Automazioni',          icon: <MessageSquare size={18} /> },
+      { id: 'client-app',  label: 'App Cliente',          icon: <Smartphone size={18} /> },
     ],
   },
 ];

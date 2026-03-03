@@ -8,6 +8,7 @@ import {
   Payment, CashSession, GamificationConfig, DEFAULT_GAMIFICATION_CONFIG, DEFAULT_SALON_CONFIG,
   WhatsAppMessage, WhatsAppConfig, DEFAULT_WHATSAPP_CONFIG,
   Supplier, ClientSubscription, SubscriptionStatus,
+  ClientAppConfig, DEFAULT_CLIENT_APP_CONFIG,
 } from '@/types/salon';
 import {
   storageGetClients, storageSaveClients,
@@ -27,6 +28,7 @@ import {
   storageGetGamificationConfig, storageSaveGamificationConfig,
   storageGetSuppliers, storageSaveSuppliers,
   storageGetSubscriptions, storageSaveSubscriptions,
+  storageGetClientAppConfig, storageSaveClientAppConfig,
   salonGenerateId, setStorageUserId,
   getLocalSavedAt, setLocalSavedAt,
 } from '@/lib/salonStorage';
@@ -46,6 +48,7 @@ interface SalonContextValue {
   stockMovements: StockMovement[];
   giftCards: GiftCard[];
   salonConfig: SalonConfig;
+  clientAppConfig: ClientAppConfig;
   salonLoading: boolean;
 
   // Clients
@@ -98,6 +101,7 @@ interface SalonContextValue {
 
   // Config
   updateSalonConfig: (c: Partial<SalonConfig>) => void;
+  updateClientAppConfig: (c: Partial<ClientAppConfig>) => void;
 
   // Payments / Cassa
   payments: Payment[];
@@ -149,6 +153,7 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
   const [giftCards, setGiftCards] = useState<GiftCard[]>([]);
   const [gamificationConfig, setGamificationConfig] = useState<GamificationConfig>(DEFAULT_GAMIFICATION_CONFIG);
   const [salonConfig, setSalonConfig] = useState<SalonConfig>(DEFAULT_SALON_CONFIG);
+  const [clientAppConfig, setClientAppConfig] = useState<ClientAppConfig>(DEFAULT_CLIENT_APP_CONFIG);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [cashSessions, setCashSessions] = useState<CashSession[]>([]);
   const [whatsappMessages, setWhatsappMessages] = useState<WhatsAppMessage[]>([]);
@@ -189,6 +194,7 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
       setActiveOperatorIdState(storageGetActiveOperatorId());
       setSuppliers(storageGetSuppliers());
       setSubscriptions(storageGetSubscriptions());
+      setClientAppConfig(storageGetClientAppConfig());
       setSalonLoading(false);
     };
     init();
@@ -232,6 +238,7 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
         if (cloudIsNewer) {
           if (cloudState.salonConfig)        { setSalonConfig(cloudState.salonConfig as SalonConfig); storageSaveSalonConfig(cloudState.salonConfig as SalonConfig); }
           if (cloudState.gamificationConfig) { setGamificationConfig(cloudState.gamificationConfig as GamificationConfig); storageSaveGamificationConfig(cloudState.gamificationConfig as GamificationConfig); }
+          if ((cloudState as Record<string, unknown>).clientAppConfig) { const cac = (cloudState as Record<string, unknown>).clientAppConfig as ClientAppConfig; setClientAppConfig(cac); storageSaveClientAppConfig(cac); }
         } else if (cloudState.salonConfig) {
           // Even if local is newer, always apply admin-set WhatsApp credentials from cloud.
           // Admins write directly to the DB without updating _savedAt, so we must always
@@ -369,7 +376,7 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
           clients, technicalCards, services, operators, absences, appointments,
           waitingList, products, stockMovements, giftCards, payments,
           cashSessions, salonConfig, gamificationConfig, whatsappMessages,
-          suppliers, subscriptions,
+          suppliers, subscriptions, clientAppConfig,
           _savedAt: savedAt,
         });
       } catch { /* ignore */ }
@@ -390,13 +397,13 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
       clients, technicalCards, services, operators, absences, appointments,
       waitingList, products, stockMovements, giftCards, payments,
       cashSessions, salonConfig, gamificationConfig, whatsappMessages,
-      suppliers, subscriptions,
+      suppliers, subscriptions, clientAppConfig,
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clients, technicalCards, services, operators, absences, appointments,
       waitingList, products, stockMovements, giftCards, payments,
       cashSessions, salonConfig, gamificationConfig, whatsappMessages,
-      suppliers, subscriptions]);
+      suppliers, subscriptions, clientAppConfig]);
 
   // ─── Flush to cloud immediately when tab is hidden or page is unloading ───
   // This fires BEFORE window.location.href navigations complete, ensuring
@@ -638,6 +645,10 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
     setSalonConfig(prev => { const n = { ...prev, ...c }; storageSaveSalonConfig(n); return n; });
   }, []);
 
+  const updateClientAppConfig = useCallback((c: Partial<ClientAppConfig>) => {
+    setClientAppConfig(prev => { const n = { ...prev, ...c }; storageSaveClientAppConfig(n); return n; });
+  }, []);
+
   // ─── Payments ───────────────────────────────────────────────────────────────
 
   const addPayment = useCallback((p: Omit<Payment, 'id' | 'createdAt'>) => {
@@ -791,7 +802,7 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
     <SalonContext.Provider value={{
       clients, technicalCards, services, operators, absences,
       appointments, waitingList, products, stockMovements, giftCards,
-      salonConfig, salonLoading,
+      salonConfig, clientAppConfig, salonLoading,
       addClient, updateClient, deleteClient, addLoyaltyPoints,
       addTechnicalCard, updateTechnicalCard, deleteTechnicalCard,
       addService, updateService, deleteService,
@@ -802,7 +813,7 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
       addProduct, updateProduct, deleteProduct,
       addStockMovement,
       addGiftCard, redeemGiftCard, updateGiftCard,
-      updateSalonConfig,
+      updateSalonConfig, updateClientAppConfig,
       payments, cashSessions, addPayment, deletePayment, addCashSession, closeCashSession,
       activeOperatorId, setActiveOperatorId, verifyOperatorPin,
       gamificationConfig, updateGamificationConfig,
