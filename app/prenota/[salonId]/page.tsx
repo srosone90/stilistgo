@@ -12,26 +12,31 @@ interface ClientAppConfig {
   cancellationPolicy: string; bookingConfirmationMessage: string;
   contactPhone?: string; contactAddress?: string;
   logoUrl?: string; coverImageUrl?: string;
-  bgStyle?: 'dark' | 'neutral' | 'warm' | 'rose';
+  bgStyle?: string;   // hex string (e.g. '#0d0d14') or legacy preset name
   fontStyle?: 'default' | 'elegant' | 'modern' | 'playful';
 }
 interface StoredClient { salonId: string; clientPhone: string; clientName: string; clientEmail: string; }
 interface HistoryBooking { id: string; service: string; preferred_date: string; preferred_time: string; status: 'pending' | 'confirmed' | 'cancelled'; created_at: string; notes?: string; }
 
-const STORAGE_KEY = 'stilistgo_client_identity';
+const STORAGE_KEY = 'stylistgo_client_identity';
 const DEFAULT_COLOR = '#c084fc';
 
 function hexToRgb(hex: string) {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
+  // Normalise short-form hex (#fff → #ffffff)
+  let h = hex.replace('#', '');
+  if (h.length === 3) h = h.split('').map(c => c + c).join('');
+  const r = parseInt(h.slice(0, 2), 16) || 0;
+  const g = parseInt(h.slice(2, 4), 16) || 0;
+  const b = parseInt(h.slice(4, 6), 16) || 0;
   return `${r},${g},${b}`;
 }
 
 function lighten(hex: string, amount = 0.3) {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
+  let h = hex.replace('#', '');
+  if (h.length === 3) h = h.split('').map(c => c + c).join('');
+  const r = parseInt(h.slice(0, 2), 16) || 0;
+  const g = parseInt(h.slice(2, 4), 16) || 0;
+  const b = parseInt(h.slice(4, 6), 16) || 0;
   const lr = Math.round(r + (255 - r) * amount);
   const lg = Math.round(g + (255 - g) * amount);
   const lb = Math.round(b + (255 - b) * amount);
@@ -72,8 +77,13 @@ function generateICS(service: string, date: string, time: string, salon: string,
 function downloadICS(content: string, filename: string) {
   const blob = new Blob([content], { type: 'text/calendar;charset=utf-8' });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
-  URL.revokeObjectURL(url);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  // Delay revocation so the browser has time to start the download
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 // ── Main ───────────────────────────────────────────────────────────
@@ -112,6 +122,8 @@ export default function PrenotaPWAPage({ params }: { params: Promise<{ salonId: 
   const [deferredPrompt, setDeferredPrompt] = useState<Event | null>(null);
   const [isStandalone, setIsStandalone] = useState(false);
   const [pwaChecked, setPwaChecked] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [bypassInstall, setBypassInstall] = useState(false);
 
   const accent = appConfig.accentColor || DEFAULT_COLOR;
   const rgb = hexToRgb(accent);
@@ -165,7 +177,7 @@ export default function PrenotaPWAPage({ params }: { params: Promise<{ salonId: 
       setServices(d.services || []);
       if (d.operators?.length > 0) { setOperators(d.operators); setSelectedOperator(d.operators[0].id); }
       if (d.clientAppConfig) setAppConfig(prev => ({ ...prev, ...d.clientAppConfig }));
-    }).catch(() => {}).finally(() => setLoading(false));
+    }).catch(() => { setLoadError(true); }).finally(() => setLoading(false));
   }, [salonId]);
 
   useEffect(() => {
@@ -177,7 +189,8 @@ export default function PrenotaPWAPage({ params }: { params: Promise<{ salonId: 
     setSelectedTime('');
   }, [selectedDate, salonId, selectedOperator]);
 
-  const minDate = useMemo(() => { const d = new Date(); d.setHours(d.getHours() + (appConfig.minAdvanceHours || 2)); return d.toISOString().split('T')[0]; }, [appConfig.minAdvanceHours]);
+  // minDate: use UTC to avoid timezone-related off-by-one-day errors
+  const minDate = useMemo(() => { const d = new Date(); d.setUTCHours(d.getUTCHours() + (appConfig.minAdvanceHours || 2)); return d.toISOString().split('T')[0]; }, [appConfig.minAdvanceHours]);
   const maxDate = useMemo(() => { const d = new Date(); d.setDate(d.getDate() + (appConfig.maxAdvanceDays || 90)); return d.toISOString().split('T')[0]; }, [appConfig.maxAdvanceDays]);
 
   const categories = useMemo(() => {
@@ -197,7 +210,7 @@ export default function PrenotaPWAPage({ params }: { params: Promise<{ salonId: 
     if (!effectiveName || !effectivePhone) return;
     setSubmitting(true);
     try {
-      await fetch('/api/bookings', {
+      const res = await fetch('/api/bookings', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           salonId,
@@ -213,7 +226,17 @@ export default function PrenotaPWAPage({ params }: { params: Promise<{ salonId: 
           notes,
         }),
       });
-    } catch { /**/ } finally { setSubmitting(false); setStep('success'); }
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error ?? 'Errore durante la prenotazione. Riprova.');
+        return;
+      }
+      setStep('success');
+    } catch {
+      alert('Errore di rete. Controlla la connessione e riprova.');
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   // Auto-load booking history whenever client identity is set
@@ -235,13 +258,20 @@ export default function PrenotaPWAPage({ params }: { params: Promise<{ salonId: 
     if (!client?.clientPhone) return;
     setCancellingId(id);
     try {
-      await fetch(`/api/bookings/${id}`, {
+      const res = await fetch(`/api/bookings/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'cancel', clientPhone: client.clientPhone }),
       });
-      setHistory(prev => prev.map(b => b.id === id ? { ...b, status: 'cancelled' as const } : b));
-    } catch { /**/ } finally { setCancellingId(null); }
+      if (res.ok) {
+        setHistory(prev => prev.map(b => b.id === id ? { ...b, status: 'cancelled' as const } : b));
+      } else {
+        const d = await res.json().catch(() => ({}));
+        alert(d.error ?? 'Impossibile cancellare la prenotazione. Riprova.');
+      }
+    } catch {
+      alert('Errore di rete. Controlla la connessione e riprova.');
+    } finally { setCancellingId(null); }
   }
 
   // ── Style helpers ──────────────────────────────────────────────────────
@@ -290,14 +320,33 @@ export default function PrenotaPWAPage({ params }: { params: Promise<{ salonId: 
   if (loading || !pwaChecked) return (
     <div style={{ ...page, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}>
       <div style={{ width: 56, height: 56, borderRadius: 18, background: `rgba(${rgb},0.2)`, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-        {appConfig.logoUrl ? <img src={appConfig.logoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Scissors size={28} style={{ color: accent }} />}
+        {appConfig.logoUrl ? <img src={appConfig.logoUrl} alt={salonName || 'Logo salone'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Scissors size={28} style={{ color: accent }} />}
       </div>
       <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 14 }}>Caricamento…</p>
     </div>
   );
 
-  // ── INSTALL GATE: visibile quando l'app NON è installata ───────────────
-  if (!isStandalone) return (
+  // ── Load error ────────────────────────────────────────────────────────
+  if (loadError) return (
+    <div style={{ ...page, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 20, padding: '40px 24px' }}>
+      <div style={{ width: 64, height: 64, borderRadius: 20, background: 'rgba(239,68,68,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <X size={32} style={{ color: '#ef4444' }} />
+      </div>
+      <div style={{ textAlign: 'center' }}>
+        <p style={{ fontSize: 20, fontWeight: 800, margin: '0 0 8px' }}>Salone non trovato</p>
+        <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', margin: 0, lineHeight: 1.6 }}>
+          Impossibile caricare le informazioni del salone. Verifica il link e riprova.
+        </p>
+      </div>
+      <button onClick={() => window.location.reload()} style={{ padding: '12px 28px', borderRadius: 14, border: 'none', background: accent, color: 'white', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
+        <RefreshCw size={15} style={{ display: 'inline', marginRight: 6, verticalAlign: 'middle' }} />
+        Riprova
+      </button>
+    </div>
+  );
+
+  // ── INSTALL GATE: visible when app is NOT installed as PWA ────────────
+  if (!isStandalone && !bypassInstall) return (
     <div style={page}>
       {/* Hero */}
       <div style={{ position: 'relative', overflow: 'hidden', padding: '72px 20px 48px', ...(appConfig.coverImageUrl ? { backgroundImage: `url(${appConfig.coverImageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}) }}>
@@ -305,7 +354,7 @@ export default function PrenotaPWAPage({ params }: { params: Promise<{ salonId: 
         <div style={{ position: 'absolute', top: -40, left: '50%', transform: 'translateX(-50%)', width: 340, height: 340, borderRadius: '50%', background: `radial-gradient(circle, rgba(${rgb},0.3) 0%, transparent 70%)`, pointerEvents: 'none' }} />
         <div style={{ ...inner, textAlign: 'center', position: 'relative' }}>
           <div style={{ width: 88, height: 88, borderRadius: 28, margin: '0 auto 22px', background: `linear-gradient(135deg, rgba(${rgb},0.6), rgba(${rgb},0.2))`, border: `2px solid rgba(${rgb},0.4)`, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 0 48px rgba(${rgb},0.3)`, overflow: 'hidden' }}>
-            {appConfig.logoUrl ? <img src={appConfig.logoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Scissors size={40} style={{ color: light }} />}
+            {appConfig.logoUrl ? <img src={appConfig.logoUrl} alt={salonName || 'Logo salone'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Scissors size={40} style={{ color: light }} />}
           </div>
           {salonName && <p style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: accent, margin: '0 0 10px' }}>{salonName}</p>}
           <h1 style={{ fontSize: 28, fontWeight: 900, margin: '0 0 10px', lineHeight: 1.2, letterSpacing: '-0.02em' }}>{appConfig.welcomeMessage}</h1>
@@ -348,6 +397,14 @@ export default function PrenotaPWAPage({ params }: { params: Promise<{ salonId: 
             </p>
           </div>
         )}
+
+        {/* Bypass — allow booking without installing */}
+        <button
+          onClick={() => setBypassInstall(true)}
+          style={{ background: 'none', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 14, padding: '12px 20px', color: 'rgba(255,255,255,0.5)', fontSize: 14, cursor: 'pointer', width: '100%', marginTop: 4 }}
+        >
+          Prenota senza installare l&apos;app →
+        </button>
       </div>
     </div>
   );
@@ -370,7 +427,7 @@ export default function PrenotaPWAPage({ params }: { params: Promise<{ salonId: 
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             boxShadow: `0 0 40px rgba(${rgb},0.25)`, overflow: 'hidden',
           }}>
-            {appConfig.logoUrl ? <img src={appConfig.logoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Scissors size={36} style={{ color: light }} />}
+            {appConfig.logoUrl ? <img src={appConfig.logoUrl} alt={salonName || 'Logo salone'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Scissors size={36} style={{ color: light }} />}
           </div>
 
           {salonName && (

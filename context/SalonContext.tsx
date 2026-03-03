@@ -242,10 +242,16 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
         );
         let clientId: string;
         if (existingClient) {
-          existingClient.firstName = bookingFirstName;
-          existingClient.lastName  = bookingLastName;
-          if (b.client_email) existingClient.email = b.client_email;
-          clientId = existingClient.id;
+          // Create a new object — do NOT mutate the reference that lives in React state
+          const updatedClient: Client = {
+            ...existingClient,
+            firstName: bookingFirstName,
+            lastName:  bookingLastName,
+            email:     b.client_email || existingClient.email,
+          };
+          const idx = mergedClients.findIndex(c => c.id === existingClient.id);
+          mergedClients[idx] = updatedClient;
+          clientId = updatedClient.id;
         } else {
           const nc: Client = {
             id: salonGenerateId(), firstName: bookingFirstName, lastName: bookingLastName,
@@ -678,10 +684,12 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
   const addPayment = useCallback((p: Omit<Payment, 'id' | 'createdAt'>) => {
     const full: Payment = { ...p, id: salonGenerateId(), createdAt: new Date().toISOString() };
     setPayments(prev => { const n = [full, ...prev]; storageSavePayments(n); return n; });
-    // Auto loyalty points: 1pt per euro spent
+    // Auto loyalty points: use configured multiplier (default 1pt per euro)
     if (p.clientId) {
+      const snap = latestStateRef.current;
+      const ptsPerEuro = (snap.salonConfig as { loyaltyPointsPerEuro?: number } | undefined)?.loyaltyPointsPerEuro ?? 1;
       setClients(prev => {
-        const n = prev.map(c => c.id === p.clientId ? { ...c, loyaltyPoints: c.loyaltyPoints + Math.floor(p.total) } : c);
+        const n = prev.map(c => c.id === p.clientId ? { ...c, loyaltyPoints: c.loyaltyPoints + Math.floor(p.total * ptsPerEuro) } : c);
         storageSaveClients(n);
         return n;
       });
@@ -761,7 +769,9 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const verifyOperatorPin = useCallback((operatorId: string, pin: string): boolean => {
-    const op = storageGetOperators().find(o => o.id === operatorId);
+    // Use the always-current ref rather than stale localStorage to get latest operators
+    const ops = (latestStateRef.current.operators as Operator[] | undefined) ?? storageGetOperators();
+    const op = ops.find(o => o.id === operatorId);
     if (!op) return false;
     if (!op.pin) return true; // no PIN set = always accept
     return op.pin === pin;

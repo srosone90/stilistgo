@@ -1,8 +1,8 @@
-// Service Worker for Stilistgo PWA
+// Service Worker for Stylistgo PWA
 // Provides offline support and enables PWA install on mobile browsers
 
-const CACHE_NAME = 'stilistgo-pwa-v1';
-const STATIC_ASSETS = ['/prenota/', '/icons/icon-192.png', '/icons/icon-512.png'];
+const CACHE_NAME = 'stylistgo-pwa-v2';
+const STATIC_ASSETS = ['/icons/icon-192.png', '/icons/icon-512.png'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

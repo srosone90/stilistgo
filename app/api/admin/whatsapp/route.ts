@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const BUCKET = 'salon-data';
-
 function getAdminClient() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -10,22 +8,28 @@ function getAdminClient() {
   );
 }
 
+// Read salon state from the salon_data TABLE (where the main app stores all data)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function readState(supabase: any, user_id: string): Promise<Record<string, unknown>> {
   try {
-    const { data, error } = await supabase.storage.from(BUCKET).download(`${user_id}.json`);
+    const { data, error } = await supabase
+      .from('salon_data')
+      .select('state')
+      .eq('user_id', user_id)
+      .maybeSingle();
     if (error || !data) return {};
-    const text = await data.text();
-    return JSON.parse(text) as Record<string, unknown>;
+    return (data.state as Record<string, unknown>) ?? {};
   } catch {
     return {};
   }
 }
 
+// Write salon state back to the salon_data TABLE
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function writeState(supabase: any, user_id: string, state: Record<string, unknown>) {
-  const blob = new Blob([JSON.stringify(state)], { type: 'application/json' });
-  await supabase.storage.from(BUCKET).upload(`${user_id}.json`, blob, { upsert: true, contentType: 'application/json' });
+  await supabase
+    .from('salon_data')
+    .upsert({ user_id, state, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
 }
 
 // PATCH — assign or remove UltraMsg instance for a tenant

@@ -128,6 +128,8 @@ export default function OperatorLockScreen({ onUnlock }: { onUnlock: () => void 
           {/* Input PIN grosso */}
           <input
             type="password"
+            inputMode="numeric"
+            pattern="[0-9]*"
             maxLength={8}
             value={pinInput}
             onChange={e => {

@@ -6,8 +6,8 @@ function timeToMin(t: string) {
   return h * 60 + m;
 }
 
-/** Build 30-min slots between openTime and closeTime (e.g. "09:00", "19:00") */
-function buildSlots(openTime = '09:00', closeTime = '19:00'): string[] {
+/** Build time slots between openTime and closeTime using the configured interval */
+function buildSlots(openTime = '09:00', closeTime = '19:00', slotMin = 30): string[] {
   const slots: string[] = [];
   let cur = timeToMin(openTime);
   const end = timeToMin(closeTime);
@@ -15,7 +15,7 @@ function buildSlots(openTime = '09:00', closeTime = '19:00'): string[] {
     const h = String(Math.floor(cur / 60)).padStart(2, '0');
     const m = String(cur % 60).padStart(2, '0');
     slots.push(`${h}:${m}`);
-    cur += 30;
+    cur += slotMin;
   }
   return slots;
 }
@@ -51,7 +51,8 @@ export async function GET(req: NextRequest) {
     const salonName: string = salonConfig?.salonName || '';
     const openTime: string = salonConfig?.openTime || '09:00';
     const closeTime: string = salonConfig?.closeTime || '19:00';
-    const ALL_SLOTS = buildSlots(openTime, closeTime);
+    const slotMinutes: number = Number((salonConfig as Record<string, unknown> | null)?.slotMinutes) || 30;
+    const ALL_SLOTS = buildSlots(openTime, closeTime, slotMinutes);
 
     // ── Services ────────────────────────────────────────────────────────────
     const rawServices = state?.services as { id: string; name: string; duration: number; price: number; category: string; active: boolean }[] | null;
@@ -95,12 +96,19 @@ export async function GET(req: NextRequest) {
       .eq('preferred_date', date)
       .neq('status', 'cancelled');
 
-    const pendingAppts: { startTime: string }[] = (onlineRows ?? []).filter(r => {
+    const pendingAppts: { startTime: string; durMin: number }[] = (onlineRows ?? []).filter(r => {
       if (!operatorId) return true;
       const m = (r.notes || '').match(/^\[op:([^\]]+)\]/);
       const pendingOp = m?.[1] || '';
       return pendingOp === operatorId;
-    }).map(r => ({ startTime: r.preferred_time }));
+    }).map(r => {
+      // Try to estimate duration from matching service; fall back to 60 min
+      const svcMatch = services.find(s =>
+        s.name.toLowerCase().includes((r.notes || '').toLowerCase()) ||
+        (r.notes || '').toLowerCase().includes(s.name.toLowerCase())
+      );
+      return { startTime: r.preferred_time, durMin: svcMatch?.duration ?? 60 };
+    });
 
     const available = ALL_SLOTS.filter(slot => {
       const slotMin = timeToMin(slot);
@@ -109,7 +117,11 @@ export async function GET(req: NextRequest) {
         const end = timeToMin(a.endTime || a.startTime);
         return slotMin >= start && slotMin < end;
       });
-      const blockedByPending = pendingAppts.some(a => slotMin === timeToMin(a.startTime));
+      // Block all slots covered by the pending booking's estimated duration
+      const blockedByPending = pendingAppts.some(a => {
+        const start = timeToMin(a.startTime);
+        return slotMin >= start && slotMin < start + a.durMin;
+      });
       return !blockedByConfirmed && !blockedByPending;
     });
 

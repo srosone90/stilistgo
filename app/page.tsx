@@ -130,6 +130,9 @@ export default function Home() {
     );
   };
 
+  // Views that have no meaningful FAB action — hide the button entirely
+  const NO_FAB_VIEWS = new Set<View>(['gamification', 'loyalty', 'bookings', 'automazioni', 'report-operatori', 'client-app']);
+
   const FAB_CONFIG: Record<View, { label: string; icon: React.ReactNode; action: () => void }> = {
     dashboard:    { label: 'Nuova Voce',       icon: <Plus size={20} />,      action: () => setShowForm(true) },
     tabella:      { label: 'Nuova Voce',       icon: <Plus size={20} />,      action: () => setShowForm(true) },
@@ -218,7 +221,7 @@ export default function Home() {
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Mobile top bar */}
         <div className="md:hidden flex items-center justify-between px-4 py-3" style={{ background: 'var(--bg-sidebar)', borderBottom: '1px solid var(--border)' }}>
-          <button onClick={() => setSidebarOpen(true)} className="p-2 rounded-lg" style={{ background: 'var(--bg-card)' }}>
+          <button onClick={() => setSidebarOpen(true)} className="p-2 rounded-lg" style={{ background: 'var(--bg-card)' }} aria-label="Apri menu">
             <div className="space-y-1">
               <div className="w-5 h-0.5 rounded" style={{ background: 'var(--text-2)' }} />
               <div className="w-5 h-0.5 rounded" style={{ background: 'var(--text-2)' }} />
@@ -231,6 +234,7 @@ export default function Home() {
             className="p-2 rounded-lg"
             style={{ background: 'var(--bg-card)' }}
             title="Esci"
+            aria-label="Esci"
           >
             <LogOut size={18} style={{ color: 'var(--muted)' }} />
           </button>
@@ -242,15 +246,18 @@ export default function Home() {
         </main>
       </div>
 
-      {/* FAB — Contextual action button */}
-      <button
-        onClick={FAB_CONFIG[view].action}
-        className="fixed bottom-6 right-6 z-30 flex items-center gap-2 px-5 py-3 rounded-2xl font-semibold text-white shadow-2xl transition-all hover:scale-105 active:scale-95"
-        style={{ background: 'linear-gradient(135deg,#6366f1,#a855f7)', boxShadow: '0 0 30px rgba(99,102,241,0.4)' }}
-      >
-        {FAB_CONFIG[view].icon}
-        <span className="hidden sm:block">{FAB_CONFIG[view].label}</span>
-      </button>
+      {/* FAB — Contextual action button: hidden on views that have no action */}
+      {!NO_FAB_VIEWS.has(view) && (
+        <button
+          onClick={FAB_CONFIG[view].action}
+          className="fixed bottom-6 right-6 z-30 flex items-center gap-2 px-5 py-3 rounded-2xl font-semibold text-white shadow-2xl transition-all hover:scale-105 active:scale-95"
+          style={{ background: 'linear-gradient(135deg,#6366f1,#a855f7)', boxShadow: '0 0 30px rgba(99,102,241,0.4)' }}
+          aria-label={FAB_CONFIG[view].label}
+        >
+          {FAB_CONFIG[view].icon}
+          <span className="hidden sm:block">{FAB_CONFIG[view].label}</span>
+        </button>
+      )}
 
       {/* Entry Form Modal */}
       {showForm && <EntryForm onClose={() => setShowForm(false)} />}

@@ -8,7 +8,7 @@ export type EntryCategory =
 
 export type EntrySource =
   | 'Diretta'
-  | 'Prenotado'
+  | 'Prenotato'
   | 'Fresha'
   | 'App Ufficiale';
 
@@ -83,7 +83,7 @@ export const ENTRY_CATEGORIES: EntryCategory[] = [
 
 export const ENTRY_SOURCES: EntrySource[] = [
   'Diretta',
-  'Prenotado',
+  'Prenotato',
   'Fresha',
   'App Ufficiale',
 ];

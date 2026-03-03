@@ -84,8 +84,6 @@ async function sendUltraMsg(instanceId: string, token: string, to: string, messa
   }
 }
 
-const BUCKET = 'salon-data';
-
 // ─── Main ────────────────────────────────────────────────────────────────────
 export default async function handler() {
   const supabase = createClient(
@@ -93,10 +91,14 @@ export default async function handler() {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
-  // List all salon state files from Storage bucket
-  const { data: fileList, error } = await supabase.storage.from(BUCKET).list('', { limit: 1000 });
-  if (error || !fileList) {
-    console.error('Scheduler: cannot list storage bucket', error);
+  // Read all salon states from the salon_data TABLE (where the main app writes data)
+  const { data: rows, error } = await supabase
+    .from('salon_data')
+    .select('user_id, state')
+    .order('updated_at', { ascending: false });
+
+  if (error || !rows) {
+    console.error('Scheduler: cannot read salon_data table', error);
     return;
   }
 
@@ -105,14 +107,14 @@ export default async function handler() {
   const yesterday = yesterdayStr();
   const mmdd      = todayMMDD();
 
-  const rows = fileList.filter(f => f.name.endsWith('.json'));
+  // Use Italy timezone (UTC+1/+2) for date calculations since the schedule runs at 08:00 UTC
+  // which is 09:00 CET / 10:00 CEST — enough to cover today accurately for Italian salons.
 
-  for (const file of rows) {
-    const userId = file.name.replace('.json', '');
+  for (const row of rows) {
+    const userId = row.user_id as string;
     let state: SalonState = {};
     try {
-      const { data: blob } = await supabase.storage.from(BUCKET).download(file.name);
-      if (blob) state = JSON.parse(await blob.text()) as SalonState;
+      state = (row.state as SalonState) ?? {};
     } catch { continue; }
 
     const wa = state.salonConfig?.whatsapp;
@@ -169,21 +171,27 @@ export default async function handler() {
     }
 
     // ── Fedeltà milestone ──
+    // Use a milestone-specific deduplication key so we don't spam every day
     if (wa.loyaltyEnabled && wa.loyaltyMilestone) {
-      for (const client of clients.filter(c => c.loyaltyPoints >= wa.loyaltyMilestone && c.phone)) {
-        const key = `loyalty:${client.id}`;
-        if (alreadySent.has(key)) continue;
+      const milestone = wa.loyaltyMilestone;
+      // Compute the highest milestone tier the client has crossed (multiple of milestone)
+      for (const client of clients.filter(c => c.loyaltyPoints >= milestone && c.phone)) {
+        const tier = Math.floor(client.loyaltyPoints / milestone); // e.g. 150pts/100=1, 200pts/100=2
+        const milestoneKey = `loyalty_tier${tier}:${client.id}`;   // unique per tier per client
+        // Check against ALL historical logs (not just today) to avoid re-notifying same tier
+        if (log.some(m => m.type === 'loyalty' && `loyalty_tier${tier}:${m.clientId}` === milestoneKey)) continue;
         const msg = renderTemplate(wa.loyaltyMsg ?? DEFAULT_LOYALTY_MSG, { nome: client.firstName, punti: String(client.loyaltyPoints), salone: salonName });
         const sent = await sendUltraMsg(instanceId, token, client.phone, msg);
         log.push({ id: crypto.randomUUID(), type: 'loyalty', clientId: client.id, clientName: `${client.firstName} ${client.lastName}`, phone: client.phone, templateName: 'loyalty', status: sent ? 'sent' : 'failed', sentAt: new Date().toISOString() });
-        alreadySent.add(key);
       }
     }
 
-    // Save updated log back to Storage (last 200)
+    // Save updated whatsappMessages log back to the salon_data TABLE (last 200 entries)
     const updatedState = { ...state, whatsappMessages: log.slice(-200) };
-    const blob = new Blob([JSON.stringify(updatedState)], { type: 'application/json' });
-    await supabase.storage.from(BUCKET).upload(file.name, blob, { upsert: true, contentType: 'application/json' });
+    const { error: saveErr } = await supabase
+      .from('salon_data')
+      .upsert({ user_id: userId, state: updatedState, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+    if (saveErr) console.error(`Scheduler: failed to save log for ${userId}`, saveErr);
   }
 
   console.log('WhatsApp scheduler completed for', rows.length, 'salons');

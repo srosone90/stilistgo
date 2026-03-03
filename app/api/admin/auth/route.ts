@@ -4,9 +4,13 @@ import { generateAdminToken, verifyAdminRequest } from '@/lib/adminAuth';
 /** POST /api/admin/auth  — login with email+password → returns token */
 export async function POST(req: NextRequest) {
   const { email, password } = await req.json().catch(() => ({}));
-  const adminEmail = process.env.ADMIN_EMAIL ?? 'admin@stylistgo.it';
-  const adminPass = process.env.ADMIN_PASSWORD ?? 'changeme';
+  const adminEmail = process.env.ADMIN_EMAIL;
+  const adminPass  = process.env.ADMIN_PASSWORD;
 
+  if (!adminEmail || !adminPass) {
+    console.error('ADMIN_EMAIL and ADMIN_PASSWORD env vars are not set.');
+    return NextResponse.json({ error: 'Server non configurato correttamente.' }, { status: 500 });
+  }
   if (email !== adminEmail || password !== adminPass) {
     return NextResponse.json({ error: 'Credenziali non valide.' }, { status: 401 });
   }

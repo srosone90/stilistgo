@@ -21,6 +21,9 @@ export async function POST(req: NextRequest) {
     if (!clientName || !clientPhone || !preferredDate || !preferredTime) {
       return NextResponse.json({ error: 'Campi obbligatori mancanti.' }, { status: 400 });
     }
+    if (!salonId || typeof salonId !== 'string' || salonId.length < 8) {
+      return NextResponse.json({ error: 'salonId non valido.' }, { status: 400 });
+    }
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;

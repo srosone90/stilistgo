@@ -17,6 +17,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="it">
+      <head>
+        {/* Blocking inline script: sets data-theme BEFORE React hydrates to prevent flash */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('stylistgo-theme');document.documentElement.setAttribute('data-theme',t==='light'?'light':'dark');}catch(e){}})();`,
+          }}
+        />
+      </head>
       <body className="antialiased">
         <ThemeProvider>
           <AppProvider>
