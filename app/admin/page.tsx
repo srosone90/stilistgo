@@ -549,7 +549,7 @@ export default function AdminPage() {
               <div>
                 <label style={{ display: 'block', fontSize: '11px', color: '#71717a', marginBottom: '4px' }}>Piano</label>
                 <select value={(e.plan ?? t.plan) as string} onChange={ev => set('plan', ev.target.value)} style={sel()}>
-                  {['trial','starter','pro','business','enterprise'].map(p => <option key={p} value={p}>{p.charAt(0).toUpperCase()+p.slice(1)}</option>)}
+                  {['trial','starter','pro','business'].map(p => <option key={p} value={p}>{p.charAt(0).toUpperCase()+p.slice(1)}</option>)}
                 </select>
               </div>
               <div>
@@ -732,7 +732,7 @@ export default function AdminPage() {
           </div>
           <select value={tenantPlanFilter} onChange={e => setTenantPlanFilter(e.target.value)} style={sel({ width: '120px' })}>
             <option value="">Tutti i piani</option>
-            {['trial','starter','pro','business','enterprise'].map(p => <option key={p} value={p}>{p.charAt(0).toUpperCase()+p.slice(1)}</option>)}
+            {['trial','starter','pro','business'].map(p => <option key={p} value={p}>{p.charAt(0).toUpperCase()+p.slice(1)}</option>)}
           </select>
           <select value={tenantStatusFilter} onChange={e => setTenantStatusFilter(e.target.value)} style={sel({ width: '130px' })}>
             <option value="">Tutti gli stati</option>
