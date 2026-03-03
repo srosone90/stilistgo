@@ -8,6 +8,8 @@ import { it } from 'date-fns/locale';
 import { RefreshCw, CheckCircle2, XCircle, Trash2, ExternalLink, Clock, Phone, Mail, Scissors, CalendarPlus } from 'lucide-react';
 import { getCurrentUser } from '@/lib/supabase';
 
+import { useNotifications } from '@/context/NotificationContext';
+
 const card: React.CSSProperties = { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '16px', padding: '20px' };
 
 const STATUS_STYLES: Record<string, React.CSSProperties> = {
@@ -21,6 +23,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 export default function OnlineBookingsView() {
   const { addAppointment, clients, addClient, services } = useSalon();
+  const { realtimeBookingTick } = useNotifications();
   const [bookings, setBookings] = useState<OnlineBooking[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'pending' | 'confirmed' | 'cancelled'>('all');
@@ -46,7 +49,8 @@ export default function OnlineBookingsView() {
     setLoading(false);
   }, [userId]);
 
-  useEffect(() => { load(); }, [load]);
+  // Re-load when real-time INSERT/UPDATE is detected via NotificationContext
+  useEffect(() => { load(); }, [load, realtimeBookingTick]);
 
   const handleConfirm = async (id: string) => {
     await dbUpdateBookingStatus(id, 'confirmed');

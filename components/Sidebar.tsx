@@ -9,6 +9,8 @@ import { useSalon } from '@/context/SalonContext';
 import { OperatorPermissions } from '@/types/salon';
 import { PlanFeatures, PLAN_FEATURES, VIEW_TO_FEATURE } from '@/lib/planGate';
 import { useTheme } from '@/context/ThemeContext';
+import NotificationBell from '@/components/NotificationBell';
+import { useNotifications } from '@/context/NotificationContext';
 
 interface NavItem {
   id: string;
@@ -70,6 +72,8 @@ export default function Sidebar({ activeView, onNavigate, onLock, permissions, p
   const { dataSource } = useApp();
   const { operators, activeOperatorId, setActiveOperatorId, verifyOperatorPin } = useSalon();
   const { isDark, toggleTheme } = useTheme();
+  const { notifications, unreadCount } = useNotifications();
+  const newBookingCount = notifications.filter(n => !n.read && n.type === 'new_booking').length;
   const [userName, setUserName] = useState('');
   const [showPinModal, setShowPinModal] = useState(false);
   const [pinStep, setPinStep] = useState<'select' | 'pin'>('select');
@@ -113,10 +117,11 @@ export default function Sidebar({ activeView, onNavigate, onLock, permissions, p
           style={{ background: 'linear-gradient(135deg,#6366f1,#a855f7)' }}>
           <Scissors size={18} className="text-white" />
         </div>
-        <div>
+        <div className="flex-1 min-w-0">
           <p className="font-bold text-sm text-white leading-tight">Stylistgo</p>
           <p className="text-xs" style={{ color: 'var(--muted)' }}>Salon Gestionale</p>
         </div>
+        <NotificationBell />
       </div>
 
       {/* Nav */}
@@ -158,6 +163,11 @@ export default function Sidebar({ activeView, onNavigate, onLock, permissions, p
                     {item.icon}
                     <span className="flex-1 text-left">{item.label}</span>
                     {planLocked && <Lock size={13} style={{ flexShrink: 0, color: 'var(--border-light)' }} />}
+                    {item.id === 'bookings' && newBookingCount > 0 && (
+                      <span style={{ background: '#ef4444', color: 'white', fontSize: 10, fontWeight: 700, borderRadius: 10, padding: '1px 6px', lineHeight: 1.6 }}>
+                        {newBookingCount}
+                      </span>
+                    )}
                   </button>
                 );
               })}

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, use } from 'react';
-import { CheckCircle2, Clock, Scissors, ArrowLeft, Calendar, User, Download, Share, Sparkles, MapPin } from 'lucide-react';
+import { CheckCircle2, Clock, Scissors, ArrowLeft, Calendar, User, Download, Share, Sparkles, MapPin, History, Phone, Star, X, ChevronRight, Edit2, RefreshCw } from 'lucide-react';
 
 // ── Types ──────────────────────────────────────────────────────────
 interface SalonService { id: string; name: string; duration: number; price: number; category: string; }
@@ -13,6 +13,7 @@ interface ClientAppConfig {
   contactPhone?: string; contactAddress?: string;
 }
 interface StoredClient { salonId: string; clientPhone: string; clientName: string; clientEmail: string; }
+interface HistoryBooking { id: string; service: string; preferred_date: string; preferred_time: string; status: 'pending' | 'confirmed' | 'cancelled'; created_at: string; notes?: string; }
 
 const STORAGE_KEY = 'stilistgo_client_identity';
 const DEFAULT_COLOR = '#c084fc';
@@ -55,6 +56,23 @@ function ProgressBar({ step, accent }: { step: string; accent: string }) {
 
 
 
+// ── ICS calendar util ─────────────────────────────────────────────
+function generateICS(service: string, date: string, time: string, salon: string, duration: number) {
+  const [y, mo, d] = date.split('-').map(Number);
+  const [h, m] = time.split(':').map(Number);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const dtStart = `${y}${pad(mo)}${pad(d)}T${pad(h)}${pad(m)}00`;
+  const end = new Date(y, mo - 1, d, h, m + duration);
+  const dtEnd = `${end.getFullYear()}${pad(end.getMonth()+1)}${pad(end.getDate())}T${pad(end.getHours())}${pad(end.getMinutes())}00`;
+  return ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Stylistgo//PWA//IT','BEGIN:VEVENT',`DTSTART:${dtStart}`,`DTEND:${dtEnd}`,`SUMMARY:${service} @ ${salon}`,'DESCRIPTION:Prenotato tramite Stylistgo','END:VEVENT','END:VCALENDAR'].join('\r\n');
+}
+function downloadICS(content: string, filename: string) {
+  const blob = new Blob([content], { type: 'text/calendar;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
 // ── Main ───────────────────────────────────────────────────────────
 export default function PrenotaPWAPage({ params }: { params: Promise<{ salonId: string }> }) {
   const { salonId } = use(params);
@@ -70,7 +88,7 @@ export default function PrenotaPWAPage({ params }: { params: Promise<{ salonId: 
   const [loading, setLoading] = useState(true);
   const [client, setClient] = useState<StoredClient | null>(null);
 
-  const [step, setStep] = useState<'home' | 'services' | 'operator' | 'datetime' | 'confirm' | 'success'>('home');
+  const [step, setStep] = useState<'home' | 'services' | 'operator' | 'datetime' | 'confirm' | 'success' | 'history' | 'profile'>('home');
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [selectedOperator, setSelectedOperator] = useState('');
   const [selectedDate, setSelectedDate] = useState('');
@@ -81,6 +99,12 @@ export default function PrenotaPWAPage({ params }: { params: Promise<{ salonId: 
   const [manualName, setManualName] = useState('');
   const [manualPhone, setManualPhone] = useState('');
   const [manualEmail, setManualEmail] = useState('');
+  const [notes, setNotes] = useState('');
+  const [history, setHistory] = useState<HistoryBooking[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [loyaltyPoints, setLoyaltyPoints] = useState(0);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [profileForm, setProfileForm] = useState({ name: '', email: '' });
 
   const [deferredPrompt, setDeferredPrompt] = useState<Event | null>(null);
   const [isStandalone, setIsStandalone] = useState(false);
@@ -183,10 +207,38 @@ export default function PrenotaPWAPage({ params }: { params: Promise<{ salonId: 
           operatorId: selectedOperator,
           preferredDate: selectedDate,
           preferredTime: selectedTime,
-          notes: '',
+          notes,
         }),
       });
     } catch { /**/ } finally { setSubmitting(false); setStep('success'); }
+  }
+
+  // Auto-load booking history whenever client identity is set
+  useEffect(() => {
+    if (!client?.clientPhone) return;
+    setHistoryLoading(true);
+    setProfileForm({ name: client.clientName, email: client.clientEmail });
+    fetch(`/api/bookings/client?clientPhone=${encodeURIComponent(client.clientPhone)}&salonId=${encodeURIComponent(salonId)}`)
+      .then(r => r.json())
+      .then(d => {
+        setHistory(d.bookings ?? []);
+        if (typeof d.loyaltyPoints === 'number') setLoyaltyPoints(d.loyaltyPoints);
+      })
+      .catch(() => {})
+      .finally(() => setHistoryLoading(false));
+  }, [client, salonId]);
+
+  async function cancelBooking(id: string) {
+    if (!client?.clientPhone) return;
+    setCancellingId(id);
+    try {
+      await fetch(`/api/bookings/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'cancel', clientPhone: client.clientPhone }),
+      });
+      setHistory(prev => prev.map(b => b.id === id ? { ...b, status: 'cancelled' as const } : b));
+    } catch { /**/ } finally { setCancellingId(null); }
   }
 
   // ── Style helpers ──────────────────────────────────────────────────────
@@ -334,6 +386,26 @@ export default function PrenotaPWAPage({ params }: { params: Promise<{ salonId: 
           </span>
         </button>
 
+        {/* Secondary actions for logged-in clients */}
+        {client && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <button onClick={() => setStep('history')}
+              style={{ padding: '14px 12px', borderRadius: 16, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: 'white', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+              <History size={18} style={{ color: accent }} />
+              <span style={{ fontSize: 13, fontWeight: 600 }}>Le mie prenotazioni</span>
+              {history.filter(b => b.status === 'pending' || b.status === 'confirmed').length > 0 && (
+                <span style={{ fontSize: 11, color: accent }}>{history.filter(b => b.status === 'pending' || b.status === 'confirmed').length} attiv{history.filter(b=>b.status==='pending'||b.status==='confirmed').length===1?'a':'e'}</span>
+              )}
+            </button>
+            <button onClick={() => setStep('profile')}
+              style={{ padding: '14px 12px', borderRadius: 16, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: 'white', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+              <User size={18} style={{ color: accent }} />
+              <span style={{ fontSize: 13, fontWeight: 600 }}>Il mio profilo</span>
+              {loyaltyPoints > 0 && <span style={{ fontSize: 11, color: accent }}>⭐ {loyaltyPoints} punti</span>}
+            </button>
+          </div>
+        )}
+
         {/* Info cards */}
         {(appConfig.contactAddress || appConfig.cancellationPolicy) && (
           <div style={{ display: 'grid', gridTemplateColumns: appConfig.contactAddress && appConfig.cancellationPolicy ? '1fr 1fr' : '1fr', gap: 10, marginTop: 4 }}>
@@ -448,6 +520,16 @@ export default function PrenotaPWAPage({ params }: { params: Promise<{ salonId: 
         <h2 style={{ fontSize: 22, fontWeight: 800, margin: '0 0 4px' }}>Con chi preferisci?</h2>
         <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', margin: '0 0 24px' }}>Scegli la tua operatrice</p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {/* Qualsiasi */}
+          <button onClick={() => { setSelectedOperator(''); setStep('datetime'); }}
+            style={{ display: 'flex', alignItems: 'center', gap: 16, cursor: 'pointer', textAlign: 'left', width: '100%', backdropFilter: 'blur(12px)', borderRadius: 20, padding: '16px 18px', transition: 'all 0.15s', border: `1px solid ${selectedOperator === '' ? `rgba(${rgb},0.5)` : 'rgba(255,255,255,0.07)'}`, background: selectedOperator === '' ? `rgba(${rgb},0.12)` : 'rgba(255,255,255,0.03)' }}>
+            <div style={{ width: 48, height: 48, borderRadius: 16, flexShrink: 0, background: 'rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>🎲</div>
+            <div style={{ flex: 1 }}>
+              <span style={{ fontSize: 17, fontWeight: 600 }}>Nessuna preferenza</span>
+              <p style={{ margin: '2px 0 0', fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>Prima disponibile</p>
+            </div>
+            {selectedOperator === '' && <ChevronRight size={20} style={{ color: accent }} />}
+          </button>
           {operators.map(op => {
             const sel = selectedOperator === op.id;
             return (
@@ -592,6 +674,18 @@ export default function PrenotaPWAPage({ params }: { params: Promise<{ salonId: 
           </div>
         )}
 
+        {/* Notes */}
+        <div style={{ ...glass, marginBottom: 16 }}>
+          <label style={{ fontSize: 12, color: 'rgba(255,255,255,0.38)', display: 'block', marginBottom: 8 }}>Note aggiuntive (opzionale)</label>
+          <textarea
+            value={notes}
+            onChange={e => setNotes(e.target.value)}
+            placeholder="Es. allergie, preferenze colore, capelli bagnati…"
+            rows={3}
+            style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.5 }}
+          />
+        </div>
+
         <button onClick={submitBooking}
           disabled={submitting || !effectiveName || !effectivePhone}
           style={{ ...btnMain, opacity: submitting || !effectiveName || !effectivePhone ? 0.4 : 1 }}>
@@ -627,13 +721,171 @@ export default function PrenotaPWAPage({ params }: { params: Promise<{ salonId: 
           </p>
         </div>
 
-        <button onClick={() => { setStep('home'); setSelectedServices([]); setSelectedDate(''); setSelectedTime(''); }}
+        <button onClick={() => { setStep('home'); setSelectedServices([]); setSelectedDate(''); setSelectedTime(''); setNotes(''); }}
           style={{ width: '100%', padding: '14px', borderRadius: 16, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.65)', fontSize: 15, cursor: 'pointer' }}>
           Torna all&apos;inizio
         </button>
+
+        {/* ICS calendar download */}
+        <button
+          onClick={() => downloadICS(generateICS(selectedObjs.map(s=>s.name).join(', '), selectedDate, selectedTime, salonName, totalDuration), `prenotazione-${selectedDate}.ics`)}
+          style={{ width: '100%', padding: '14px', borderRadius: 16, border: `1px solid rgba(${rgb},0.3)`, background: `rgba(${rgb},0.06)`, color: accent, fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          <Calendar size={15} /> Aggiungi al calendario (.ics)
+        </button>
+
+        {/* History shortcut */}
+        {client && (
+          <button onClick={() => { setStep('history'); }}
+            style={{ width: '100%', padding: '14px', borderRadius: 16, border: '1px solid rgba(255,255,255,0.08)', background: 'transparent', color: 'rgba(255,255,255,0.45)', fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+            <History size={14} /> Vedi tutte le mie prenotazioni
+          </button>
+        )}
       </div>
     </div>
   );
+
+  // ── HISTORY ───────────────────────────────────────────────────────────────
+  if (step === 'history') {
+    const STATUS_LABEL: Record<string, string> = { pending: '⏳ In attesa', confirmed: '✅ Confermata', cancelled: '❌ Cancellata' };
+    const STATUS_COLOR: Record<string, string> = { pending: '#fbbf24', confirmed: '#4ade80', cancelled: '#f87171' };
+    const today = new Date().toISOString().split('T')[0];
+    return (
+      <div style={page}>
+        <div style={{ ...inner, paddingBottom: 40 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 24, marginBottom: 8 }}>
+            <button style={backBtn} onClick={() => setStep('home')}><ArrowLeft size={15} /> Indietro</button>
+            <button onClick={() => {
+              if (!client?.clientPhone) return;
+              setHistoryLoading(true);
+              fetch(`/api/bookings/client?clientPhone=${encodeURIComponent(client.clientPhone)}&salonId=${encodeURIComponent(salonId)}`)
+                .then(r => r.json()).then(d => { setHistory(d.bookings??[]); if(typeof d.loyaltyPoints==='number') setLoyaltyPoints(d.loyaltyPoints); })
+                .finally(() => setHistoryLoading(false));
+            }} style={{ background:'none', border:'none', color: accent, cursor:'pointer', display:'flex', alignItems:'center', gap:4, fontSize:13 }}>
+              <RefreshCw size={13} /> Aggiorna
+            </button>
+          </div>
+          <h2 style={{ fontSize: 22, fontWeight: 800, margin: '0 0 4px' }}>Le mie prenotazioni</h2>
+          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', margin: '0 0 20px' }}>Storico e prenotazioni attive</p>
+
+          {loyaltyPoints > 0 && (
+            <div style={{ ...glass, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 14, borderColor: `rgba(${rgb},0.25)`, background: `rgba(${rgb},0.07)` }}>
+              <Star size={22} style={{ color: accent, flexShrink: 0 }} />
+              <div>
+                <p style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>{loyaltyPoints} punti fedeltà</p>
+                <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', margin: 0 }}>Accumulati con le tue visite</p>
+              </div>
+            </div>
+          )}
+
+          {historyLoading ? (
+            <p style={{ color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: '40px 0', fontSize: 14 }}>Caricamento…</p>
+          ) : history.length === 0 ? (
+            <div style={{ ...glass, textAlign: 'center', padding: '40px 20px' }}>
+              <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 15, margin: '0 0 16px' }}>Nessuna prenotazione trovata</p>
+              <button onClick={() => setStep('services')} style={{ ...btnMain, fontSize: 14, padding: '12px 24px', width: 'auto' }}>Prenota ora</button>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {history.map(b => {
+                const isFuture = b.preferred_date >= today;
+                const canCancel = (b.status === 'pending' || b.status === 'confirmed') && isFuture;
+                return (
+                  <div key={b.id} style={{ ...glass, borderColor: b.status === 'cancelled' ? 'rgba(255,255,255,0.05)' : `rgba(${rgb},0.15)`, opacity: b.status === 'cancelled' ? 0.55 : 1 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                      <p style={{ fontSize: 15, fontWeight: 700, margin: 0, maxWidth: '65%', lineHeight: 1.3 }}>{b.service}</p>
+                      <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: `${STATUS_COLOR[b.status]}22`, color: STATUS_COLOR[b.status], border: `1px solid ${STATUS_COLOR[b.status]}44`, whiteSpace: 'nowrap' }}>
+                        {STATUS_LABEL[b.status] ?? b.status}
+                      </span>
+                    </div>
+                    <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', margin: '0 0 4px', display: 'flex', alignItems: 'center', gap: 6 } as React.CSSProperties}>
+                      <Calendar size={12} /> {new Date(b.preferred_date + 'T12:00:00').toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })}
+                    </p>
+                    <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', margin: 0, display: 'flex', alignItems: 'center', gap: 6 } as React.CSSProperties}>
+                      <Clock size={12} /> {b.preferred_time}
+                    </p>
+                    {canCancel && (
+                      <button
+                        onClick={() => cancelBooking(b.id)}
+                        disabled={cancellingId === b.id}
+                        style={{ marginTop: 12, width: '100%', padding: '10px', borderRadius: 12, border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.07)', color: '#f87171', fontSize: 13, cursor: 'pointer', opacity: cancellingId === b.id ? 0.5 : 1 }}>
+                        {cancellingId === b.id ? 'Cancellazione…' : '✕ Disdici prenotazione'}
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <button onClick={() => setStep('services')} style={{ ...btnMain, marginTop: 20 }}>
+            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              <Calendar size={16} /> Nuova prenotazione
+            </span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── PROFILE ───────────────────────────────────────────────────────────────
+  if (step === 'profile') {
+    function saveProfile() {
+      if (!client) return;
+      const updated: StoredClient = { ...client, clientName: profileForm.name || client.clientName, clientEmail: profileForm.email };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      setClient(updated);
+      setStep('home');
+    }
+    function logout() {
+      localStorage.removeItem(STORAGE_KEY);
+      setClient(null);
+      setHistory([]);
+      setLoyaltyPoints(0);
+      setStep('home');
+    }
+    return (
+      <div style={page}>
+        <div style={{ ...inner, paddingBottom: 40 }}>
+          <button style={{ ...backBtn, paddingTop: 24 }} onClick={() => setStep('home')}><ArrowLeft size={15} /> Indietro</button>
+          <h2 style={{ fontSize: 22, fontWeight: 800, margin: '0 0 4px' }}>Il mio profilo</h2>
+          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', margin: '0 0 24px' }}>Modifica i tuoi dati</p>
+
+          {loyaltyPoints > 0 && (
+            <div style={{ ...glass, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 14, borderColor: `rgba(${rgb},0.25)`, background: `rgba(${rgb},0.07)` }}>
+              <Star size={22} style={{ color: accent, flexShrink: 0 }} />
+              <div>
+                <p style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>{loyaltyPoints} punti fedeltà</p>
+                <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', margin: 0 }}>Accumulati con le tue visite</p>
+              </div>
+            </div>
+          )}
+
+          <div style={{ ...glass, marginBottom: 14 }}>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ fontSize: 12, color: 'rgba(255,255,255,0.38)', display: 'block', marginBottom: 6 }}>Nome</label>
+              <input value={profileForm.name} onChange={e => setProfileForm(p => ({ ...p, name: e.target.value }))} style={inputStyle} />
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ fontSize: 12, color: 'rgba(255,255,255,0.38)', display: 'block', marginBottom: 6 }}>Telefono (non modificabile)</label>
+              <input value={client?.clientPhone ?? ''} disabled style={{ ...inputStyle, opacity: 0.45, cursor: 'not-allowed' }} />
+            </div>
+            <div>
+              <label style={{ fontSize: 12, color: 'rgba(255,255,255,0.38)', display: 'block', marginBottom: 6 }}>Email</label>
+              <input type="email" value={profileForm.email} onChange={e => setProfileForm(p => ({ ...p, email: e.target.value }))} style={inputStyle} />
+            </div>
+          </div>
+
+          <button onClick={saveProfile} style={{ ...btnMain, marginBottom: 10 }}>
+            Salva modifiche
+          </button>
+
+          <button onClick={logout} style={{ width: '100%', padding: '14px', borderRadius: 16, border: '1px solid rgba(239,68,68,0.25)', background: 'rgba(239,68,68,0.06)', color: '#f87171', fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+            <X size={14} /> Esci dall&apos;account
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return null;
 }
