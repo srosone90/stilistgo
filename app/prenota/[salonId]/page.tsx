@@ -170,10 +170,21 @@ export default function PrenotaPWAPage({ params }: { params: Promise<{ salonId: 
     if (!effectiveName || !effectivePhone) return;
     setSubmitting(true);
     try {
-      const op = operators.find(o => o.id === selectedOperator);
-      await fetch('/api/booking-request', {
+      await fetch('/api/bookings', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ salonId, clientName: effectiveName, clientPhone: effectivePhone, clientEmail: effectiveEmail, services: selectedObjs.map(s => s.name).join(', '), operatorId: selectedOperator, operatorName: op?.name ?? '', preferredDate: selectedDate, preferredTime: selectedTime, notes: '' }),
+        body: JSON.stringify({
+          salonId,
+          clientName: effectiveName,
+          clientPhone: effectivePhone,
+          clientEmail: effectiveEmail,
+          service: selectedObjs.map(s => s.name).join(', '),
+          serviceIds: selectedObjs.map(s => s.id),
+          duration: totalDuration,
+          operatorId: selectedOperator,
+          preferredDate: selectedDate,
+          preferredTime: selectedTime,
+          notes: '',
+        }),
       });
     } catch { /**/ } finally { setSubmitting(false); setStep('success'); }
   }

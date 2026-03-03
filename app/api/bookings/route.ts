@@ -61,17 +61,21 @@ export async function POST(req: NextRequest) {
     // ── 2. WhatsApp booking confirmation ────────────────────────────────────
     if (salonId) {
       try {
-        const stateRes = await fetch(
-          `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/api/salon-state?userId=${salonId}`
-        );
-        const stateJson = stateRes.ok ? await stateRes.json() : null;
-        const salonState = stateJson?.state;
-        const wa = salonState?.salonConfig?.whatsapp;
+        // Leggi direttamente dalla tabella salon_data (stessa fonte di booking-slots).
+        // /api/salon-state usa Supabase Storage (fonte sbagliata) → ritorna sempre null → WA non parte mai.
+        const { data: sdRow } = await supabase
+          .from('salon_data')
+          .select('state')
+          .eq('user_id', salonId)
+          .maybeSingle();
+        const salonState = sdRow?.state as Record<string, unknown> | null;
+        const salonConf = salonState?.salonConfig as Record<string, unknown> | null;
+        const wa = salonConf?.whatsapp as Record<string, unknown> | null;
         if (wa?.bookingConfirmEnabled && wa.enabled && wa.ultraMsgInstanceId && wa.ultraMsgToken && clientPhone) {
-          const salonName = salonState?.salonConfig?.salonName ?? 'il salone';
+          const salonName = (salonConf?.salonName as string | undefined) ?? 'il salone';
           const phone = clientPhone.replace(/\D/g, '');
           const DEFAULT_BOOKING_MSG = 'Ciao {nome}! ✅ La tua prenotazione da *{salone}* per il {data} alle {ora} è confermata. A presto!';
-          const template: string = wa.bookingConfirmMsg ?? DEFAULT_BOOKING_MSG;
+          const template: string = (wa.bookingConfirmMsg as string | undefined) ?? DEFAULT_BOOKING_MSG;
           const msg = template
             .split('{nome}').join(clientName)
             .split('{salone}').join(salonName)
@@ -80,7 +84,7 @@ export async function POST(req: NextRequest) {
           await fetch(`https://api.ultramsg.com/${wa.ultraMsgInstanceId}/messages/chat`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({ token: wa.ultraMsgToken, to: phone, body: msg }).toString(),
+            body: new URLSearchParams({ token: wa.ultraMsgToken as string, to: phone, body: msg }).toString(),
           });
         }
       } catch (waErr) {

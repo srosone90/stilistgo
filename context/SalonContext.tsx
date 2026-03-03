@@ -333,6 +333,30 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
                 createdAt: new Date().toISOString(),
                 history: [{ timestamp: new Date().toISOString(), action: 'Importato da prenotazione online' }],
               });
+
+              // ── WA conferma appuntamento per prenotazioni auto-importate ──
+              try {
+                const wa = (cloudState.salonConfig as SalonConfig | undefined)?.whatsapp;
+                const clientPhone = b.client_phone?.replace(/\D/g, '');
+                if (wa?.ultraMsgInstanceId && wa?.ultraMsgToken && (wa.appointmentConfirmEnabled ?? true) && clientPhone) {
+                  const svcName = matchedService?.name || b.service || 'appuntamento';
+                  const salonName = (cloudState.salonConfig as SalonConfig | undefined)?.salonName ?? 'il salone';
+                  const DEFAULT_APPT_MSG = 'Ciao {nome}! ✅ Il tuo appuntamento di *{servizio}* è confermato per il {data} alle {ora} da {salone}. A presto!';
+                  const template = wa.appointmentConfirmMsg ?? DEFAULT_APPT_MSG;
+                  const msg = template
+                    .split('{nome}').join(bookingFirstName)
+                    .split('{servizio}').join(svcName)
+                    .split('{data}').join(b.preferred_date)
+                    .split('{ora}').join(b.preferred_time)
+                    .split('{salone}').join(salonName);
+                  fetch('/api/ultramsg/send', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ instanceId: wa.ultraMsgInstanceId, token: wa.ultraMsgToken, to: clientPhone, message: msg }),
+                  }).catch(() => {});
+                }
+              } catch { /* non bloccare l'import */ }
+
               dbUpdateBookingStatus(b.id, 'confirmed').catch(() => {});
             }
 
