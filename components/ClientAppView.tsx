@@ -123,7 +123,7 @@ export default function ClientAppView() {
     accentColor: clientAppConfig.accentColor,
     logoUrl: clientAppConfig.logoUrl ?? '',
     coverImageUrl: clientAppConfig.coverImageUrl ?? '',
-    bgStyle: clientAppConfig.bgStyle ?? 'dark',
+    bgStyle: clientAppConfig.bgStyle ?? '#0d0d14',
     fontStyle: clientAppConfig.fontStyle ?? 'default',
   });
   const [brandingSaved, setBrandingSaved] = useState(false);
@@ -135,7 +135,7 @@ export default function ClientAppView() {
       accentColor: clientAppConfig.accentColor,
       logoUrl: clientAppConfig.logoUrl ?? '',
       coverImageUrl: clientAppConfig.coverImageUrl ?? '',
-      bgStyle: clientAppConfig.bgStyle ?? 'dark',
+      bgStyle: clientAppConfig.bgStyle ?? '#0d0d14',
       fontStyle: clientAppConfig.fontStyle ?? 'default',
     }));
   }, [clientAppConfig]);
@@ -392,32 +392,49 @@ export default function ClientAppView() {
           </p>
         </Field>
 
-        {/* Background style */}
-        <Field label="Sfondo dell'app">
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10 }}>
+        {/* Background color */}
+        <Field label="Colore di sfondo">
+          <div className="flex items-center gap-3 mb-2">
+            <input
+              type="color"
+              value={/^#[0-9a-fA-F]{6}$/.test(branding.bgStyle) ? branding.bgStyle : '#0d0d14'}
+              onChange={e => setBranding(b => ({ ...b, bgStyle: e.target.value }))}
+              style={{ width: 48, height: 40, border: 'none', borderRadius: 8, cursor: 'pointer', background: 'none', padding: 2 }}
+            />
+            <input
+              style={{ ...inputStyle, flex: 1 }}
+              value={branding.bgStyle}
+              onChange={e => setBranding(b => ({ ...b, bgStyle: e.target.value }))}
+              placeholder="#0d0d14"
+            />
+            <div style={{ width: 36, height: 36, borderRadius: 8, background: branding.bgStyle, border: '1px solid var(--border)', flexShrink: 0 }} />
+          </div>
+          {/* Quick presets */}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {([
-              { value: 'dark',    label: 'Scuro',    bg: '#0d0d14', desc: 'Nero blu' },
-              { value: 'neutral', label: 'Neutro',   bg: '#111827', desc: 'Grigio antracite' },
-              { value: 'warm',    label: 'Caldo',    bg: '#1a1208', desc: 'Marrone caldo' },
-              { value: 'rose',    label: 'Rosa',     bg: '#160a14', desc: 'Bordeaux rosa' },
-            ] as { value: string; label: string; bg: string; desc: string }[]).map(opt => (
+              { color: '#0d0d14', label: 'Nero' },
+              { color: '#111827', label: 'Antracite' },
+              { color: '#1a1208', label: 'Caldo' },
+              { color: '#160a14', label: 'Rosa scuro' },
+              { color: '#0a101a', label: 'Blu notte' },
+              { color: '#0f1a0f', label: 'Verde scuro' },
+              { color: '#1a0a0a', label: 'Bordeaux' },
+              { color: '#ffffff', label: 'Bianco' },
+            ] as { color: string; label: string }[]).map(opt => (
               <button
-                key={opt.value}
-                onClick={() => setBranding(b => ({ ...b, bgStyle: opt.value as typeof branding.bgStyle }))}
+                key={opt.color}
+                title={opt.label}
+                onClick={() => setBranding(b => ({ ...b, bgStyle: opt.color }))}
                 style={{
-                  borderRadius: 12, border: branding.bgStyle === opt.value ? `2px solid ${branding.accentColor}` : '2px solid var(--border)',
-                  cursor: 'pointer', overflow: 'hidden', padding: 0,
-                  boxShadow: branding.bgStyle === opt.value ? `0 0 12px rgba(0,0,0,0.5)` : 'none',
+                  width: 32, height: 32, borderRadius: 8,
+                  background: opt.color,
+                  border: branding.bgStyle === opt.color ? `2px solid ${branding.accentColor}` : '2px solid var(--border)',
+                  cursor: 'pointer', flexShrink: 0,
                 }}
-              >
-                <div style={{ height: 48, background: opt.bg }} />
-                <div style={{ padding: '6px 4px', background: 'var(--bg-input)', textAlign: 'center' }}>
-                  <p style={{ fontSize: 12, fontWeight: 700, color: branding.bgStyle === opt.value ? branding.accentColor : 'var(--text)', margin: 0 }}>{opt.label}</p>
-                  <p style={{ fontSize: 10, color: 'var(--muted)', margin: 0 }}>{opt.desc}</p>
-                </div>
-              </button>
+              />
             ))}
           </div>
+          <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>Usa il selettore colore o digita un codice hex personalizzato</p>
         </Field>
 
         {/* Font style */}
@@ -465,7 +482,7 @@ export default function ClientAppView() {
 
         {/* Live mini-preview */}
         {(() => {
-          const bgMap: Record<string, string> = {
+          const legacyBgMap: Record<string, string> = {
             dark: '#0d0d14', neutral: '#111827', warm: '#1a1208', rose: '#160a14',
           };
           const ffMap: Record<string, string> = {
@@ -474,7 +491,8 @@ export default function ClientAppView() {
             modern: '"Helvetica Neue", Helvetica, Arial, sans-serif',
             playful: '"Trebuchet MS", "Segoe UI", sans-serif',
           };
-          const bg = bgMap[branding.bgStyle ?? 'dark'] ?? '#0d0d14';
+          const rawBg = branding.bgStyle ?? '#0d0d14';
+          const bg = rawBg.startsWith('#') ? rawBg : (legacyBgMap[rawBg] ?? '#0d0d14');
           const ff = ffMap[branding.fontStyle ?? 'default'] ?? '';
           const r = parseInt(branding.accentColor.slice(1,3),16);
           const g = parseInt(branding.accentColor.slice(3,5),16);

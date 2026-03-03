@@ -22,7 +22,7 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 export default function OnlineBookingsView() {
-  const { addAppointment, clients, addClient, services } = useSalon();
+  const { addAppointment, clients, addClient, services, importPendingBookings } = useSalon();
   const { realtimeBookingTick } = useNotifications();
   const [bookings, setBookings] = useState<OnlineBooking[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,8 +49,12 @@ export default function OnlineBookingsView() {
     setLoading(false);
   }, [userId]);
 
-  // Re-load when real-time INSERT/UPDATE is detected via NotificationContext
-  useEffect(() => { load(); }, [load, realtimeBookingTick]);
+  // Re-load display list AND import into calendar when real-time tick fires
+  useEffect(() => {
+    load();
+    if (realtimeBookingTick > 0) importPendingBookings();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [load, realtimeBookingTick]);
 
   const handleConfirm = async (id: string) => {
     await dbUpdateBookingStatus(id, 'confirmed');

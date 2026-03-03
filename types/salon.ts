@@ -486,8 +486,8 @@ export interface ClientAppConfig {
   logoUrl?: string;
   /** Hero/cover image URL shown behind the salon name on the home screen */
   coverImageUrl?: string;
-  /** Background tone of the PWA */
-  bgStyle?: 'dark' | 'neutral' | 'warm' | 'rose';
+  /** Background color of the PWA (hex, e.g. "#0d0d14") */
+  bgStyle?: string;
   /** Font style preset of the PWA */
   fontStyle?: 'default' | 'elegant' | 'modern' | 'playful';
   /** Whether to show service prices in the app */
@@ -518,7 +518,7 @@ export const DEFAULT_CLIENT_APP_CONFIG: ClientAppConfig = {
   accentColor: '#c084fc',
   logoUrl: '',
   coverImageUrl: '',
-  bgStyle: 'dark',
+  bgStyle: '#0d0d14',
   fontStyle: 'default',
   showPrices: true,
   requireLoginForBooking: true,

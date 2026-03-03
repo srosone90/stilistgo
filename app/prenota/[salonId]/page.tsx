@@ -245,7 +245,8 @@ export default function PrenotaPWAPage({ params }: { params: Promise<{ salonId: 
   }
 
   // ── Style helpers ──────────────────────────────────────────────────────
-  const BG_MAP: Record<string, string> = {
+  // bgStyle is now a hex string; keep a fallback map for old preset names
+  const LEGACY_BG: Record<string, string> = {
     dark: '#0d0d14', neutral: '#111827', warm: '#1a1208', rose: '#160a14',
   };
   const FF_MAP: Record<string, string> = {
@@ -254,7 +255,8 @@ export default function PrenotaPWAPage({ params }: { params: Promise<{ salonId: 
     modern: '"Helvetica Neue", Helvetica, Arial, sans-serif',
     playful: '"Trebuchet MS", "Segoe UI", sans-serif',
   };
-  const baseBg = BG_MAP[appConfig.bgStyle ?? 'dark'] ?? '#0d0d14';
+  const rawBg = appConfig.bgStyle ?? '#0d0d14';
+  const baseBg = rawBg.startsWith('#') ? rawBg : (LEGACY_BG[rawBg] ?? '#0d0d14');
   const fontFamily = FF_MAP[appConfig.fontStyle ?? 'default'];
 
   const page: React.CSSProperties = {

@@ -136,6 +136,9 @@ interface SalonContextValue {
   updateSubscription: (s: ClientSubscription) => void;
   deleteSubscription: (id: string) => void;
   useSubscriptionSession: (subscriptionId: string) => boolean; // returns false if no sessions left
+
+  // Online bookings → calendar import (called on real-time tick)
+  importPendingBookings: () => Promise<void>;
 }
 
 const SalonContext = createContext<SalonContextValue | null>(null);
@@ -200,6 +203,115 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
     init();
   }, []);
 
+  // ─── Import pending online bookings into calendar (also called on realtime tick) ─
+  const importPendingBookings = useCallback(async () => {
+    try {
+      const user = await getCurrentUser();
+      if (!user || (user.id as string).startsWith('local-')) return;
+      const userId = user.id as string;
+
+      const pendingBookings = await dbGetOnlineBookings(userId);
+      const pending = pendingBookings.filter(b => b.status === 'pending');
+      if (pending.length === 0) return;
+
+      // localStorage is always up-to-date (state changes are saved there immediately)
+      const baseApts     = storageGetAppointments();
+      const baseClients  = storageGetClients();
+      const baseServices = storageGetServices();
+      const sc           = storageGetSalonConfig(); // for WA settings
+      const mergedApts     = [...baseApts];
+      const mergedClients  = [...baseClients];
+
+      for (const b of pending) {
+        const alreadyIn = mergedApts.some(a =>
+          a.notes?.includes(b.id) ||
+          (a.date === b.preferred_date && a.startTime === b.preferred_time &&
+           mergedClients.find(c => c.id === a.clientId)?.phone === b.client_phone)
+        );
+        if (alreadyIn) { dbUpdateBookingStatus(b.id, 'confirmed').catch(() => {}); continue; }
+
+        const opMatch = (b.notes || '').match(/^\[op:([^\]]+)\]/);
+        const bookingOperatorId = opMatch?.[1] || '';
+        const cleanNotes = (b.notes || '').replace(/^\[op:[^\]]+\]\s*/, '');
+        const [firstName, ...rest] = (b.client_name || '').trim().split(' ');
+        const bookingFirstName = firstName || b.client_name;
+        const bookingLastName  = rest.join(' ') || '';
+
+        const existingClient = mergedClients.find(c =>
+          c.phone === b.client_phone || (b.client_email && c.email === b.client_email)
+        );
+        let clientId: string;
+        if (existingClient) {
+          existingClient.firstName = bookingFirstName;
+          existingClient.lastName  = bookingLastName;
+          if (b.client_email) existingClient.email = b.client_email;
+          clientId = existingClient.id;
+        } else {
+          const nc: Client = {
+            id: salonGenerateId(), firstName: bookingFirstName, lastName: bookingLastName,
+            phone: b.client_phone, email: b.client_email || '', birthDate: '',
+            notes: `Prenotato online il ${b.created_at?.slice(0, 10) ?? ''}`,
+            allergies: '', tags: [], gdprConsent: false, gdprDate: '', loyaltyPoints: 0,
+            createdAt: new Date().toISOString(),
+          };
+          mergedClients.push(nc);
+          clientId = nc.id;
+        }
+
+        const matchedService = baseServices.find(s =>
+          s.name.toLowerCase().includes((b.service || '').toLowerCase()) ||
+          (b.service || '').toLowerCase().includes(s.name.toLowerCase())
+        );
+        const dur = matchedService?.duration ?? 60;
+        const [hh, mm] = (b.preferred_time || '10:00').split(':').map(Number);
+        const endMin = (hh || 10) * 60 + (mm || 0) + dur;
+        const endTime = `${String(Math.floor(endMin / 60) % 24).padStart(2, '0')}:${String(endMin % 60).padStart(2, '0')}`;
+        mergedApts.push({
+          id: salonGenerateId(), clientId, operatorId: bookingOperatorId,
+          serviceIds: matchedService ? [matchedService.id] : [],
+          date: b.preferred_date, startTime: b.preferred_time, endTime,
+          status: 'scheduled',
+          notes: `📱 Prenotazione online [${b.id}]: ${b.service}${cleanNotes ? ` — ${cleanNotes}` : ''}`,
+          isBlock: false, blockReason: '', recurringGroupId: '', feedbackScore: 0,
+          createdAt: new Date().toISOString(),
+          history: [{ timestamp: new Date().toISOString(), action: 'Importato da prenotazione online' }],
+        });
+
+        // WA conferma al cliente
+        try {
+          const wa = sc?.whatsapp;
+          const clientPhone = b.client_phone?.replace(/\D/g, '');
+          if (wa?.ultraMsgInstanceId && wa?.ultraMsgToken && (wa.appointmentConfirmEnabled ?? true) && clientPhone) {
+            const svcName  = matchedService?.name || b.service || 'appuntamento';
+            const salonName = sc?.salonName ?? 'il salone';
+            const DEFAULT_APPT_MSG = 'Ciao {nome}! ✅ Il tuo appuntamento di *{servizio}* è confermato per il {data} alle {ora} da {salone}. A presto!';
+            const msg = (wa.appointmentConfirmMsg ?? DEFAULT_APPT_MSG)
+              .split('{nome}').join(bookingFirstName)
+              .split('{servizio}').join(svcName)
+              .split('{data}').join(b.preferred_date)
+              .split('{ora}').join(b.preferred_time)
+              .split('{salone}').join(salonName);
+            fetch('/api/ultramsg/send', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ instanceId: wa.ultraMsgInstanceId, token: wa.ultraMsgToken, to: clientPhone, message: msg }),
+            }).catch(() => {});
+          }
+        } catch { /* non bloccare l'import */ }
+
+        // Mark as confirmed BEFORE state update to prevent double import on rapid refresh
+        await dbUpdateBookingStatus(b.id, 'confirmed');
+      }
+
+      if (mergedApts.length > baseApts.length) {
+        setAppointments(mergedApts); storageSaveAppointments(mergedApts);
+      }
+      const baseClientMap = new Map(baseClients.map(c => [c.id, c]));
+      const clientsChanged = mergedClients.length !== baseClients.length ||
+        mergedClients.some(c => { const o = baseClientMap.get(c.id); return o && (o.firstName !== c.firstName || o.lastName !== c.lastName || o.email !== c.email); });
+      if (clientsChanged) { setClients(mergedClients); storageSaveClients(mergedClients); }
+    } catch { /* ignore */ }
+  }, []); // uses refs/storage only — no reactive deps needed
+
   // ─── Cloud sync: load from Supabase once after local load ─────────────────
   useEffect(() => {
     if (salonLoading) return;
@@ -262,119 +374,7 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
         }
 
         // ── Auto-import pending online bookings into the calendar ────────────
-        try {
-          const pendingBookings = await dbGetOnlineBookings(user.id as string);
-          const pending = pendingBookings.filter(b => b.status === 'pending');
-          if (pending.length > 0) {
-            // Use localStorage as safe base (already updated by cloud load above)
-            const baseApts = storageGetAppointments();
-            const baseClients = storageGetClients();
-            const baseServices = storageGetServices();
-            const mergedApts = [...baseApts];
-            const mergedClients = [...baseClients];
-
-            for (const b of pending) {
-              // Skip if already imported (check by booking id in notes)
-              const alreadyIn = mergedApts.some(a =>
-                a.notes?.includes(b.id) ||
-                (a.date === b.preferred_date && a.startTime === b.preferred_time &&
-                 mergedClients.find(c => c.id === a.clientId)?.phone === b.client_phone)
-              );
-              if (alreadyIn) {
-                dbUpdateBookingStatus(b.id, 'confirmed').catch(() => {});
-                continue;
-              }
-
-              // Extract operatorId encoded as [op:xxx] prefix in notes
-              const opMatch = (b.notes || '').match(/^\[op:([^\]]+)\]/);
-              const bookingOperatorId = opMatch?.[1] || '';
-              const cleanNotes = (b.notes || '').replace(/^\[op:[^\]]+\]\s*/, '');
-
-              const [firstName, ...rest] = (b.client_name || '').trim().split(' ');
-              const bookingFirstName = firstName || b.client_name;
-              const bookingLastName = rest.join(' ') || '';
-
-              const existingClient = mergedClients.find(c =>
-                c.phone === b.client_phone || (b.client_email && c.email === b.client_email)
-              );
-              let clientId: string;
-              if (existingClient) {
-                // Always update name from booking (fixes corrupted names from old imports)
-                existingClient.firstName = bookingFirstName;
-                existingClient.lastName = bookingLastName;
-                if (b.client_email) existingClient.email = b.client_email;
-                clientId = existingClient.id;
-              } else {
-                const nc: Client = {
-                  id: salonGenerateId(), firstName: bookingFirstName, lastName: bookingLastName,
-                  phone: b.client_phone, email: b.client_email || '', birthDate: '',
-                  notes: `Prenotato online il ${b.created_at?.slice(0, 10) ?? ''}`,
-                  allergies: '', tags: [], gdprConsent: false, gdprDate: '', loyaltyPoints: 0,
-                  createdAt: new Date().toISOString(),
-                };
-                mergedClients.push(nc);
-                clientId = nc.id;
-              }
-              const matchedService = baseServices.find(s =>
-                s.name.toLowerCase().includes((b.service || '').toLowerCase()) ||
-                (b.service || '').toLowerCase().includes(s.name.toLowerCase())
-              );
-              const dur = matchedService?.duration ?? 60;
-              const [hh, mm] = (b.preferred_time || '10:00').split(':').map(Number);
-              const endMin = (hh || 10) * 60 + (mm || 0) + dur;
-              const endTime = `${String(Math.floor(endMin / 60) % 24).padStart(2, '0')}:${String(endMin % 60).padStart(2, '0')}`;
-              mergedApts.push({
-                id: salonGenerateId(), clientId, operatorId: bookingOperatorId,
-                serviceIds: matchedService ? [matchedService.id] : [],
-                date: b.preferred_date, startTime: b.preferred_time, endTime,
-                status: 'scheduled',
-                notes: `📱 Prenotazione online [${b.id}]: ${b.service}${cleanNotes ? ` — ${cleanNotes}` : ''}`,
-                isBlock: false, blockReason: '', recurringGroupId: '', feedbackScore: 0,
-                createdAt: new Date().toISOString(),
-                history: [{ timestamp: new Date().toISOString(), action: 'Importato da prenotazione online' }],
-              });
-
-              // ── WA conferma appuntamento per prenotazioni auto-importate ──
-              try {
-                const wa = (cloudState.salonConfig as SalonConfig | undefined)?.whatsapp;
-                const clientPhone = b.client_phone?.replace(/\D/g, '');
-                if (wa?.ultraMsgInstanceId && wa?.ultraMsgToken && (wa.appointmentConfirmEnabled ?? true) && clientPhone) {
-                  const svcName = matchedService?.name || b.service || 'appuntamento';
-                  const salonName = (cloudState.salonConfig as SalonConfig | undefined)?.salonName ?? 'il salone';
-                  const DEFAULT_APPT_MSG = 'Ciao {nome}! ✅ Il tuo appuntamento di *{servizio}* è confermato per il {data} alle {ora} da {salone}. A presto!';
-                  const template = wa.appointmentConfirmMsg ?? DEFAULT_APPT_MSG;
-                  const msg = template
-                    .split('{nome}').join(bookingFirstName)
-                    .split('{servizio}').join(svcName)
-                    .split('{data}').join(b.preferred_date)
-                    .split('{ora}').join(b.preferred_time)
-                    .split('{salone}').join(salonName);
-                  fetch('/api/ultramsg/send', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ instanceId: wa.ultraMsgInstanceId, token: wa.ultraMsgToken, to: clientPhone, message: msg }),
-                  }).catch(() => {});
-                }
-              } catch { /* non bloccare l'import */ }
-
-              dbUpdateBookingStatus(b.id, 'confirmed').catch(() => {});
-            }
-
-            if (mergedApts.length > baseApts.length) {
-              setAppointments(mergedApts); storageSaveAppointments(mergedApts);
-            }
-            // Save clients if any were added OR a name/email was updated from booking data
-            const baseClientMap = new Map(baseClients.map(c => [c.id, c]));
-            const clientsChanged = mergedClients.length !== baseClients.length ||
-              mergedClients.some(c => {
-                const orig = baseClientMap.get(c.id);
-                return orig && (orig.firstName !== c.firstName || orig.lastName !== c.lastName || orig.email !== c.email);
-              });
-            if (clientsChanged) {
-              setClients(mergedClients); storageSaveClients(mergedClients);
-            }
-          }
-        } catch { /* ignore — online bookings are optional */ }
+        await importPendingBookings();
       } catch { /* ignore */ } finally {
         cloudLoadAttempted.current = true;
       }
@@ -413,7 +413,7 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
   }, [clients, technicalCards, services, operators, absences, appointments,
       waitingList, products, stockMovements, giftCards, payments,
       cashSessions, salonConfig, gamificationConfig, whatsappMessages,
-      suppliers, subscriptions]);
+      suppliers, subscriptions, clientAppConfig]);
 
   // Keep latestStateRef in sync so the flush-on-hide effect has fresh data
   useEffect(() => {
@@ -844,6 +844,7 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
       whatsappMessages, addWhatsAppMessage,
       suppliers, addSupplier, updateSupplier, deleteSupplier,
       subscriptions, addSubscription, updateSubscription, deleteSubscription, useSubscriptionSession,
+      importPendingBookings,
     }}>
       {children}
     </SalonContext.Provider>
