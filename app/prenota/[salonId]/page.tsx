@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, use } from 'react';
-import { CheckCircle2, Clock, Scissors, ArrowLeft, Calendar, User, Download, Sparkles, MapPin } from 'lucide-react';
+import { CheckCircle2, Clock, Scissors, ArrowLeft, Calendar, User, Download, Share, Sparkles, MapPin } from 'lucide-react';
 
 // ── Types ──────────────────────────────────────────────────────────
 interface SalonService { id: string; name: string; duration: number; price: number; category: string; }
@@ -84,6 +84,7 @@ export default function PrenotaPWAPage({ params }: { params: Promise<{ salonId: 
 
   const [deferredPrompt, setDeferredPrompt] = useState<Event | null>(null);
   const [isStandalone, setIsStandalone] = useState(false);
+  const [pwaChecked, setPwaChecked] = useState(false);
 
   const accent = appConfig.accentColor || DEFAULT_COLOR;
   const rgb = hexToRgb(accent);
@@ -101,6 +102,7 @@ export default function PrenotaPWAPage({ params }: { params: Promise<{ salonId: 
     const handler = (e: Event) => { e.preventDefault(); setDeferredPrompt(e); };
     window.addEventListener('beforeinstallprompt', handler);
     setIsStandalone(window.matchMedia('(display-mode: standalone)').matches);
+    setPwaChecked(true);
     return () => window.removeEventListener('beforeinstallprompt', handler);
   }, [salonId]);
 
@@ -205,12 +207,67 @@ export default function PrenotaPWAPage({ params }: { params: Promise<{ salonId: 
   const inner: React.CSSProperties = { maxWidth: 520, margin: '0 auto', padding: '0 20px' };
 
   // ── Loading ────────────────────────────────────────────────────────────
-  if (loading) return (
+  if (loading || !pwaChecked) return (
     <div style={{ ...page, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}>
       <div style={{ width: 56, height: 56, borderRadius: 18, background: `rgba(${rgb},0.2)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <Scissors size={28} style={{ color: accent }} />
       </div>
       <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 14 }}>Caricamento…</p>
+    </div>
+  );
+
+  // ── INSTALL GATE: visibile quando l'app NON è installata ───────────────
+  if (!isStandalone) return (
+    <div style={page}>
+      {/* Hero */}
+      <div style={{ position: 'relative', overflow: 'hidden', padding: '72px 20px 48px' }}>
+        <div style={{ position: 'absolute', top: -40, left: '50%', transform: 'translateX(-50%)', width: 340, height: 340, borderRadius: '50%', background: `radial-gradient(circle, rgba(${rgb},0.3) 0%, transparent 70%)`, pointerEvents: 'none' }} />
+        <div style={{ ...inner, textAlign: 'center', position: 'relative' }}>
+          <div style={{ width: 88, height: 88, borderRadius: 28, margin: '0 auto 22px', background: `linear-gradient(135deg, rgba(${rgb},0.6), rgba(${rgb},0.2))`, border: `2px solid rgba(${rgb},0.4)`, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 0 48px rgba(${rgb},0.3)` }}>
+            <Scissors size={40} style={{ color: light }} />
+          </div>
+          {salonName && <p style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: accent, margin: '0 0 10px' }}>{salonName}</p>}
+          <h1 style={{ fontSize: 28, fontWeight: 900, margin: '0 0 10px', lineHeight: 1.2, letterSpacing: '-0.02em' }}>{appConfig.welcomeMessage}</h1>
+          {appConfig.aboutText && <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.5)', margin: 0, lineHeight: 1.7, maxWidth: 320, marginInline: 'auto' }}>{appConfig.aboutText}</p>}
+        </div>
+      </div>
+
+      <div style={{ ...inner, display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ ...glass, textAlign: 'center', padding: '24px 20px', borderColor: `rgba(${rgb},0.25)`, background: `rgba(${rgb},0.06)` }}>
+          <p style={{ fontSize: 17, fontWeight: 800, margin: '0 0 6px' }}>Installa l&apos;app per prenotare</p>
+          <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.45)', margin: 0, lineHeight: 1.6 }}>Aggiungi l&apos;app alla schermata Home per accedere alle prenotazioni</p>
+        </div>
+
+        {/* Android / Chrome / Edge — prompt nativo */}
+        {deferredPrompt ? (
+          <button
+            onClick={() => { (deferredPrompt as unknown as { prompt: () => void }).prompt(); setDeferredPrompt(null); }}
+            style={btnMain}
+          >
+            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              <Download size={18} /> Installa l&apos;app
+            </span>
+          </button>
+        ) : (
+          /* iOS Safari — istruzioni manuali */
+          <div style={{ ...glass, display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <p style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.08em', textTransform: 'uppercase', margin: 0 }}>Come installare</p>
+            {([
+              { n: '1', text: <><strong>iPhone/iPad:</strong> tocca <Share size={13} style={{ display: 'inline', verticalAlign: 'middle', color: accent }} /> in basso nel browser</> },
+              { n: '2', text: 'Scorri e tocca "Aggiungi a schermata Home"' },
+              { n: '3', text: 'Tocca "Aggiungi" in alto a destra' },
+            ] as { n: string; text: React.ReactNode }[]).map(s => (
+              <div key={s.n} style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                <div style={{ width: 28, height: 28, borderRadius: 9, background: `rgba(${rgb},0.2)`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 13, fontWeight: 700, color: accent }}>{s.n}</div>
+                <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5, paddingTop: 5 }}>{s.text}</span>
+              </div>
+            ))}
+            <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.25)', margin: '2px 0 0', textAlign: 'center' }}>
+              Su Android: Chrome → menu ⋮ → &ldquo;Aggiungi a schermata Home&rdquo;
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 
@@ -265,20 +322,6 @@ export default function PrenotaPWAPage({ params }: { params: Promise<{ salonId: 
             <Calendar size={18} /> Prenota un appuntamento
           </span>
         </button>
-
-        {!isStandalone && deferredPrompt && (
-          <button
-            onClick={() => { (deferredPrompt as unknown as { prompt: () => void }).prompt(); setDeferredPrompt(null); }}
-            style={{
-              width: '100%', padding: '13px', borderRadius: 16, cursor: 'pointer',
-              background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
-              color: 'rgba(255,255,255,0.6)', fontSize: 14, fontWeight: 500,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-            }}
-          >
-            <Download size={15} /> Installa l&apos;app
-          </button>
-        )}
 
         {/* Info cards */}
         {(appConfig.contactAddress || appConfig.cancellationPolicy) && (
