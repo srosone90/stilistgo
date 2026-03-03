@@ -28,6 +28,17 @@ export async function GET(req: NextRequest) {
   // Read admin_tenants metadata
   const { data: metaRows } = await db.from('admin_tenants').select('*');
 
+  // Online bookings count per salon — last 30 days
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString();
+  const { data: bookingRows } = await db
+    .from('online_bookings')
+    .select('salon_id')
+    .gte('created_at', thirtyDaysAgo);
+  const bookingCountMap = new Map<string, number>();
+  for (const r of (bookingRows ?? []) as Array<{ salon_id: string }>) {
+    bookingCountMap.set(r.salon_id, (bookingCountMap.get(r.salon_id) ?? 0) + 1);
+  }
+
   const metaMap = new Map((metaRows ?? []).map((m: MetaRow) => [m.user_id, m]));
   const toCreate: { user_id: string; salon_name: string; email: string; full_name: string; registered_at: string }[] = [];
 
@@ -71,6 +82,8 @@ export async function GET(req: NextRequest) {
       // Config extras
       phone: cfg.phone ?? '',
       vat_number: cfg.vatNumber ?? '',
+      // Client app & online bookings
+      online_bookings_30d: bookingCountMap.get(row.user_id) ?? 0,
     };
   });
 

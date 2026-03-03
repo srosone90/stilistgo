@@ -7,7 +7,7 @@ import {
   ShieldCheck, TrendingUp, AlertTriangle, CheckCircle2, XCircle, Clock,
   ChevronRight, Plus, Search, X, Save, RefreshCw, ToggleLeft, ToggleRight,
   Building2, Phone, Mail, MapPin, UserCog, Calendar as CalendarIcon, Trash2,
-  MessageSquare, Wifi, WifiOff,
+  MessageSquare, Wifi, WifiOff, ArrowUpRight, Send,
 } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -29,6 +29,7 @@ interface Tenant {
   clients_count: number; appointments_count: number; operators_count: number;
   services_count: number; last_sync: string; phone: string; vat_number: string;
   is_admin: boolean;
+  online_bookings_30d: number;
 }
 
 interface Ticket {
@@ -40,6 +41,17 @@ interface Ticket {
 interface Broadcast { id: string; title: string; body: string; target: string; created_at: string; }
 interface Flag { id: string; name: string; description: string; enabled_for: string; enabled: boolean; created_at: string; }
 interface AuditEntry { id: string; action: string; target_tenant: string; details: Record<string, unknown>; created_at: string; }
+
+interface AnalyticsData {
+  monthlyRevenue: { month: string; total: number }[];
+  topServices: { name: string; count: number; revenue: number }[];
+  paymentBreakdown: { method: string; total: number }[];
+  totalRevenue: number;
+  giftCardsCount: number;
+  giftCardsActive: number;
+  onlineBookings30d: number;
+  onlineBookingsPending: number;
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -162,6 +174,15 @@ export default function AdminPage() {
   const [waStatuses, setWaStatuses] = useState<Record<string, 'connected' | 'disconnected' | 'none'>>({});
   const [waQrCodes, setWaQrCodes] = useState<Record<string, string | null>>({});
   const [waInstances, setWaInstances] = useState<Record<string, string>>({});
+
+  // Analytics / impersonation / WA test
+  const [selTenantTab, setSelTenantTab] = useState<'info' | 'analytics'>('info');
+  const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [impersonating, setImpersonating] = useState(false);
+  const [testPhone, setTestPhone] = useState('');
+  const [testSending, setTestSending] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null);
 
   function getToken() { return sessionStorage.getItem('stylistgo_admin_token') ?? ''; }
 
@@ -298,6 +319,47 @@ export default function AdminPage() {
     loadSection('flags');
   };
 
+  // ─── Analytics + impersonation + WA test ────────────────────────────────
+  const loadAnalytics = useCallback(async (userId: string) => {
+    setAnalyticsLoading(true);
+    setAnalyticsData(null);
+    const res = await af(`/api/admin/tenant-analytics?user_id=${userId}`);
+    const d = await res.json();
+    setAnalyticsData(d);
+    setAnalyticsLoading(false);
+  }, [af]);
+
+  const impersonateTenant = useCallback(async (tenant: Tenant) => {
+    setImpersonating(true);
+    const res = await af('/api/admin/impersonate', { method: 'POST', body: JSON.stringify({ user_id: tenant.user_id }) });
+    const d = await res.json();
+    setImpersonating(false);
+    if (d.url) {
+      window.open(d.url, '_blank');
+    } else {
+      alert(`Errore: ${d.error}`);
+    }
+  }, [af]);
+
+  const sendWaTest = useCallback(async () => {
+    if (!waModal || !testPhone || !waForm.ultraMsgInstanceId || !waForm.ultraMsgToken) return;
+    setTestSending(true);
+    setTestResult(null);
+    const res = await fetch('/api/ultramsg/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        instanceId: waForm.ultraMsgInstanceId,
+        token: waForm.ultraMsgToken,
+        to: testPhone,
+        message: `✅ Messaggio di test da Stylistgo Admin — ${waModal.salon_name}`,
+      }),
+    });
+    const d = await res.json();
+    setTestResult({ ok: d.success, msg: d.success ? 'Inviato! Verifica il telefono.' : (d.error ?? 'Errore invio') });
+    setTestSending(false);
+  }, [waModal, testPhone, waForm]);
+
   // ─── Filtered lists ───────────────────────────────────────────────────────
   const filteredTenants = tenants.filter(t => {
     const q = tenantSearch.toLowerCase();
@@ -385,10 +447,10 @@ export default function AdminPage() {
                 <p style={{ color: '#f4f4f5', fontSize: '13px', fontWeight: 600, margin: 0 }}>{t.salon_name}</p>
                 <p style={{ color: '#71717a', fontSize: '11px', margin: 0 }}>Ultimo accesso: {fmtDate(t.last_seen_at)}</p>
               </div>
-              <button onClick={() => { changeSection('tenants'); setTimeout(() => { setSelTenant(t); setEditTenant({ ...t }); setConfirmDeleteTenant(false); setDeleteDataToo(false); }, 100); }}
-                style={{ background: 'none', border: 'none', color: '#818cf8', cursor: 'pointer', fontSize: '12px' }}>
-                Dettaglio <ChevronRight size={12} style={{ display: 'inline' }} />
-              </button>
+              <button onClick={() => { changeSection('tenants'); setTimeout(() => { setSelTenant(t); setEditTenant({ ...t }); setConfirmDeleteTenant(false); setDeleteDataToo(false); setSelTenantTab('info'); setAnalyticsData(null); }, 100); }}
+                  style={{ background: 'none', border: 'none', color: '#818cf8', cursor: 'pointer', fontSize: '12px' }}>
+                        Dettaglio <ChevronRight size={12} style={{ display: 'inline' }} />
+                      </button>
             </div>
           ))}
         </div>
@@ -432,9 +494,28 @@ export default function AdminPage() {
                 <Badge s={t.plan} map={PLAN} />
               </div>
             </div>
-            <button onClick={() => { setSelTenant(null); setConfirmDeleteTenant(false); setDeleteDataToo(false); }} style={{ background: 'none', border: 'none', color: '#71717a', cursor: 'pointer', padding: '4px' }}><X size={18} /></button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-end' }}>
+              <button onClick={() => { setSelTenant(null); setConfirmDeleteTenant(false); setDeleteDataToo(false); setSelTenantTab('info'); setAnalyticsData(null); }} style={{ background: 'none', border: 'none', color: '#71717a', cursor: 'pointer', padding: '4px' }}><X size={18} /></button>
+              <button onClick={() => impersonateTenant(t)} disabled={impersonating}
+                style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '5px 10px', borderRadius: '8px', border: '1px solid rgba(99,102,241,0.35)', background: 'rgba(99,102,241,0.08)', color: '#818cf8', fontSize: '11px', cursor: impersonating ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' }}>
+                <ArrowUpRight size={11} /> {impersonating ? 'Apertura…' : 'Accedi come'}
+              </button>
+            </div>
           </div>
 
+          {/* Tabs */}
+          <div style={{ display: 'flex', gap: '4px', background: '#12121a', borderRadius: '10px', padding: '4px' }}>
+            {(['info', 'analytics'] as const).map(tab => (
+              <button key={tab} onClick={() => {
+                setSelTenantTab(tab);
+                if (tab === 'analytics' && !analyticsData && !analyticsLoading) loadAnalytics(t.user_id);
+              }} style={{ flex: 1, padding: '7px', borderRadius: '8px', border: 'none', background: selTenantTab === tab ? '#1c1c27' : 'transparent', color: selTenantTab === tab ? '#f4f4f5' : '#71717a', fontWeight: selTenantTab === tab ? 600 : 400, fontSize: '12px', cursor: 'pointer' }}>
+                {tab === 'info' ? '📋 Info' : '📊 Analytics'}
+              </button>
+            ))}
+          </div>
+
+          {selTenantTab === 'info' && <>
           {/* Metrics row */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '8px' }}>
             {[['Clienti', t.clients_count], ['Appunt.', t.appointments_count], ['Operat.', t.operators_count], ['Servizi', t.services_count]].map(([l, v]) => (
@@ -554,6 +635,86 @@ export default function AdminPage() {
               </div>
             </div>
           )}
+          </>}
+
+          {/* Analytics tab */}
+          {selTenantTab === 'analytics' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {analyticsLoading && <p style={{ color: '#71717a', fontSize: '13px', textAlign: 'center', padding: '20px 0' }}>Caricamento analytics…</p>}
+              {analyticsData && (() => {
+                const maxRev = Math.max(...analyticsData.monthlyRevenue.map(m => m.total), 1);
+                const totalMethod = analyticsData.paymentBreakdown.reduce((s, p) => s + p.total, 0);
+                const fmtEur = (n: number) => `€${n.toLocaleString('it-IT', { minimumFractionDigits: 0 })}`;
+                return (<>
+                  {/* KPI strip */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '8px' }}>
+                    {[
+                      ['Tot. entrate', fmtEur(analyticsData.totalRevenue), '#4ade80'],
+                      ['Prenot. online 30g', String(analyticsData.onlineBookings30d), '#818cf8'],
+                      ['Gift card attive', `${analyticsData.giftCardsActive}/${analyticsData.giftCardsCount}`, '#fbbf24'],
+                    ].map(([l, v, c]) => (
+                      <div key={l} style={{ background: '#12121a', borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
+                        <p style={{ color: c, fontSize: '18px', fontWeight: 700, margin: 0 }}>{v}</p>
+                        <p style={{ color: '#71717a', fontSize: '10px', margin: 0 }}>{l}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Monthly revenue bar chart */}
+                  <div style={{ background: '#12121a', borderRadius: '12px', padding: '14px' }}>
+                    <p style={{ color: '#71717a', fontSize: '11px', margin: '0 0 10px' }}>Entrate mensili (12 mesi)</p>
+                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: '3px', height: '70px' }}>
+                      {analyticsData.monthlyRevenue.map(m => (
+                        <div key={m.month} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
+                          <div title={fmtEur(m.total)}
+                            style={{ width: '100%', borderRadius: '3px 3px 0 0', background: m.total > 0 ? 'rgba(99,102,241,0.7)' : '#1e1e2a', height: `${Math.max(2, (m.total / maxRev) * 58)}px` }} />
+                          <span style={{ color: '#3f3f5a', fontSize: '8px' }}>{m.month.slice(5)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Top services */}
+                  {analyticsData.topServices.length > 0 && (
+                    <div style={{ background: '#12121a', borderRadius: '12px', padding: '14px' }}>
+                      <p style={{ color: '#71717a', fontSize: '11px', margin: '0 0 10px' }}>Top 5 servizi per fatturato</p>
+                      {analyticsData.topServices.map((s, i) => (
+                        <div key={s.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', borderBottom: i < analyticsData.topServices.length - 1 ? '1px solid #1e1e2a' : 'none' }}>
+                          <div><span style={{ color: '#71717a', fontSize: '10px', marginRight: '6px' }}>#{i + 1}</span><span style={{ color: '#f4f4f5', fontSize: '12px' }}>{s.name}</span></div>
+                          <div><span style={{ color: '#4ade80', fontSize: '12px', fontWeight: 600 }}>{fmtEur(s.revenue)}</span><span style={{ color: '#71717a', fontSize: '10px', marginLeft: '6px' }}>{s.count}×</span></div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Payment breakdown */}
+                  {analyticsData.paymentBreakdown.length > 0 && (
+                    <div style={{ background: '#12121a', borderRadius: '12px', padding: '14px' }}>
+                      <p style={{ color: '#71717a', fontSize: '11px', margin: '0 0 10px' }}>Metodi di pagamento</p>
+                      {analyticsData.paymentBreakdown.map(p => {
+                        const pct = totalMethod > 0 ? (p.total / totalMethod) * 100 : 0;
+                        const labels: Record<string, string> = { cash: 'Contanti', card: 'Carta', gift_card: 'Gift Card', mixed: 'Misto' };
+                        return (
+                          <div key={p.method} style={{ marginBottom: '8px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+                              <span style={{ color: '#a1a1aa', fontSize: '11px' }}>{labels[p.method] ?? p.method}</span>
+                              <span style={{ color: '#f4f4f5', fontSize: '11px', fontWeight: 600 }}>{fmtEur(p.total)} <span style={{ color: '#71717a' }}>({pct.toFixed(0)}%)</span></span>
+                            </div>
+                            <div style={{ height: '4px', background: '#1e1e2a', borderRadius: '2px' }}>
+                              <div style={{ width: `${pct}%`, height: '100%', borderRadius: '2px', background: '#6366f1' }} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>);
+              })()}
+              {!analyticsLoading && !analyticsData && (
+                <p style={{ color: '#52525b', fontSize: '12px', textAlign: 'center', padding: '20px 0' }}>Nessun dato disponibile.</p>
+              )}
+            </div>
+          )}
         </div>
       </div>
     );
@@ -585,7 +746,7 @@ export default function AdminPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid #2e2e40' }}>
-                {['Salone','Titolare','Piano','Stato','Clienti','Appunt.','Registrato','Azioni'].map(h => (
+                {['Salone','Titolare','Piano','Stato','Clienti','Appunt.','Prenot.30g','Registrato','Azioni'].map(h => (
                   <th key={h} style={{ padding: '12px 14px', textAlign: 'left', color: '#71717a', fontWeight: 500, fontSize: '11px', whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
@@ -595,16 +756,21 @@ export default function AdminPage() {
                 <tr key={t.user_id} style={{ borderBottom: '1px solid #1e1e2a', cursor: 'pointer', transition: 'background 0.15s' }}
                   onMouseEnter={e => (e.currentTarget.style.background = '#202030')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                  onClick={() => { setSelTenant(t); setEditTenant({ ...t }); setConfirmDeleteTenant(false); setDeleteDataToo(false); }}>
+                  onClick={() => { setSelTenant(t); setEditTenant({ ...t }); setConfirmDeleteTenant(false); setDeleteDataToo(false); setSelTenantTab('info'); setAnalyticsData(null); }}>
                   <td style={{ padding: '12px 14px', color: '#f4f4f5', fontWeight: 600 }}>{t.salon_name}</td>
                   <td style={{ padding: '12px 14px', color: '#a1a1aa' }}>{t.full_name || '—'}</td>
                   <td style={{ padding: '12px 14px' }}><Badge s={t.plan} map={PLAN} /></td>
                   <td style={{ padding: '12px 14px' }}><Badge s={t.status} map={STATUS} /></td>
                   <td style={{ padding: '12px 14px', color: '#a1a1aa', textAlign: 'center' }}>{t.clients_count}</td>
                   <td style={{ padding: '12px 14px', color: '#a1a1aa', textAlign: 'center' }}>{t.appointments_count}</td>
+                  <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                    {(t.online_bookings_30d ?? 0) > 0
+                      ? <span style={{ color: '#818cf8', fontWeight: 600 }}>{t.online_bookings_30d}</span>
+                      : <span style={{ color: '#3f3f5a' }}>—</span>}
+                  </td>
                   <td style={{ padding: '12px 14px', color: '#71717a', whiteSpace: 'nowrap' }}>{fmtDate(t.registered_at)}</td>
                   <td style={{ padding: '12px 14px' }}>
-                    <button onClick={ev => { ev.stopPropagation(); setSelTenant(t); setEditTenant({ ...t }); setConfirmDeleteTenant(false); setDeleteDataToo(false); }}
+                    <button onClick={ev => { ev.stopPropagation(); setSelTenant(t); setEditTenant({ ...t }); setConfirmDeleteTenant(false); setDeleteDataToo(false); setSelTenantTab('info'); setAnalyticsData(null); }}
                       style={{ background: 'none', border: '1px solid #2e2e40', borderRadius: '6px', padding: '4px 10px', color: '#818cf8', fontSize: '11px', cursor: 'pointer' }}>
                       Apri
                     </button>
@@ -612,7 +778,7 @@ export default function AdminPage() {
                 </tr>
               ))}
               {filteredTenants.length === 0 && (
-                <tr><td colSpan={8} style={{ padding: '24px', textAlign: 'center', color: '#3f3f5a' }}>Nessun tenant trovato.</td></tr>
+                <tr><td colSpan={9} style={{ padding: '24px', textAlign: 'center', color: '#3f3f5a' }}>Nessun tenant trovato.</td></tr>
               )}
             </tbody>
           </table>
@@ -904,6 +1070,8 @@ export default function AdminPage() {
     setWaModal(tenant);
     setWaSaved(false);
     setWaForm({ ultraMsgInstanceId: '', ultraMsgToken: '' });
+    setTestPhone('');
+    setTestResult(null);
     try {
       const res = await af(`/api/admin/whatsapp?user_id=${tenant.user_id}`);
       if (res.ok) {
@@ -1112,6 +1280,32 @@ export default function AdminPage() {
                   </button>
                 )}
               </div>
+
+              {/* Test WA */}
+              {waForm.ultraMsgInstanceId && waForm.ultraMsgToken && (
+                <div style={{ borderTop: '1px solid #2e2e40', paddingTop: '14px' }}>
+                  <p style={{ color: '#71717a', fontSize: '11px', margin: '0 0 8px' }}>Invia messaggio di test</p>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input
+                      value={testPhone}
+                      onChange={e => { setTestPhone(e.target.value); setTestResult(null); }}
+                      placeholder="391234567890"
+                      style={{ ...inp({ flex: '1' }) }}
+                    />
+                    <button
+                      onClick={sendWaTest}
+                      disabled={testSending || !testPhone.trim()}
+                      style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '9px 14px', borderRadius: '10px', border: 'none', background: testSending || !testPhone.trim() ? '#2e2e40' : 'rgba(99,102,241,0.2)', color: '#818cf8', fontWeight: 600, fontSize: '12px', cursor: testSending || !testPhone.trim() ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' }}>
+                      <Send size={12} /> {testSending ? '…' : 'Manda test'}
+                    </button>
+                  </div>
+                  {testResult && (
+                    <p style={{ marginTop: '6px', fontSize: '12px', color: testResult.ok ? '#4ade80' : '#f87171' }}>
+                      {testResult.ok ? '✅' : '❌'} {testResult.msg}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}
