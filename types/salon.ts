@@ -482,6 +482,14 @@ export interface ClientAppConfig {
   aboutText: string;
   /** Primary accent color (hex) used throughout the client app */
   accentColor: string;
+  /** Logo image — base64 data URL or external https URL */
+  logoUrl?: string;
+  /** Hero/cover image URL shown behind the salon name on the home screen */
+  coverImageUrl?: string;
+  /** Background tone of the PWA */
+  bgStyle?: 'dark' | 'neutral' | 'warm' | 'rose';
+  /** Font style preset of the PWA */
+  fontStyle?: 'default' | 'elegant' | 'modern' | 'playful';
   /** Whether to show service prices in the app */
   showPrices: boolean;
   /** Whether clients must be logged-in to book */
@@ -508,6 +516,10 @@ export const DEFAULT_CLIENT_APP_CONFIG: ClientAppConfig = {
   welcomeMessage: 'Benvenuta! 💇‍♀️',
   aboutText: '',
   accentColor: '#c084fc',
+  logoUrl: '',
+  coverImageUrl: '',
+  bgStyle: 'dark',
+  fontStyle: 'default',
   showPrices: true,
   requireLoginForBooking: true,
   maxAdvanceDays: 90,

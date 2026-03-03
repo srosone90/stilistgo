@@ -11,6 +11,9 @@ interface ClientAppConfig {
   showPrices: boolean; maxAdvanceDays: number; minAdvanceHours: number;
   cancellationPolicy: string; bookingConfirmationMessage: string;
   contactPhone?: string; contactAddress?: string;
+  logoUrl?: string; coverImageUrl?: string;
+  bgStyle?: 'dark' | 'neutral' | 'warm' | 'rose';
+  fontStyle?: 'default' | 'elegant' | 'modern' | 'playful';
 }
 interface StoredClient { salonId: string; clientPhone: string; clientName: string; clientEmail: string; }
 interface HistoryBooking { id: string; service: string; preferred_date: string; preferred_time: string; status: 'pending' | 'confirmed' | 'cancelled'; created_at: string; notes?: string; }
@@ -242,10 +245,22 @@ export default function PrenotaPWAPage({ params }: { params: Promise<{ salonId: 
   }
 
   // ── Style helpers ──────────────────────────────────────────────────────
+  const BG_MAP: Record<string, string> = {
+    dark: '#0d0d14', neutral: '#111827', warm: '#1a1208', rose: '#160a14',
+  };
+  const FF_MAP: Record<string, string> = {
+    default: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    elegant: 'Georgia, "Times New Roman", serif',
+    modern: '"Helvetica Neue", Helvetica, Arial, sans-serif',
+    playful: '"Trebuchet MS", "Segoe UI", sans-serif',
+  };
+  const baseBg = BG_MAP[appConfig.bgStyle ?? 'dark'] ?? '#0d0d14';
+  const fontFamily = FF_MAP[appConfig.fontStyle ?? 'default'];
+
   const page: React.CSSProperties = {
     minHeight: '100vh', color: 'white', paddingBottom: 100,
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-    background: `radial-gradient(ellipse 80% 50% at 50% -10%, rgba(${rgb},0.28) 0%, transparent 65%), #0d0d14`,
+    fontFamily,
+    background: `radial-gradient(ellipse 80% 50% at 50% -10%, rgba(${rgb},0.28) 0%, transparent 65%), ${baseBg}`,
   };
   const glass: React.CSSProperties = {
     background: 'rgba(255,255,255,0.04)', backdropFilter: 'blur(12px)',
@@ -272,8 +287,8 @@ export default function PrenotaPWAPage({ params }: { params: Promise<{ salonId: 
   // ── Loading ────────────────────────────────────────────────────────────
   if (loading || !pwaChecked) return (
     <div style={{ ...page, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}>
-      <div style={{ width: 56, height: 56, borderRadius: 18, background: `rgba(${rgb},0.2)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Scissors size={28} style={{ color: accent }} />
+      <div style={{ width: 56, height: 56, borderRadius: 18, background: `rgba(${rgb},0.2)`, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+        {appConfig.logoUrl ? <img src={appConfig.logoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Scissors size={28} style={{ color: accent }} />}
       </div>
       <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 14 }}>Caricamento…</p>
     </div>
@@ -283,11 +298,12 @@ export default function PrenotaPWAPage({ params }: { params: Promise<{ salonId: 
   if (!isStandalone) return (
     <div style={page}>
       {/* Hero */}
-      <div style={{ position: 'relative', overflow: 'hidden', padding: '72px 20px 48px' }}>
+      <div style={{ position: 'relative', overflow: 'hidden', padding: '72px 20px 48px', ...(appConfig.coverImageUrl ? { backgroundImage: `url(${appConfig.coverImageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}) }}>
+        {appConfig.coverImageUrl && <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(2px)' }} />}
         <div style={{ position: 'absolute', top: -40, left: '50%', transform: 'translateX(-50%)', width: 340, height: 340, borderRadius: '50%', background: `radial-gradient(circle, rgba(${rgb},0.3) 0%, transparent 70%)`, pointerEvents: 'none' }} />
         <div style={{ ...inner, textAlign: 'center', position: 'relative' }}>
-          <div style={{ width: 88, height: 88, borderRadius: 28, margin: '0 auto 22px', background: `linear-gradient(135deg, rgba(${rgb},0.6), rgba(${rgb},0.2))`, border: `2px solid rgba(${rgb},0.4)`, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 0 48px rgba(${rgb},0.3)` }}>
-            <Scissors size={40} style={{ color: light }} />
+          <div style={{ width: 88, height: 88, borderRadius: 28, margin: '0 auto 22px', background: `linear-gradient(135deg, rgba(${rgb},0.6), rgba(${rgb},0.2))`, border: `2px solid rgba(${rgb},0.4)`, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 0 48px rgba(${rgb},0.3)`, overflow: 'hidden' }}>
+            {appConfig.logoUrl ? <img src={appConfig.logoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Scissors size={40} style={{ color: light }} />}
           </div>
           {salonName && <p style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: accent, margin: '0 0 10px' }}>{salonName}</p>}
           <h1 style={{ fontSize: 28, fontWeight: 900, margin: '0 0 10px', lineHeight: 1.2, letterSpacing: '-0.02em' }}>{appConfig.welcomeMessage}</h1>
@@ -338,7 +354,8 @@ export default function PrenotaPWAPage({ params }: { params: Promise<{ salonId: 
   if (step === 'home') return (
     <div style={page}>
       {/* Hero */}
-      <div style={{ position: 'relative', overflow: 'hidden', padding: '64px 20px 48px' }}>
+      <div style={{ position: 'relative', overflow: 'hidden', padding: '64px 20px 48px', ...(appConfig.coverImageUrl ? { backgroundImage: `url(${appConfig.coverImageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}) }}>
+        {appConfig.coverImageUrl && <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(2px)' }} />}
         <div style={{ position: 'absolute', top: -40, left: '50%', transform: 'translateX(-50%)', width: 320, height: 320, borderRadius: '50%', background: `radial-gradient(circle, rgba(${rgb},0.3) 0%, transparent 70%)`, pointerEvents: 'none' }} />
         <div style={{ position: 'absolute', bottom: -60, right: -40, width: 180, height: 180, borderRadius: '50%', background: `radial-gradient(circle, rgba(${rgb},0.12) 0%, transparent 70%)`, pointerEvents: 'none' }} />
 
@@ -349,9 +366,9 @@ export default function PrenotaPWAPage({ params }: { params: Promise<{ salonId: 
             background: `linear-gradient(135deg, rgba(${rgb},0.6), rgba(${rgb},0.2))`,
             border: `2px solid rgba(${rgb},0.4)`,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: `0 0 40px rgba(${rgb},0.25)`,
+            boxShadow: `0 0 40px rgba(${rgb},0.25)`, overflow: 'hidden',
           }}>
-            <Scissors size={36} style={{ color: light }} />
+            {appConfig.logoUrl ? <img src={appConfig.logoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Scissors size={36} style={{ color: light }} />}
           </div>
 
           {salonName && (

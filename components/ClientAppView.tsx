@@ -1,13 +1,13 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSalon } from '@/context/SalonContext';
 import { ClientAppConfig } from '@/types/salon';
 import { getCurrentUser } from '@/lib/supabase';
 import {
   Smartphone, Copy, Check, Palette, Settings2, MessageSquare,
-  MapPin, Phone, Instagram, Facebook, Clock, Eye, Lock,
-  Link2, ExternalLink, UserPlus,
+  MapPin, Phone, Instagram, Facebook, Lock,
+  Link2, ExternalLink, UserPlus, ImagePlus, X,
 } from 'lucide-react';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://stylistgo.netlify.app';
@@ -116,13 +116,40 @@ export default function ClientAppView() {
   function copyClientLink() { navigator.clipboard.writeText(generatedLink); setClientLinkCopied(true); setTimeout(() => setClientLinkCopied(false), 2000); }
 
   // ── Branding ──────────────────────────────────────────────────────────────
+  const logoInputRef = useRef<HTMLInputElement>(null);
   const [branding, setBranding] = useState({
     welcomeMessage: clientAppConfig.welcomeMessage,
     aboutText: clientAppConfig.aboutText,
     accentColor: clientAppConfig.accentColor,
+    logoUrl: clientAppConfig.logoUrl ?? '',
+    coverImageUrl: clientAppConfig.coverImageUrl ?? '',
+    bgStyle: clientAppConfig.bgStyle ?? 'dark',
+    fontStyle: clientAppConfig.fontStyle ?? 'default',
   });
   const [brandingSaved, setBrandingSaved] = useState(false);
-  useEffect(() => { setBranding(b => ({ ...b, welcomeMessage: clientAppConfig.welcomeMessage, aboutText: clientAppConfig.aboutText, accentColor: clientAppConfig.accentColor })); }, [clientAppConfig]);
+  useEffect(() => {
+    setBranding(b => ({
+      ...b,
+      welcomeMessage: clientAppConfig.welcomeMessage,
+      aboutText: clientAppConfig.aboutText,
+      accentColor: clientAppConfig.accentColor,
+      logoUrl: clientAppConfig.logoUrl ?? '',
+      coverImageUrl: clientAppConfig.coverImageUrl ?? '',
+      bgStyle: clientAppConfig.bgStyle ?? 'dark',
+      fontStyle: clientAppConfig.fontStyle ?? 'default',
+    }));
+  }, [clientAppConfig]);
+
+  function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 300 * 1024) { alert('Il logo non deve superare 300 KB. Usa un\'immagine più piccola.'); return; }
+    const reader = new FileReader();
+    reader.onload = ev => setBranding(b => ({ ...b, logoUrl: ev.target?.result as string ?? '' }));
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  }
+
   function saveBranding() {
     updateClientAppConfig(branding);
     setBrandingSaved(true); setTimeout(() => setBrandingSaved(false), 2000);
@@ -290,23 +317,61 @@ export default function ClientAppView() {
 
       {/* ── BRANDING ─────────────────────────────────────────────────────── */}
       <Section title="Aspetto e Testo" icon={<Palette size={16} />}>
-        <Field label="Messaggio di benvenuto (mostrato nella schermata Home)">
+
+        {/* Logo */}
+        <Field label="Logo del salone">
+          <input ref={logoInputRef} type="file" accept="image/*" onChange={handleLogoUpload} style={{ display: 'none' }} />
+          <div className="flex items-center gap-4">
+            <div
+              style={{
+                width: 80, height: 80, borderRadius: 20,
+                background: 'var(--bg-input)', border: '2px dashed var(--border)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                overflow: 'hidden', flexShrink: 0, cursor: 'pointer',
+              }}
+              onClick={() => logoInputRef.current?.click()}
+            >
+              {branding.logoUrl
+                ? <img src={branding.logoUrl} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                : <ImagePlus size={28} style={{ color: 'var(--muted)' }} />}
+            </div>
+            <div className="flex flex-col gap-2 flex-1">
+              <button
+                onClick={() => logoInputRef.current?.click()}
+                style={{ background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.35)', borderRadius: 10, padding: '8px 16px', color: 'var(--accent-light)', fontSize: 13, cursor: 'pointer', fontWeight: 600 }}
+              >
+                {branding.logoUrl ? '📷 Cambia logo' : '📷 Carica logo'}
+              </button>
+              {branding.logoUrl && (
+                <button
+                  onClick={() => setBranding(b => ({ ...b, logoUrl: '' }))}
+                  style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 10, padding: '8px 16px', color: '#f87171', fontSize: 13, cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}
+                >
+                  <X size={13} /> Rimuovi logo
+                </button>
+              )}
+              <p className="text-xs" style={{ color: 'var(--muted)' }}>PNG/JPG · max 300 KB · consigliato 200×200 px</p>
+            </div>
+          </div>
+        </Field>
+
+        {/* Cover image URL */}
+        <Field label="Immagine copertina (URL — mostrata in alto nella home)">
           <input
             style={inputStyle}
-            value={branding.welcomeMessage}
-            onChange={e => setBranding(b => ({ ...b, welcomeMessage: e.target.value }))}
-            placeholder="es. Benvenuta da Le Ribelle! 💇‍♀️"
+            value={branding.coverImageUrl}
+            onChange={e => setBranding(b => ({ ...b, coverImageUrl: e.target.value }))}
+            placeholder="https://example.com/cover.jpg"
           />
+          {branding.coverImageUrl && (
+            <div style={{ marginTop: 8, borderRadius: 12, overflow: 'hidden', height: 80 }}>
+              <img src={branding.coverImageUrl} alt="Cover preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => (e.currentTarget.style.display = 'none')} />
+            </div>
+          )}
         </Field>
-        <Field label="Descrizione del salone (mostrata nel profilo e nell'home)">
-          <textarea
-            style={textareaStyle}
-            value={branding.aboutText}
-            onChange={e => setBranding(b => ({ ...b, aboutText: e.target.value }))}
-            placeholder="Breve descrizione del tuo salone..."
-          />
-        </Field>
-        <Field label="Colore principale app">
+
+        {/* Accent color */}
+        <Field label="Colore principale">
           <div className="flex items-center gap-3">
             <input
               type="color"
@@ -322,10 +387,132 @@ export default function ClientAppView() {
             />
             <div style={{ width: 36, height: 36, borderRadius: 8, background: branding.accentColor, border: '1px solid var(--border)', flexShrink: 0 }} />
           </div>
-          <p className="text-xs mt-1" style={{ color: 'var(--border-light)' }}>
-            Usato per pulsanti, schede e icone nell&apos;app. Predefinito: <code>#c084fc</code>
+          <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>
+            Usato per pulsanti, schede e icone.
           </p>
         </Field>
+
+        {/* Background style */}
+        <Field label="Sfondo dell'app">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10 }}>
+            {([
+              { value: 'dark',    label: 'Scuro',    bg: '#0d0d14', desc: 'Nero blu' },
+              { value: 'neutral', label: 'Neutro',   bg: '#111827', desc: 'Grigio antracite' },
+              { value: 'warm',    label: 'Caldo',    bg: '#1a1208', desc: 'Marrone caldo' },
+              { value: 'rose',    label: 'Rosa',     bg: '#160a14', desc: 'Bordeaux rosa' },
+            ] as { value: string; label: string; bg: string; desc: string }[]).map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => setBranding(b => ({ ...b, bgStyle: opt.value as typeof branding.bgStyle }))}
+                style={{
+                  borderRadius: 12, border: branding.bgStyle === opt.value ? `2px solid ${branding.accentColor}` : '2px solid var(--border)',
+                  cursor: 'pointer', overflow: 'hidden', padding: 0,
+                  boxShadow: branding.bgStyle === opt.value ? `0 0 12px rgba(0,0,0,0.5)` : 'none',
+                }}
+              >
+                <div style={{ height: 48, background: opt.bg }} />
+                <div style={{ padding: '6px 4px', background: 'var(--bg-input)', textAlign: 'center' }}>
+                  <p style={{ fontSize: 12, fontWeight: 700, color: branding.bgStyle === opt.value ? branding.accentColor : 'var(--text)', margin: 0 }}>{opt.label}</p>
+                  <p style={{ fontSize: 10, color: 'var(--muted)', margin: 0 }}>{opt.desc}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        </Field>
+
+        {/* Font style */}
+        <Field label="Stile carattere">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 8 }}>
+            {([
+              { value: 'default', label: 'Default',  sample: 'System UI', ff: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
+              { value: 'elegant', label: 'Elegante', sample: 'Georgia',   ff: 'Georgia, "Times New Roman", serif' },
+              { value: 'modern',  label: 'Moderno',  sample: 'Helvetica', ff: '"Helvetica Neue", Helvetica, Arial, sans-serif' },
+              { value: 'playful', label: 'Amichevole', sample: 'Trebuchet', ff: '"Trebuchet MS", "Segoe UI", sans-serif' },
+            ] as { value: string; label: string; sample: string; ff: string }[]).map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => setBranding(b => ({ ...b, fontStyle: opt.value as typeof branding.fontStyle }))}
+                style={{
+                  borderRadius: 12, border: branding.fontStyle === opt.value ? `2px solid ${branding.accentColor}` : '2px solid var(--border)',
+                  padding: '12px', cursor: 'pointer', background: branding.fontStyle === opt.value ? `rgba(99,102,241,0.1)` : 'var(--bg-input)',
+                  textAlign: 'left',
+                }}
+              >
+                <p style={{ fontSize: 16, fontFamily: opt.ff, color: 'white', margin: 0, fontWeight: 600 }}>{opt.sample}</p>
+                <p style={{ fontSize: 11, color: 'var(--muted)', margin: '2px 0 0' }}>{opt.label}</p>
+              </button>
+            ))}
+          </div>
+        </Field>
+
+        {/* Texts */}
+        <Field label="Messaggio di benvenuto">
+          <input
+            style={inputStyle}
+            value={branding.welcomeMessage}
+            onChange={e => setBranding(b => ({ ...b, welcomeMessage: e.target.value }))}
+            placeholder="es. Benvenuta da Le Ribelle! 💇‍♀️"
+          />
+        </Field>
+        <Field label="Descrizione breve del salone">
+          <textarea
+            style={textareaStyle}
+            value={branding.aboutText}
+            onChange={e => setBranding(b => ({ ...b, aboutText: e.target.value }))}
+            placeholder="Breve descrizione del tuo salone..."
+          />
+        </Field>
+
+        {/* Live mini-preview */}
+        {(() => {
+          const bgMap: Record<string, string> = {
+            dark: '#0d0d14', neutral: '#111827', warm: '#1a1208', rose: '#160a14',
+          };
+          const ffMap: Record<string, string> = {
+            default: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+            elegant: 'Georgia, "Times New Roman", serif',
+            modern: '"Helvetica Neue", Helvetica, Arial, sans-serif',
+            playful: '"Trebuchet MS", "Segoe UI", sans-serif',
+          };
+          const bg = bgMap[branding.bgStyle ?? 'dark'] ?? '#0d0d14';
+          const ff = ffMap[branding.fontStyle ?? 'default'] ?? '';
+          const r = parseInt(branding.accentColor.slice(1,3),16);
+          const g = parseInt(branding.accentColor.slice(3,5),16);
+          const bv = parseInt(branding.accentColor.slice(5,7),16);
+          const rgb = `${r},${g},${bv}`;
+          return (
+            <div style={{ marginTop: 12 }}>
+              <p className="text-xs mb-2" style={{ color: 'var(--muted)' }}>Anteprima app</p>
+              <div style={{
+                borderRadius: 20, overflow: 'hidden', border: '1px solid var(--border)',
+                background: `radial-gradient(ellipse 80% 50% at 50% -10%, rgba(${rgb},0.3) 0%, transparent 65%), ${bg}`,
+                fontFamily: ff, padding: '24px 20px', textAlign: 'center', maxWidth: 280,
+              }}>
+                {branding.coverImageUrl && (
+                  <div style={{ marginBottom: 16, borderRadius: 14, overflow: 'hidden', height: 80, margin: '-24px -20px 16px' }}>
+                    <img src={branding.coverImageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.6 }} onError={e => (e.currentTarget.style.display = 'none')} />
+                  </div>
+                )}
+                <div style={{
+                  width: 60, height: 60, borderRadius: 18, margin: '0 auto 12px',
+                  background: `rgba(${rgb},0.25)`, border: `2px solid rgba(${rgb},0.4)`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+                }}>
+                  {branding.logoUrl
+                    ? <img src={branding.logoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    : <span style={{ fontSize: 26 }}>✂️</span>}
+                </div>
+                <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', color: branding.accentColor, margin: '0 0 6px', textTransform: 'uppercase' }}>Nome Salone</p>
+                <p style={{ fontSize: 15, fontWeight: 800, color: 'white', margin: '0 0 6px' }}>{branding.welcomeMessage || 'Benvenuta!'}</p>
+                {branding.aboutText && <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', margin: 0 }}>{branding.aboutText.slice(0, 60)}{branding.aboutText.length > 60 ? '…' : ''}</p>}
+                <div style={{ marginTop: 14, borderRadius: 12, padding: '10px 16px', background: `linear-gradient(135deg, ${branding.accentColor}, rgba(${rgb},0.7))`, color: 'white', fontSize: 13, fontWeight: 700 }}>
+                  📅 Prenota
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         <SaveBtn onClick={saveBranding} saved={brandingSaved} />
       </Section>
 
