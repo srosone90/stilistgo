@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://stylistgo.netlify.app';
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://stilistgo.vercel.app';
 
 export const metadata: Metadata = {
   title: 'Prenota',

@@ -501,7 +501,7 @@ export default function SalesPage() {
             >
               Registrati gratis &rarr;
             </a>
-            <p style={{ color: '#3f3f5a', fontSize: '11px', margin: '16px 0 0' }}>stylistgo.netlify.app</p>
+            <p style={{ color: '#3f3f5a', fontSize: '11px', margin: '16px 0 0' }}>stilistgo.vercel.app</p>
           </div>
 
         </div>

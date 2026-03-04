@@ -1,7 +1,7 @@
 import { createHmac } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 
-const SECRET = process.env.CLIENT_TOKEN_SECRET ?? 'dev-secret-change-me';
+const SECRET = (process.env.CLIENT_TOKEN_SECRET ?? 'dev-secret-change-me').trim();
 const ALGO = 'sha256';
 const TOKEN_TTL_DAYS = 365 * 5; // 5 years — link is permanent for a client
 

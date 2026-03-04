@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 const DEFAULT_COLOR = '#c084fc';
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://stylistgo.netlify.app';
+const APP_URL = (process.env.NEXT_PUBLIC_APP_URL ?? 'https://stilistgo.vercel.app').trim();
 
 export async function GET(
   _req: NextRequest,
@@ -15,8 +15,8 @@ export async function GET(
 
   try {
     const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      process.env.NEXT_PUBLIC_SUPABASE_URL!.trim(),
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!.trim()
     );
     const { data } = await supabase
       .from('salon_data')

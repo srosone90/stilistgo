@@ -122,6 +122,7 @@ export async function PATCH(req: NextRequest) {
     'email', 'full_name', 'salon_name', 'plan', 'monthly_price',
     'trial_ends_at', 'status', 'region', 'sector', 'notes', 'csm',
     'registered_at', 'last_seen_at', 'is_admin',
+    'pipeline_stage', 'health_score', 'trial_extended_days',
   ];
   const patchObj = patch as Record<string, unknown>;
   const safe: Record<string, unknown> = {};
