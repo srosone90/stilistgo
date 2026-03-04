@@ -1373,6 +1373,7 @@ export default function AdminPage() {
             <LogOut size={16} style={{ flexShrink: 0 }} />
             {sidebarOpen && <span style={{ fontSize: '12px' }}>Esci</span>}
           </button>
+          {sidebarOpen && <a href="/admin/sales" target="_blank" rel="noreferrer" style={{ fontSize: '11px', color: '#fbbf24', textAlign: 'center', textDecoration: 'none', padding: '4px 0', fontWeight: 600 }}>💰 Piani &amp; Prezzi</a>}
           {sidebarOpen && <a href="/login" style={{ fontSize: '10px', color: '#2e2e40', textAlign: 'center', textDecoration: 'none', padding: '4px 0' }}>← Gestionale</a>}
         </div>
       </div>
