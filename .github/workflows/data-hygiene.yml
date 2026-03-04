@@ -1,0 +1,47 @@
+name: Data Hygiene Cron
+
+on:
+  schedule:
+    # Ogni domenica alle 02:00 UTC
+    - cron: '0 2 * * 0'
+  workflow_dispatch:
+    inputs:
+      inactiveClientMonths:
+        description: 'Mesi di inattività prima della rimozione cliente'
+        required: false
+        default: '24'
+      securityEventDays:
+        description: 'Giorni di retention per security_events'
+        required: false
+        default: '180'
+
+jobs:
+  cleanup:
+    name: Pulizia automatica dati
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Esegui cleanup API
+        run: |
+          RESPONSE=$(curl -s -o /tmp/cleanup_response.json -w "%{http_code}" \
+            -X POST "${{ secrets.APP_URL }}/api/admin/cleanup" \
+            -H "Content-Type: application/json" \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            -d '{
+              "inactiveClientMonths": ${{ github.event.inputs.inactiveClientMonths || 24 }},
+              "securityEventDays": ${{ github.event.inputs.securityEventDays || 180 }}
+            }')
+          echo "HTTP Status: $RESPONSE"
+          cat /tmp/cleanup_response.json
+          if [ "$RESPONSE" != "200" ]; then
+            echo "::error::Cleanup fallito con status $RESPONSE"
+            exit 1
+          fi
+
+      - name: Log risultati
+        run: |
+          echo "=== Risultati Data Hygiene ==="
+          cat /tmp/cleanup_response.json
+          echo ""
+          echo "Eseguito il: $(date -u)"

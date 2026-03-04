@@ -17,10 +17,11 @@ import CouponsSection from './components/CouponsSection';
 import CommsSection from './components/CommsSection';
 import BISection from './components/BISection';
 import ReportsSection from './components/ReportsSection';
+import GdprSection from './components/GdprSection';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type Section = 'overview' | 'tenants' | 'tickets' | 'broadcasts' | 'flags' | 'audit' | 'whatsapp' | 'invoices' | 'pipeline' | 'tasks' | 'coupons' | 'comms' | 'bi' | 'reports';
+type Section = 'overview' | 'tenants' | 'tickets' | 'broadcasts' | 'flags' | 'audit' | 'whatsapp' | 'invoices' | 'pipeline' | 'tasks' | 'coupons' | 'comms' | 'bi' | 'reports' | 'gdpr';
 
 interface Metrics {
   total: number; active: number; trial: number; suspended: number; cancelled: number;
@@ -426,6 +427,7 @@ export default function AdminPage() {
     { group: 'Sistema', items: [
       { id: 'flags', icon: <Flag size={16} />, label: 'Feature Flag' },
       { id: 'audit', icon: <ScrollText size={16} />, label: 'Audit Log' },
+      { id: 'gdpr', icon: <ShieldCheck size={16} />, label: 'GDPR & Privacy' },
     ]},
   ];
   // ─── OVERVIEW ────────────────────────────────────────────────────────────
@@ -1431,6 +1433,7 @@ export default function AdminPage() {
             {section === 'comms'       && <CommsSection af={af} />}
             {section === 'bi'          && <BISection af={af} />}
             {section === 'reports'     && <ReportsSection af={af} />}
+            {section === 'gdpr'        && <GdprSection af={af} />}
           </>
         )}
       </div>

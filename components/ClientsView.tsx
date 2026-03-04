@@ -6,7 +6,7 @@ import { Client, TechnicalCard, HairType, HairCondition } from '@/types/salon';
 import { salonGenerateId } from '@/lib/salonStorage';
 import { getCurrentUser } from '@/lib/supabase';
 import { format, parseISO, differenceInDays } from 'date-fns';
-import { UserPlus, Search, Trash2, ChevronDown, ChevronUp, X, Star, AlertTriangle, FlaskConical, Clock, Camera, ImagePlus } from 'lucide-react';
+import { UserPlus, Search, Trash2, ChevronDown, ChevronUp, X, Star, AlertTriangle, FlaskConical, Clock, Camera, ImagePlus, Download, ShieldOff } from 'lucide-react';
 
 const card: React.CSSProperties = { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '16px', padding: '20px' };
 const inputStyle: React.CSSProperties = { background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '10px', padding: '9px 13px', color: 'var(--text)', fontSize: '13px', outline: 'none', width: '100%' };
@@ -35,6 +35,53 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
   const [showForm, setShowForm] = useState(false);
   const [currentSalonId, setCurrentSalonId] = useState('');
   useEffect(() => { getCurrentUser().then(u => { if (u) setCurrentSalonId(u.id); }); }, []);
+
+  const [gdprExporting, setGdprExporting] = useState(false);
+  const [gdprDeleting, setGdprDeleting] = useState(false);
+
+  const gdprExport = async (clientId: string) => {
+    setGdprExporting(true);
+    try {
+      const { getSupabaseClient } = await import('@/lib/supabase');
+      const session = (await getSupabaseClient().auth.getSession()).data.session;
+      const token = session?.access_token ?? '';
+      const res = await fetch(`/api/salon-gdpr?clientId=${encodeURIComponent(clientId)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) { alert('Errore esportazione dati'); return; }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `cliente_${clientId}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setGdprExporting(false);
+    }
+  };
+
+  const gdprHardDelete = async (client: Client) => {
+    const name = `${client.firstName} ${client.lastName}`;
+    if (!confirm(`Eliminazione definitiva (GDPR art. 17)\n\nStai per cancellare irreversibilmente tutti i dati di "${name}":\n• Anagrafica\n• Appuntamenti\n• Schede tecniche\n• Transazioni\n\nQuesta azione non può essere annullata. Confermi?`)) return;
+    if (!confirm(`Ultima conferma: eliminare definitivamente "${name}"?`)) return;
+    setGdprDeleting(true);
+    try {
+      const { getSupabaseClient } = await import('@/lib/supabase');
+      const session = (await getSupabaseClient().auth.getSession()).data.session;
+      const token = session?.access_token ?? '';
+      const res = await fetch('/api/salon-gdpr', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ clientId: client.id }),
+      });
+      if (!res.ok) { const d = await res.json().catch(() => ({})); alert(`Errore: ${d.error ?? res.status}`); return; }
+      deleteClient(client.id);
+      setSelectedId(null);
+    } finally {
+      setGdprDeleting(false);
+    }
+  };
 
   useEffect(() => { if (newTrigger && newTrigger > 0) { setShowForm(true); setEditingClient(null); setForm(EMPTY_CLIENT); } }, [newTrigger]);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
@@ -197,9 +244,18 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
                 <h2 className="text-xl font-bold text-white">{selected.firstName} {selected.lastName}</h2>
                 <p style={{ fontSize: '13px', color: 'var(--muted)' }}>Cliente dal {format(parseISO(selected.createdAt), 'dd/MM/yyyy')}</p>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap justify-end">
                 <button onClick={() => openEdit(selected)} style={btnPrimary}>Modifica</button>
-                <button onClick={() => { deleteClient(selected.id); setSelectedId(null); }} style={btnDanger}>Elimina</button>
+                <button onClick={() => gdprExport(selected.id)} disabled={gdprExporting}
+                  style={{ ...btnPrimary, opacity: gdprExporting ? 0.6 : 1 }}
+                  title="Esporta tutti i dati del cliente (GDPR art. 20)">
+                  <Download size={13} />{gdprExporting ? '…' : 'Esporta'}
+                </button>
+                <button onClick={() => gdprHardDelete(selected)} disabled={gdprDeleting}
+                  style={{ ...btnDanger, display: 'flex', alignItems: 'center', gap: '4px', opacity: gdprDeleting ? 0.6 : 1 }}
+                  title="Elimina definitivamente tutti i dati (GDPR art. 17)">
+                  <ShieldOff size={12} />{gdprDeleting ? '…' : 'Elimina'}
+                </button>
               </div>
             </div>
 
