@@ -7,12 +7,20 @@ import {
   ShieldCheck, TrendingUp, AlertTriangle, CheckCircle2, XCircle, Clock,
   ChevronRight, Plus, Search, X, Save, RefreshCw, ToggleLeft, ToggleRight,
   Building2, Phone, Mail, MapPin, UserCog, Calendar as CalendarIcon, Trash2,
-  MessageSquare, Wifi, WifiOff, ArrowUpRight, Send,
+  MessageSquare, Wifi, WifiOff, ArrowUpRight, Send, FileText, BarChart2,
+  GitBranch, CheckSquare, Tag, BookOpen, Receipt,
 } from 'lucide-react';
+import InvoicesSection from './components/InvoicesSection';
+import PipelineSection from './components/PipelineSection';
+import TasksSection from './components/TasksSection';
+import CouponsSection from './components/CouponsSection';
+import CommsSection from './components/CommsSection';
+import BISection from './components/BISection';
+import ReportsSection from './components/ReportsSection';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type Section = 'overview' | 'tenants' | 'tickets' | 'broadcasts' | 'flags' | 'audit' | 'whatsapp';
+type Section = 'overview' | 'tenants' | 'tickets' | 'broadcasts' | 'flags' | 'audit' | 'whatsapp' | 'invoices' | 'pipeline' | 'tasks' | 'coupons' | 'comms' | 'bi' | 'reports';
 
 interface Metrics {
   total: number; active: number; trial: number; suspended: number; cancelled: number;
@@ -393,16 +401,33 @@ export default function AdminPage() {
   const filteredTickets = tickets.filter(t => !ticketStatusFilter || t.status === ticketStatusFilter);
 
   // ─── SIDEBAR ─────────────────────────────────────────────────────────────
-  const navItems: { id: Section; icon: React.ReactNode; label: string; count?: number }[] = [
-    { id: 'overview', icon: <LayoutDashboard size={18} />, label: 'Overview' },
-    { id: 'tenants', icon: <Users size={18} />, label: 'Tenant', count: metrics?.total },
-    { id: 'tickets', icon: <Ticket size={18} />, label: 'Ticket', count: metrics?.openTickets },
-    { id: 'broadcasts', icon: <Megaphone size={18} />, label: 'Broadcast' },
-    { id: 'flags', icon: <Flag size={18} />, label: 'Feature Flag' },
-    { id: 'audit', icon: <ScrollText size={18} />, label: 'Audit Log' },
-    { id: 'whatsapp', icon: <MessageSquare size={18} />, label: 'WhatsApp' },
+  type NavGroup = { group: string; items: { id: Section; icon: React.ReactNode; label: string; count?: number }[] };
+  const navGroups: NavGroup[] = [
+    { group: 'Panoramica', items: [
+      { id: 'overview', icon: <LayoutDashboard size={16} />, label: 'Overview' },
+      { id: 'bi', icon: <BarChart2 size={16} />, label: 'Analytics & BI' },
+    ]},
+    { group: 'Clienti SaaS', items: [
+      { id: 'tenants', icon: <Users size={16} />, label: 'Tenant', count: metrics?.total },
+      { id: 'pipeline', icon: <GitBranch size={16} />, label: 'Pipeline CRM' },
+      { id: 'comms', icon: <BookOpen size={16} />, label: 'Comunicazioni' },
+      { id: 'tasks', icon: <CheckSquare size={16} />, label: 'Task' },
+    ]},
+    { group: 'Fatturazione', items: [
+      { id: 'invoices', icon: <FileText size={16} />, label: 'Fatture' },
+      { id: 'reports', icon: <Receipt size={16} />, label: 'Report & Incassi' },
+      { id: 'coupons', icon: <Tag size={16} />, label: 'Coupon' },
+    ]},
+    { group: 'Supporto', items: [
+      { id: 'tickets', icon: <Ticket size={16} />, label: 'Ticket', count: metrics?.openTickets },
+      { id: 'broadcasts', icon: <Megaphone size={16} />, label: 'Broadcast' },
+      { id: 'whatsapp', icon: <MessageSquare size={16} />, label: 'WhatsApp' },
+    ]},
+    { group: 'Sistema', items: [
+      { id: 'flags', icon: <Flag size={16} />, label: 'Feature Flag' },
+      { id: 'audit', icon: <ScrollText size={16} />, label: 'Audit Log' },
+    ]},
   ];
-
   // ─── OVERVIEW ────────────────────────────────────────────────────────────
   const OverviewSection = () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -1348,19 +1373,25 @@ export default function AdminPage() {
         </div>
 
         {/* Nav */}
-        <nav style={{ flex: 1, padding: '12px 8px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-          {navItems.map(item => {
-            const active = section === item.id;
-            return (
-              <button key={item.id} onClick={() => changeSection(item.id)} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: sidebarOpen ? '9px 10px' : '9px', borderRadius: '10px', border: 'none', background: active ? 'rgba(245,158,11,0.15)' : 'transparent', color: active ? '#fbbf24' : '#71717a', cursor: 'pointer', textAlign: 'left', width: '100%', whiteSpace: 'nowrap', justifyContent: sidebarOpen ? 'flex-start' : 'center' }}>
-                <span style={{ flexShrink: 0 }}>{item.icon}</span>
-                {sidebarOpen && <><span style={{ fontSize: '13px', fontWeight: active ? 600 : 400, flex: 1 }}>{item.label}</span>
-                  {item.count !== undefined && item.count > 0 && (
-                    <span style={{ background: active ? 'rgba(245,158,11,0.3)' : 'rgba(245,158,11,0.15)', color: '#fbbf24', borderRadius: '10px', padding: '1px 7px', fontSize: '10px', fontWeight: 600 }}>{item.count}</span>
-                  )}</>}
-              </button>
-            );
-          })}
+        <nav style={{ flex: 1, padding: '8px 6px', display: 'flex', flexDirection: 'column', gap: '1px', overflowY: 'auto' }}>
+          {navGroups.map(group => (
+            <div key={group.group} style={{ marginBottom: '4px' }}>
+              {sidebarOpen && <p style={{ color: '#3f3f5a', fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', padding: '8px 6px 3px', margin: 0 }}>{group.group}</p>}
+              {!sidebarOpen && <div style={{ height: '6px' }} />}
+              {group.items.map(item => {
+                const active = section === item.id;
+                return (
+                  <button key={item.id} onClick={() => changeSection(item.id)} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: sidebarOpen ? '8px 10px' : '8px', borderRadius: '8px', border: 'none', background: active ? 'rgba(245,158,11,0.15)' : 'transparent', color: active ? '#fbbf24' : '#71717a', cursor: 'pointer', textAlign: 'left', width: '100%', whiteSpace: 'nowrap', justifyContent: sidebarOpen ? 'flex-start' : 'center' }}>
+                    <span style={{ flexShrink: 0 }}>{item.icon}</span>
+                    {sidebarOpen && <><span style={{ fontSize: '12px', fontWeight: active ? 600 : 400, flex: 1 }}>{item.label}</span>
+                      {item.count !== undefined && item.count > 0 && (
+                        <span style={{ background: active ? 'rgba(245,158,11,0.3)' : 'rgba(245,158,11,0.15)', color: '#fbbf24', borderRadius: '10px', padding: '1px 6px', fontSize: '9px', fontWeight: 600 }}>{item.count}</span>
+                      )}</>}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
         </nav>
 
         {/* Bottom */}
@@ -1393,6 +1424,13 @@ export default function AdminPage() {
             {section === 'flags'       && FlagsSection()}
             {section === 'audit'       && AuditSection()}
             {section === 'whatsapp'    && WhatsAppSection()}
+            {section === 'invoices'    && <InvoicesSection af={af} />}
+            {section === 'pipeline'    && <PipelineSection af={af} />}
+            {section === 'tasks'       && <TasksSection af={af} />}
+            {section === 'coupons'     && <CouponsSection af={af} />}
+            {section === 'comms'       && <CommsSection af={af} />}
+            {section === 'bi'          && <BISection af={af} />}
+            {section === 'reports'     && <ReportsSection af={af} />}
           </>
         )}
       </div>
