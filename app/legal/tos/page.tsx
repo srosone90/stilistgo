@@ -6,19 +6,21 @@ export const metadata: Metadata = {
 };
 
 const s = {
+  wrap: { background: '#ffffff', minHeight: '100vh' } as React.CSSProperties,
   page: {
     maxWidth: '780px', margin: '0 auto', padding: '40px 24px 80px',
-    fontFamily: 'system-ui, sans-serif', color: '#1a1a2e',
+    fontFamily: 'system-ui, sans-serif', color: '#111111',
   } as React.CSSProperties,
-  h1: { fontSize: '28px', fontWeight: 800, marginBottom: '6px' } as React.CSSProperties,
+  h1: { fontSize: '28px', fontWeight: 800, marginBottom: '6px', color: '#111' } as React.CSSProperties,
   meta: { color: '#6b7280', fontSize: '13px', marginBottom: '36px' } as React.CSSProperties,
   h2: { fontSize: '17px', fontWeight: 700, marginTop: '32px', marginBottom: '8px', color: '#4f46e5' } as React.CSSProperties,
-  p: { fontSize: '14px', lineHeight: '1.7', marginBottom: '12px' } as React.CSSProperties,
+  p: { fontSize: '14px', lineHeight: '1.7', marginBottom: '12px', color: '#222' } as React.CSSProperties,
   back: { display: 'inline-block', marginBottom: '24px', color: '#4f46e5', textDecoration: 'none', fontSize: '14px' } as React.CSSProperties,
 };
 
 export default function TosPage() {
   return (
+    <div style={s.wrap}>
     <div style={s.page}>
       <a href="/" style={s.back}>← Torna al gestionale</a>
       <h1 style={s.h1}>Termini e Condizioni di Servizio</h1>
@@ -64,6 +66,7 @@ export default function TosPage() {
 
       <h2 style={s.h2}>10. Contatti</h2>
       <p style={s.p}>Per assistenza: support@stylistgo.it | Per questioni legali e privacy: privacy@stylistgo.it</p>
+    </div>
     </div>
   );
 }

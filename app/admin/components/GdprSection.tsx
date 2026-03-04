@@ -37,6 +37,9 @@ export default function GdprSection({ af }: { af: (url: string, opts?: RequestIn
   const [cleanupLoading, setCleanupLoading] = useState(false);
   const [cleanupResult, setCleanupResult] = useState<CleanupResult | null>(null);
   const [cleanupError, setCleanupError] = useState<string | null>(null);
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [syncResult, setSyncResult] = useState<{ totalAuthUsers: number; orphansFound: number; removedSalonData: number } | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -72,6 +75,24 @@ export default function GdprSection({ af }: { af: (url: string, opts?: RequestIn
       setCleanupError(String(err));
     } finally {
       setCleanupLoading(false);
+    }
+  };
+
+  const runSync = async () => {
+    if (!confirm('Sincronizzare con Supabase Auth? I tenant orfani (cancellati da Supabase ma ancora presenti nel database) verranno rimossi. Operazione irreversibile.')) return;
+    setSyncLoading(true);
+    setSyncResult(null);
+    setSyncError(null);
+    try {
+      const res = await af('/api/admin/sync-tenants', { method: 'POST' });
+      const d = await res.json();
+      if (!res.ok) { setSyncError(d.error ?? `Errore ${res.status}`); return; }
+      setSyncResult(d);
+      load();
+    } catch (err) {
+      setSyncError(String(err));
+    } finally {
+      setSyncLoading(false);
     }
   };
 
@@ -170,6 +191,66 @@ export default function GdprSection({ af }: { af: (url: string, opts?: RequestIn
                 ['Log eliminati', cleanupResult.deletedEvents],
                 ['Saloni elaborati', cleanupResult.processedSalons],
                 ['Clienti rimossi', cleanupResult.totalClientsRemoved],
+              ].map(([label, value]) => (
+                <div key={label as string} style={{ textAlign: 'center' }}>
+                  <p style={{ color: '#f4f4f5', fontSize: '22px', fontWeight: 700, margin: 0 }}>{value}</p>
+                  <p style={{ color: '#71717a', fontSize: '11px', margin: 0 }}>{label as string}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Sync tenants */}
+      <div style={card()}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+              <RefreshCw size={16} style={{ color: '#818cf8' }} />
+              <p style={{ color: '#f4f4f5', fontWeight: 600, fontSize: '14px', margin: 0 }}>Sincronizza con Supabase Auth</p>
+            </div>
+            <p style={{ color: '#71717a', fontSize: '12px', margin: 0, lineHeight: '1.5' }}>
+              Rimuove i tenant orfani: righe in <code style={{ color: '#818cf8' }}>salon_data</code> che non corrispondono a nessun utente reale in Supabase Auth.<br />
+              Accade quando un utente viene cancellato direttamente dal pannello Supabase.
+            </p>
+          </div>
+          <button
+            onClick={runSync}
+            disabled={syncLoading}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '6px',
+              padding: '9px 18px', borderRadius: '10px', border: 'none',
+              background: syncLoading ? '#2e2e40' : 'linear-gradient(135deg,#6366f1,#4f46e5)',
+              color: 'white', fontWeight: 600, fontSize: '13px',
+              cursor: syncLoading ? 'not-allowed' : 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {syncLoading
+              ? <><RefreshCw size={14} className="animate-spin" /> Sincronizzazione…</>
+              : <><RefreshCw size={14} /> Sincronizza ora</>}
+          </button>
+        </div>
+
+        {syncError && (
+          <div style={{ marginTop: '14px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '10px', padding: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <AlertTriangle size={14} style={{ color: '#f87171', flexShrink: 0 }} />
+            <span style={{ color: '#f87171', fontSize: '13px' }}>{syncError}</span>
+          </div>
+        )}
+
+        {syncResult && (
+          <div style={{ marginTop: '14px', background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.25)', borderRadius: '10px', padding: '14px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
+              <CheckCircle2 size={14} style={{ color: '#4ade80' }} />
+              <span style={{ color: '#4ade80', fontSize: '13px', fontWeight: 600 }}>Sincronizzazione completata</span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '10px' }}>
+              {[
+                ['Utenti auth reali', syncResult.totalAuthUsers],
+                ['Orfani trovati', syncResult.orphansFound],
+                ['Righe rimosse', syncResult.removedSalonData],
               ].map(([label, value]) => (
                 <div key={label as string} style={{ textAlign: 'center' }}>
                   <p style={{ color: '#f4f4f5', fontSize: '22px', fontWeight: 700, margin: 0 }}>{value}</p>

@@ -7,7 +7,6 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { getCurrentUser } from '@/lib/supabase';
 
 const TOS_VERSION = '1.0';
 const DPA_VERSION = '1.0';
@@ -32,45 +31,29 @@ export default function GdprConsentModal() {
   const [activeTab, setActiveTab] = useState<'tos' | 'dpa'>('tos');
 
   useEffect(() => {
-    // Controlla il consenso già registrato in localStorage (fast path)
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const stored: ConsentRecord = JSON.parse(raw);
-        if (isConsentValid(stored)) return;
-      }
-    } catch { /* corrupt storage */ }
-
-    // Controlla sul server se l'utente è loggato
-    getCurrentUser().then(async user => {
-      if (!user) return;
+    const checkConsent = () => {
       try {
-        const res = await fetch('/api/salon-gdpr', {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-        });
-        // Se 401, utente non ha sessione — non mostrare il modal
-        if (res.status === 401) return;
-        // Controlla admin_tenants per consenso già registrato
-        const tenantRes = await fetch('/api/user');
-        if (tenantRes.ok) {
-          const tenant = await tenantRes.json();
-          const consents = tenant?.legal_consents;
-          if (
-            consents?.tos?.version === TOS_VERSION &&
-            consents?.dpa?.version === DPA_VERSION
-          ) {
-            // Salva in locale per evitare richieste future
-            localStorage.setItem(STORAGE_KEY, JSON.stringify({
-              tosVersion: TOS_VERSION,
-              dpaVersion: DPA_VERSION,
-              acceptedAt: consents.tos.accepted_at,
-            }));
-            return;
-          }
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const stored: ConsentRecord = JSON.parse(raw);
+          if (isConsentValid(stored)) return; // consenso già valido
         }
-      } catch { /* ignora errori di rete */ }
+      } catch { /* storage corrotto — mostra il modal */ }
       setShow(true);
+    };
+
+    // Controlla sessione corrente
+    import('@/lib/supabase').then(({ getSupabaseClient }) => {
+      const client = getSupabaseClient();
+      // 1. Check immediato (utente già loggato)
+      client.auth.getSession().then(({ data: { session } }) => {
+        if (session?.user) checkConsent();
+      });
+      // 2. Ascolta login futuri (il componente è montato sulla login page)
+      const { data: { subscription } } = client.auth.onAuthStateChange((event) => {
+        if (event === 'SIGNED_IN') checkConsent();
+      });
+      return () => subscription.unsubscribe();
     });
   }, []);
 
@@ -78,21 +61,7 @@ export default function GdprConsentModal() {
     if (!tosChecked || !dpaChecked) return;
     setSaving(true);
     try {
-      const user = await getCurrentUser();
-      if (!user) { setSaving(false); return; }
-      const authToken = (await import('@/lib/supabase')).getSupabaseClient()
-        .auth.getSession().then(s => s.data.session?.access_token ?? '');
-      const token = await authToken;
-
-      await fetch('/api/salon-gdpr', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ tosVersion: TOS_VERSION, dpaVersion: DPA_VERSION }),
-      });
-
+      // 1. Salva subito in localStorage — gate principale
       const record: ConsentRecord = {
         tosVersion: TOS_VERSION,
         dpaVersion: DPA_VERSION,
@@ -100,7 +69,18 @@ export default function GdprConsentModal() {
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(record));
       setShow(false);
-    } catch { /* ignora — l'utente può riprovare */ }
+
+      // 2. Registra sul server (best-effort, non blocca l'UI)
+      const { getSupabaseClient } = await import('@/lib/supabase');
+      const { data: { session } } = await getSupabaseClient().auth.getSession();
+      if (session?.access_token) {
+        fetch('/api/salon-gdpr', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+          body: JSON.stringify({ tosVersion: TOS_VERSION, dpaVersion: DPA_VERSION }),
+        }).catch(() => {});
+      }
+    } catch { /* ignora */ }
     setSaving(false);
   };
 
