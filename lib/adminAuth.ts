@@ -41,13 +41,10 @@ export function getAdminDb(): SupabaseClient {
   if (!_adminDb) {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
     const sk = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    // Accept both new sb_secret_ format and legacy eyJ JWT format
-    const isValid = sk?.startsWith('eyJ') || sk?.startsWith('sb_secret_');
-    if (!isValid || !sk) {
-      // Log clearly so it's visible in Netlify function logs
-      console.error('[adminAuth] SUPABASE_SERVICE_ROLE_KEY is missing or invalid. All admin DB writes will fail. Set this env var in Netlify.');
+    if (!sk) {
+      console.error('[adminAuth] SUPABASE_SERVICE_ROLE_KEY mancante.');
     }
-    const key = (isValid && sk) ? sk : process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+    const key = sk ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
     _adminDb = createClient(url, key);
   }
   return _adminDb;
