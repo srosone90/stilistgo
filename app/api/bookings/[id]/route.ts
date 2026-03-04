@@ -22,7 +22,7 @@ export async function PATCH(
   }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
   const supabaseKey = serviceKey ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!supabaseUrl || !supabaseKey) return NextResponse.json({ error: 'Configurazione server mancante.' }, { status: 500 });
 
