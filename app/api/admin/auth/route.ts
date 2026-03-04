@@ -11,8 +11,7 @@ export async function POST(req: NextRequest) {
     console.error('ADMIN_EMAIL and ADMIN_PASSWORD env vars are not set.');
     return NextResponse.json({ error: 'Server non configurato correttamente.' }, { status: 500 });
   }
-  console.log('[admin/auth] emailMatch:', email === adminEmail, '| passMatch:', password === adminPass, '| emailLen:', email.length, adminEmail.length, '| passLen:', password.length, adminPass.length);
-  if (email !== adminEmail || password !== adminPass) {
+  if (email.trim() !== adminEmail.trim() || password.trim() !== adminPass.trim()) {
     return NextResponse.json({ error: 'Credenziali non valide.' }, { status: 401 });
   }
   const token = generateAdminToken();
