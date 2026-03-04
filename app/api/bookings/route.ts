@@ -27,8 +27,7 @@ export async function POST(req: NextRequest) {
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    const isValidServiceKey = serviceKey?.startsWith('eyJ') || serviceKey?.startsWith('sb_secret_');
-    const supabaseKey = (isValidServiceKey ? serviceKey : null) ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    const supabaseKey = serviceKey ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
     if (!supabaseUrl || !supabaseKey) {
       return NextResponse.json({ error: 'Configurazione server non disponibile.' }, { status: 500 });
