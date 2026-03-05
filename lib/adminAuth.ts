@@ -36,17 +36,12 @@ export function verifyAdminRequest(authHeader: string | null): boolean {
 
 /** A Supabase admin client (server-side only). */
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-let _adminDb: SupabaseClient | null = null;
 export function getAdminDb(): SupabaseClient {
-  // Sempre ricrea il client (no singleton) per evitare cache della chiave errata
+  // Always create a fresh client — never cache, so env var changes take effect immediately.
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const sk = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
-  if (!sk) {
-    console.error('[adminAuth] SUPABASE_SERVICE_ROLE_KEY mancante.');
-  }
   const key = sk ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-  if (!_adminDb) {
-    _adminDb = createClient(url, key);
-  }
-  return _adminDb;
+  return createClient(url, key, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
 }

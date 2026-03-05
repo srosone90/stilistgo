@@ -87,9 +87,11 @@ export async function GET(req: NextRequest) {
     };
   });
 
-  // Auto-upsert new tenants (fire and forget)
+  // Auto-upsert new tenants (fire and forget — errors logged, not fatal)
   if (toCreate.length > 0) {
-    db.from('admin_tenants').upsert(toCreate, { onConflict: 'user_id' }).then(() => {});
+    db.from('admin_tenants').upsert(toCreate, { onConflict: 'user_id' }).then(({ error }) => {
+      if (error) console.error('[GET /api/admin/tenants] auto-upsert error:', JSON.stringify(error));
+    });
   }
 
   // Sync live salon info (name, email) back to existing admin_tenants records
@@ -102,7 +104,9 @@ export async function GET(req: NextRequest) {
     return [{ user_id: row.user_id, salon_name: cfg2.salonName ?? meta2.salon_name, email: cfg2.email ?? meta2.email }];
   });
   if (toSync.length > 0) {
-    db.from('admin_tenants').upsert(toSync, { onConflict: 'user_id' }).then(() => {});
+    db.from('admin_tenants').upsert(toSync, { onConflict: 'user_id' }).then(({ error }) => {
+      if (error) console.error('[GET /api/admin/tenants] sync error:', JSON.stringify(error));
+    });
   }
 
   return NextResponse.json({ tenants });
@@ -130,9 +134,9 @@ export async function PATCH(req: NextRequest) {
     if (key in patchObj) safe[key] = patchObj[key];
   }
 
+  // Use upsert so new tenants (not yet in admin_tenants) are created on first save
   const { error } = await db.from('admin_tenants')
-    .update(safe)
-    .eq('user_id', user_id);
+    .upsert({ user_id, ...safe }, { onConflict: 'user_id' });
 
   if (error) {
     console.error('[PATCH /api/admin/tenants] DB error:', JSON.stringify(error));
