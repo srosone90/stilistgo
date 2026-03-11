@@ -77,7 +77,7 @@ const card = (extra?: React.CSSProperties): React.CSSProperties => ({
 
 const btn = (variant: 'primary' | 'danger' | 'ghost' | 'purple' = 'primary', extra?: React.CSSProperties): React.CSSProperties => ({
   display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px',
-  borderRadius: '10px', border: 'none', fontWeight: 600, fontSize: '12px', cursor: 'pointer',
+  borderRadius: '10px', fontWeight: 600, fontSize: '12px', cursor: 'pointer',
   background: variant === 'primary' ? 'linear-gradient(135deg,#f59e0b,#ef4444)'
     : variant === 'danger' ? 'rgba(239,68,68,0.12)'
     : variant === 'purple' ? 'rgba(99,102,241,0.15)'
@@ -469,3 +469,4 @@ export default function SalonDataSection({ af, tenants }: {
     </div>
   );
 }
+
