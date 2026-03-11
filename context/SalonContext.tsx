@@ -335,7 +335,7 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
         if (arr<Client>(cloudState.clients))                   { setClients(cloudState.clients as Client[]); storageSaveClients(cloudState.clients as Client[]); }
         if (arr<TechnicalCard>(cloudState.technicalCards))     { setTechnicalCards(cloudState.technicalCards as TechnicalCard[]); storageSaveTechnicalCards(cloudState.technicalCards as TechnicalCard[]); }
         if (arr<Service>(cloudState.services))                 { setServices(cloudState.services as Service[]); storageSaveServices(cloudState.services as Service[]); }
-        if (arr<Operator>(cloudState.operators))               { setOperators(cloudState.operators as Operator[]); storageSaveOperators(cloudState.operators as Operator[]); }
+        if (Array.isArray(cloudState.operators))               { setOperators(cloudState.operators as Operator[]); storageSaveOperators(cloudState.operators as Operator[]); }
         if (arr<Absence>(cloudState.absences))                 { setAbsences(cloudState.absences as Absence[]); storageSaveAbsences(cloudState.absences as Absence[]); }
         if (arr<Appointment>(cloudState.appointments))         { setAppointments(cloudState.appointments as Appointment[]); storageSaveAppointments(cloudState.appointments as Appointment[]); }
         if (arr<WaitingListEntry>(cloudState.waitingList))     { setWaitingList(cloudState.waitingList as WaitingListEntry[]); storageSaveWaitingList(cloudState.waitingList as WaitingListEntry[]); }
@@ -868,3 +868,4 @@ export function useSalon(): SalonContextValue {
   if (!ctx) throw new Error('useSalon must be used inside SalonProvider');
   return ctx;
 }
+
