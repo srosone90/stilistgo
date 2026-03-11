@@ -1,4 +1,3 @@
-@'
 import { supabase } from './supabase';
 
 export async function dbGetSalonState(userId: string): Promise<Record<string, unknown> | null> {
