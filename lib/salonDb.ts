@@ -15,11 +15,13 @@ export async function dbGetSalonState(userId: string): Promise<Record<string, un
   try {
     const { data, error } = await supabase
       .from('salon_data')
-      .select('state')
+      .select('state, admin_state')
       .eq('user_id', userId)
       .maybeSingle();
     if (error) return null;
-    return (data?.state as Record<string, unknown>) ?? null;
+    const state = (data?.state as Record<string, unknown>) ?? null;
+    if (!state) return null;
+    return { ...state, admin_state: data?.admin_state ?? {} };
   } catch {
     return null;
   }
@@ -79,3 +81,6 @@ export async function dbDeleteBooking(id: string): Promise<void> {
     // ignore
   }
 }
+
+
+

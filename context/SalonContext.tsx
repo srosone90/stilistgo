@@ -329,6 +329,9 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
         setStorageUserId(user.id as string);
         const cloudState = await dbGetSalonState(user.id as string);
         if (!cloudState) return;
+        const adminState = cloudState.admin_state as Record<string, unknown> | undefined;
+        if (adminState?.operators) { setOperators(adminState.operators as Operator[]); storageSaveOperators(adminState.operators as Operator[]); }
+        if (adminState?.salonConfig) { setSalonConfig(prev => ({ ...prev, ...(adminState.salonConfig as SalonConfig) })); storageSaveSalonConfig({ ...({} as SalonConfig), ...(adminState.salonConfig as SalonConfig) }); }
         // Only overwrite local data if cloud has actual content (non-empty arrays).
         // This prevents a partial/empty cloud state from wiping freshly-read local data.
         const arr = <T,>(v: unknown): v is T[] => Array.isArray(v) && (v as T[]).length > 0;
@@ -868,6 +871,11 @@ export function useSalon(): SalonContextValue {
   if (!ctx) throw new Error('useSalon must be used inside SalonProvider');
   return ctx;
 }
+
+
+
+
+
 
 
 

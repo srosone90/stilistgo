@@ -12,14 +12,14 @@ export async function GET(req: NextRequest) {
   const db = getAdminDb();
   const { data, error } = await db
     .from('salon_data')
-    .select('state, updated_at')
+    .select('state, admin_state, updated_at')
     .eq('user_id', user_id)
     .maybeSingle();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  return NextResponse.json({ state: data.state, updated_at: data.updated_at });
+  return NextResponse.json({ state: data.state, admin_state: data.admin_state, updated_at: data.updated_at });
 }
 
 /** PATCH /api/admin/salon-data — update operators or salonConfig for a tenant */
@@ -33,7 +33,7 @@ export async function PATCH(req: NextRequest) {
 
   const { data, error: readErr } = await db
     .from('salon_data')
-    .select('state')
+    .select('state, admin_state')
     .eq('user_id', user_id)
     .maybeSingle();
 
@@ -41,16 +41,17 @@ export async function PATCH(req: NextRequest) {
   if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const currentState = (data.state ?? {}) as Record<string, unknown>;
-  const newState: Record<string, unknown> = { ...currentState };
+  const adminState: Record<string, unknown> = {};
 
-  if (operators !== undefined) newState.operators = operators;
-  if (salonConfig !== undefined) newState.salonConfig = { ...(currentState.salonConfig as Record<string, unknown> ?? {}), ...salonConfig };
-
-  newState._savedAt = Date.now();
+  if (operators !== undefined) adminState.operators = operators;
+  if (salonConfig !== undefined) {
+    const currentAdmin = (data.admin_state ?? {}) as Record<string, unknown>;
+    adminState.salonConfig = { ...(currentAdmin.salonConfig as Record<string, unknown> ?? {}), ...salonConfig };
+  }
 
   const { error: writeErr } = await db
     .from('salon_data')
-    .update({ state: newState, updated_at: new Date().toISOString() })
+    .update({ admin_state: adminState, updated_at: new Date().toISOString() })
     .eq('user_id', user_id);
 
   if (writeErr) return NextResponse.json({ error: writeErr.message }, { status: 500 });
@@ -66,3 +67,8 @@ export async function PATCH(req: NextRequest) {
 
   return NextResponse.json({ success: true });
 }
+
+
+
+
+
