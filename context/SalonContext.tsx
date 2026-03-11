@@ -332,17 +332,17 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
         // Only overwrite local data if cloud has actual content (non-empty arrays).
         // This prevents a partial/empty cloud state from wiping freshly-read local data.
         const arr = <T,>(v: unknown): v is T[] => Array.isArray(v) && (v as T[]).length > 0;
-        if (arr<Client>(cloudState.clients))                   { setClients(cloudState.clients as Client[]); storageSaveClients(cloudState.clients as Client[]); }
-        if (arr<TechnicalCard>(cloudState.technicalCards))     { setTechnicalCards(cloudState.technicalCards as TechnicalCard[]); storageSaveTechnicalCards(cloudState.technicalCards as TechnicalCard[]); }
-        if (arr<Service>(cloudState.services))                 { setServices(cloudState.services as Service[]); storageSaveServices(cloudState.services as Service[]); }
+        if (Array.isArray(cloudState.clients))                   { setClients(cloudState.clients as Client[]); storageSaveClients(cloudState.clients as Client[]); }
+        if (Array.isArray(cloudState.technicalCards))     { setTechnicalCards(cloudState.technicalCards as TechnicalCard[]); storageSaveTechnicalCards(cloudState.technicalCards as TechnicalCard[]); }
+        if (Array.isArray(cloudState.services))                 { setServices(cloudState.services as Service[]); storageSaveServices(cloudState.services as Service[]); }
         if (Array.isArray(cloudState.operators))               { setOperators(cloudState.operators as Operator[]); storageSaveOperators(cloudState.operators as Operator[]); }
-        if (arr<Absence>(cloudState.absences))                 { setAbsences(cloudState.absences as Absence[]); storageSaveAbsences(cloudState.absences as Absence[]); }
-        if (arr<Appointment>(cloudState.appointments))         { setAppointments(cloudState.appointments as Appointment[]); storageSaveAppointments(cloudState.appointments as Appointment[]); }
-        if (arr<WaitingListEntry>(cloudState.waitingList))     { setWaitingList(cloudState.waitingList as WaitingListEntry[]); storageSaveWaitingList(cloudState.waitingList as WaitingListEntry[]); }
-        if (arr<Product>(cloudState.products))                 { setProducts(cloudState.products as Product[]); storageSaveProducts(cloudState.products as Product[]); }
-        if (arr<StockMovement>(cloudState.stockMovements))     { setStockMovements(cloudState.stockMovements as StockMovement[]); storageSaveStockMovements(cloudState.stockMovements as StockMovement[]); }
-        if (arr<GiftCard>(cloudState.giftCards))               { setGiftCards(cloudState.giftCards as GiftCard[]); storageSaveGiftCards(cloudState.giftCards as GiftCard[]); }
-        if (arr<Payment>(cloudState.payments))                 { setPayments(cloudState.payments as Payment[]); storageSavePayments(cloudState.payments as Payment[]); }
+        if (Array.isArray(cloudState.absences))                 { setAbsences(cloudState.absences as Absence[]); storageSaveAbsences(cloudState.absences as Absence[]); }
+        if (Array.isArray(cloudState.appointments))         { setAppointments(cloudState.appointments as Appointment[]); storageSaveAppointments(cloudState.appointments as Appointment[]); }
+        if (Array.isArray(cloudState.waitingList))     { setWaitingList(cloudState.waitingList as WaitingListEntry[]); storageSaveWaitingList(cloudState.waitingList as WaitingListEntry[]); }
+        if (Array.isArray(cloudState.products))                 { setProducts(cloudState.products as Product[]); storageSaveProducts(cloudState.products as Product[]); }
+        if (Array.isArray(cloudState.stockMovements))     { setStockMovements(cloudState.stockMovements as StockMovement[]); storageSaveStockMovements(cloudState.stockMovements as StockMovement[]); }
+        if (Array.isArray(cloudState.giftCards))               { setGiftCards(cloudState.giftCards as GiftCard[]); storageSaveGiftCards(cloudState.giftCards as GiftCard[]); }
+        if (Array.isArray(cloudState.payments))                 { setPayments(cloudState.payments as Payment[]); storageSavePayments(cloudState.payments as Payment[]); }
         if (arr<CashSession>(cloudState.cashSessions))         { setCashSessions(cloudState.cashSessions as CashSession[]); storageSaveCashSessions(cloudState.cashSessions as CashSession[]); }
         if (arr<WhatsAppMessage>((cloudState as Record<string, unknown>).whatsappMessages)) { setWhatsappMessages((cloudState as Record<string, unknown>).whatsappMessages as WhatsAppMessage[]); }
         const cs = cloudState as Record<string, unknown>;
@@ -868,4 +868,5 @@ export function useSalon(): SalonContextValue {
   if (!ctx) throw new Error('useSalon must be used inside SalonProvider');
   return ctx;
 }
+
 
