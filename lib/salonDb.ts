@@ -1,15 +1,5 @@
+@'
 import { supabase } from './supabase';
-
-// ─── Salon state via Supabase DB (salon_data table, anon key + RLS) ───────────
-//
-// SQL to run in Supabase SQL Editor (once):
-//   create table if not exists salon_data (
-//     user_id text primary key,
-//     state   jsonb  not null default '{}',
-//     updated_at timestamptz default now()
-//   );
-//   alter table salon_data enable row level security;
-//   create policy "own" on salon_data using (auth.uid()::text = user_id) with check (auth.uid()::text = user_id);
 
 export async function dbGetSalonState(userId: string): Promise<Record<string, unknown> | null> {
   try {
@@ -29,15 +19,26 @@ export async function dbGetSalonState(userId: string): Promise<Record<string, un
 
 export async function dbSaveSalonState(userId: string, state: Record<string, unknown>): Promise<void> {
   try {
+    const { data: existing } = await supabase
+      .from('salon_data')
+      .select('admin_state')
+      .eq('user_id', userId)
+      .maybeSingle();
+    const adminState = (existing?.admin_state ?? {}) as Record<string, unknown>;
+    const merged = { ...state };
+    if (Array.isArray(adminState.operators) && adminState.operators.length > 0) {
+      merged.operators = adminState.operators;
+    }
+    if (adminState.salonConfig) {
+      merged.salonConfig = { ...(state.salonConfig as Record<string, unknown> ?? {}), ...(adminState.salonConfig as Record<string, unknown>) };
+    }
     await supabase
       .from('salon_data')
-      .upsert({ user_id: userId, state, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+      .upsert({ user_id: userId, state: merged, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
   } catch {
-    // ignore — offline
+    // ignore - offline
   }
 }
-
-// ─── Online bookings ─────────────────────────────────────────────────────────
 
 export interface OnlineBooking {
   id: string;
@@ -81,6 +82,4 @@ export async function dbDeleteBooking(id: string): Promise<void> {
     // ignore
   }
 }
-
-
-
+'@ | Set-Content lib\salonDb.ts -Encoding UTF8
