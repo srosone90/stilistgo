@@ -332,6 +332,9 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
         // Only overwrite local data if cloud has actual content (non-empty arrays).
         // This prevents a partial/empty cloud state from wiping freshly-read local data.
         const arr = <T,>(v: unknown): v is T[] => Array.isArray(v) && (v as T[]).length > 0;
+        const cloudSavedAt = (cloudState._savedAt as number) ?? 0;
+        const localSavedAt = getLocalSavedAt();
+        const cloudIsNewer = cloudSavedAt >= localSavedAt;
         if (cloudIsNewer && Array.isArray(cloudState.clients))                   { setClients(cloudState.clients as Client[]); storageSaveClients(cloudState.clients as Client[]); }
         if (cloudIsNewer && Array.isArray(cloudState.technicalCards))     { setTechnicalCards(cloudState.technicalCards as TechnicalCard[]); storageSaveTechnicalCards(cloudState.technicalCards as TechnicalCard[]); }
         if (cloudIsNewer && Array.isArray(cloudState.services))                 { setServices(cloudState.services as Service[]); storageSaveServices(cloudState.services as Service[]); }
@@ -350,9 +353,6 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
         if (arr<ClientSubscription>(cs.subscriptions)) { setSubscriptions(cs.subscriptions as ClientSubscription[]); storageSaveSubscriptions(cs.subscriptions as ClientSubscription[]); }
         // For object fields (salonConfig, gamificationConfig) compare timestamps:
         // only apply cloud data if cloud saved it MORE RECENTLY than our last local save.
-        const cloudSavedAt = (cloudState._savedAt as number) ?? 0;
-        const localSavedAt = getLocalSavedAt();
-        const cloudIsNewer = cloudSavedAt >= localSavedAt;
         if (cloudIsNewer) {
           if (cloudState.salonConfig)        { setSalonConfig(cloudState.salonConfig as SalonConfig); storageSaveSalonConfig(cloudState.salonConfig as SalonConfig); }
           if (cloudState.gamificationConfig) { setGamificationConfig(cloudState.gamificationConfig as GamificationConfig); storageSaveGamificationConfig(cloudState.gamificationConfig as GamificationConfig); }
@@ -868,6 +868,7 @@ export function useSalon(): SalonContextValue {
   if (!ctx) throw new Error('useSalon must be used inside SalonProvider');
   return ctx;
 }
+
 
 
 
