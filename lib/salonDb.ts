@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+﻿import { supabase } from './supabase';
 
 export async function dbGetSalonState(userId: string): Promise<Record<string, unknown> | null> {
   try {
@@ -81,4 +81,3 @@ export async function dbDeleteBooking(id: string): Promise<void> {
     // ignore
   }
 }
-'@ | Set-Content lib\salonDb.ts -Encoding UTF8
