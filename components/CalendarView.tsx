@@ -12,7 +12,7 @@ const labelStyle: React.CSSProperties = { fontSize: '12px', color: 'var(--muted)
 const btnPrimary: React.CSSProperties = { background: 'rgba(99,102,241,0.2)', border: '1px solid rgba(99,102,241,0.4)', color: 'var(--accent-light)', borderRadius: '10px', padding: '8px 16px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' };
 
 const EMPTY_APPT: Omit<Appointment, 'id' | 'createdAt' | 'history'> = {
-  clientId: '', operatorId: '', serviceIds: [],
+  clientId: '', operatorId: '', serviceIds: [], serviceOperators: {},
   date: format(new Date(), 'yyyy-MM-dd'), startTime: '09:00', endTime: '10:00',
   status: 'scheduled', notes: '', isBlock: false, blockReason: '',
   recurringGroupId: '', feedbackScore: 0,
@@ -183,7 +183,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
 
   function openEdit(a: Appointment) {
     setEditAppt(a);
-    setForm({ clientId: a.clientId, operatorId: a.operatorId, serviceIds: [...a.serviceIds], date: a.date, startTime: a.startTime, endTime: a.endTime, status: a.status, notes: a.notes, isBlock: a.isBlock, blockReason: a.blockReason, recurringGroupId: a.recurringGroupId, feedbackScore: a.feedbackScore });
+    setForm({ clientId: a.clientId, operatorId: a.operatorId, serviceIds: [...a.serviceIds], serviceOperators: { ...(a.serviceOperators ?? {}) }, date: a.date, startTime: a.startTime, endTime: a.endTime, status: a.status, notes: a.notes, isBlock: a.isBlock, blockReason: a.blockReason, recurringGroupId: a.recurringGroupId, feedbackScore: a.feedbackScore });
     setShowForm(true);
   }
 
@@ -261,7 +261,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
         const totalDelta = Math.abs(e.clientX - dragRef.current.startX) + Math.abs(e.clientY - dragRef.current.startY);
         if (totalDelta > 5) wasDraggedRef.current = true;
         const deltaY = e.clientY - dragRef.current.startY;
-        const deltaMin = Math.round(deltaY / hourPxRef.current * 60 / 15) * 15;
+        const deltaMin = Math.round(deltaY / hourPxRef.current * 60); // free movement, no 15-min snap
         const newStartMin = Math.max(openHour * 60, dragRef.current.origStartMin + deltaMin);
         const newEndMin = newStartMin + dragRef.current.durationMin;
         let newDayIdx = dragRef.current.dayIndex;
@@ -516,66 +516,51 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                   const client = clients.find(c => c.id === a.clientId);
                   const apptSvcs = a.serviceIds.map(sid => services.find(s => s.id === sid)).filter(Boolean) as (typeof services[0])[];
                   const totalSvcMin = apptSvcs.reduce((s, sv) => s + sv.duration, 0);
+                  const bodyH = Math.max(totalHeight - 30, 0);
                   return (
                     <div key={a.id}
                       onMouseDown={e => handleDragStart(e, a)}
                       onClick={e => { if (wasDraggedRef.current || draggingId || resizingId) { e.stopPropagation(); return; } e.stopPropagation(); openEdit(a); }}
                       className="absolute left-1 right-1 rounded-lg overflow-hidden hover:brightness-110 transition-all"
                       style={{ top, height: totalHeight, background: `${color}22`, border: `1px solid ${color}55`, zIndex: isDragging ? 10 : 2, opacity: isDragging ? 0.7 : 1, cursor: isDragging ? 'grabbing' : 'grab', userSelect: 'none' }}>
-                      {/* Client name header */}
-                      <div className="px-2 pt-1" style={{ background: `${color}18` }}>
+                      {/* Header */}
+                      <div className="px-2 pt-1 pb-0.5" style={{ background: `${color}28` }}>
                         <p className="text-xs font-semibold truncate" style={{ color }}>
                           {a.isBlock ? '🔒 ' + (a.blockReason || 'Blocco') : (client ? `${client.firstName} ${client.lastName}` : '—')}
                         </p>
                         <p style={{ color: 'var(--text-3)', fontSize: 10 }}>{effectiveStart}–{effectiveEnd}</p>
                       </div>
-                      {/* Service sub-blocks — one per service, proportionally sized */}
-                      {!a.isBlock && apptSvcs.length > 1 ? (
-                        <div className="flex flex-col" style={{ flex: 1 }}>
-                          {apptSvcs.map((sv, si) => {
+                      {/* Service sub-blocks with per-operator color and posa phase */}
+                      {!a.isBlock && apptSvcs.length > 0 && bodyH > 8 && (
+                        <div className="flex flex-col" style={{ height: bodyH, overflow: 'hidden' }}>
+                          {apptSvcs.map((sv) => {
                             const proportion = totalSvcMin > 0 ? sv.duration / totalSvcMin : 1 / apptSvcs.length;
-                            const subH = Math.max((totalHeight - 30) * proportion, 14);
-                            const hueShift = (si * 25) % 60;
+                            const subH = Math.max(bodyH * proportion, 14);
+                            const svOpId = a.serviceOperators?.[sv.id] || a.operatorId;
+                            const svOp = operators.find(o => o.id === svOpId);
+                            const svColor = svOp?.color || color;
                             const opDur = sv.operatorDuration ?? sv.duration;
                             const procDur = sv.processingDuration ?? 0;
                             const hasProc = procDur > 0 && sv.duration > 0;
                             const activeH = hasProc ? Math.max((opDur / sv.duration) * subH, 10) : subH;
                             const procH = hasProc ? Math.max((procDur / sv.duration) * subH, 10) : 0;
                             return (
-                              <div key={sv.id} style={{ borderTop: `1px solid ${color}33`, overflow: 'hidden', flexShrink: 0 }}>
-                                <div style={{ height: activeH, padding: '1px 8px', overflow: 'hidden', background: si % 2 === 1 ? `${color}10` : 'transparent' }}>
-                                  <span style={{ fontSize: 9, color: color, opacity: 0.85 + hueShift * 0.001 }} className="truncate block">{sv.name} · {opDur}&apos;</span>
+                              <div key={sv.id} style={{ borderTop: `1px solid ${svColor}30`, flexShrink: 0 }}>
+                                <div style={{ height: activeH, padding: '1px 8px', overflow: 'hidden', background: `${svColor}18` }}>
+                                  <span style={{ fontSize: 9, color: svColor, fontWeight: 600 }} className="truncate block">
+                                    {sv.name} · {opDur}&apos;{svColor !== color && svOp ? ` · ${svOp.name}` : ''}
+                                  </span>
                                 </div>
                                 {hasProc && (
-                                  <div style={{ height: procH, padding: '1px 8px', overflow: 'hidden', background: `repeating-linear-gradient(-45deg, transparent, transparent 3px, ${color}18 3px, ${color}18 6px)` }}>
-                                    <span style={{ fontSize: 9, color, opacity: 0.55 }} className="truncate block">Posa · {procDur}&apos;</span>
+                                  <div style={{ height: procH, padding: '1px 8px', overflow: 'hidden', background: `repeating-linear-gradient(-45deg, transparent, transparent 3px, ${svColor}20 3px, ${svColor}20 6px)`, borderTop: `1px dashed ${svColor}40` }}>
+                                    <span style={{ fontSize: 9, color: svColor, opacity: 0.6 }} className="truncate block">⏳ Posa · {procDur}&apos;</span>
                                   </div>
                                 )}
                               </div>
                             );
                           })}
                         </div>
-                      ) : (!a.isBlock && apptSvcs.length === 1 && (() => {
-                        const sv = apptSvcs[0];
-                        const opDur = sv.operatorDuration ?? sv.duration;
-                        const procDur = sv.processingDuration ?? 0;
-                        if (procDur > 0 && sv.duration > 0 && totalHeight > 44) {
-                          const availH = Math.max(totalHeight - 34, 20);
-                          const activeH = Math.max((opDur / sv.duration) * availH, 10);
-                          const procH = Math.max((procDur / sv.duration) * availH, 10);
-                          return (
-                            <>
-                              <div style={{ height: activeH, padding: '1px 8px', overflow: 'hidden' }}>
-                                <span style={{ fontSize: 9, color: 'var(--muted)' }}>{sv.name} · {opDur}&apos;</span>
-                              </div>
-                              <div style={{ height: procH, padding: '1px 8px', overflow: 'hidden', background: `repeating-linear-gradient(-45deg, transparent, transparent 3px, ${color}18 3px, ${color}18 6px)` }}>
-                                <span style={{ fontSize: 9, color, opacity: 0.5 }}>Posa · {procDur}&apos;</span>
-                              </div>
-                            </>
-                          );
-                        }
-                        return <div className="px-2" style={{ fontSize: 10, color: 'var(--muted)' }}>{sv.name} · {sv.duration}&apos;</div>;
-                      })())}
+                      )}
                       <div onMouseDown={e => handleResizeStart(e, a)}
                         className="absolute bottom-0 left-0 right-0 flex items-center justify-center"
                         style={{ height: 10, cursor: 'ns-resize', background: `${color}30` }}>
@@ -614,63 +599,49 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                   const client = clients.find(c => c.id === a.clientId);
                   const apptSvcs = a.serviceIds.map(sid => services.find(s => s.id === sid)).filter(Boolean) as (typeof services[0])[];
                   const totalSvcMin = apptSvcs.reduce((s, sv) => s + sv.duration, 0);
+                  const bodyH = Math.max(totalHeight - 30, 0);
                   return (
                     <div key={a.id}
                       onMouseDown={e => handleDragStart(e, a)}
                       onClick={e => { if (wasDraggedRef.current || draggingId || resizingId) { e.stopPropagation(); return; } e.stopPropagation(); openEdit(a); }}
                       className="absolute left-1 right-1 rounded-lg overflow-hidden hover:brightness-110 transition-all"
                       style={{ top, height: totalHeight, background: 'rgba(113,113,122,0.15)', border: '1px solid rgba(113,113,122,0.4)', zIndex: isDragging ? 10 : 2, opacity: isDragging ? 0.7 : 1, cursor: isDragging ? 'grabbing' : 'grab', userSelect: 'none' }}>
-                      <div className="px-2 pt-1">
+                      <div className="px-2 pt-1 pb-0.5" style={{ background: 'rgba(113,113,122,0.15)' }}>
                         <p className="text-xs font-semibold truncate" style={{ color }}>
                           {a.isBlock ? '🔒 ' + (a.blockReason || 'Blocco') : (client ? `${client.firstName} ${client.lastName}` : '—')}
                         </p>
                         <p style={{ color: 'var(--text-3)', fontSize: 10 }}>{effectiveStart}–{effectiveEnd}</p>
                       </div>
-                      {!a.isBlock && apptSvcs.length > 1 ? (
-                        <div className="flex flex-col">
-                          {apptSvcs.map((sv, si) => {
+                      {!a.isBlock && apptSvcs.length > 0 && bodyH > 8 && (
+                        <div className="flex flex-col" style={{ height: bodyH, overflow: 'hidden' }}>
+                          {apptSvcs.map((sv) => {
                             const proportion = totalSvcMin > 0 ? sv.duration / totalSvcMin : 1 / apptSvcs.length;
-                            const subH = Math.max((totalHeight - 30) * proportion, 14);
+                            const subH = Math.max(bodyH * proportion, 14);
+                            const svOpId = a.serviceOperators?.[sv.id] || a.operatorId;
+                            const svOp = operators.find(o => o.id === svOpId);
+                            const svColor = svOp?.color || color;
                             const opDur = sv.operatorDuration ?? sv.duration;
                             const procDur = sv.processingDuration ?? 0;
                             const hasProc = procDur > 0 && sv.duration > 0;
                             const activeH = hasProc ? Math.max((opDur / sv.duration) * subH, 10) : subH;
                             const procH = hasProc ? Math.max((procDur / sv.duration) * subH, 10) : 0;
                             return (
-                              <div key={sv.id} style={{ borderTop: '1px solid rgba(113,113,122,0.2)', overflow: 'hidden', flexShrink: 0 }}>
-                                <div style={{ height: activeH, padding: '1px 8px', overflow: 'hidden', background: si % 2 === 1 ? 'rgba(113,113,122,0.1)' : 'transparent' }}>
-                                  <span style={{ fontSize: 9, color: '#71717a' }} className="truncate block">{sv.name} · {opDur}&apos;</span>
+                              <div key={sv.id} style={{ borderTop: `1px solid ${svColor}30`, flexShrink: 0 }}>
+                                <div style={{ height: activeH, padding: '1px 8px', overflow: 'hidden', background: `${svColor}18` }}>
+                                  <span style={{ fontSize: 9, color: svColor, fontWeight: 600 }} className="truncate block">
+                                    {sv.name} · {opDur}&apos;{svOp ? ` · ${svOp.name}` : ''}
+                                  </span>
                                 </div>
                                 {hasProc && (
-                                  <div style={{ height: procH, padding: '1px 8px', overflow: 'hidden', background: 'repeating-linear-gradient(-45deg, transparent, transparent 3px, rgba(113,113,122,0.18) 3px, rgba(113,113,122,0.18) 6px)' }}>
-                                    <span style={{ fontSize: 9, color: '#71717a', opacity: 0.55 }} className="truncate block">Posa · {procDur}&apos;</span>
+                                  <div style={{ height: procH, padding: '1px 8px', overflow: 'hidden', background: `repeating-linear-gradient(-45deg, transparent, transparent 3px, ${svColor}20 3px, ${svColor}20 6px)`, borderTop: `1px dashed ${svColor}40` }}>
+                                    <span style={{ fontSize: 9, color: svColor, opacity: 0.6 }} className="truncate block">⏳ Posa · {procDur}&apos;</span>
                                   </div>
                                 )}
                               </div>
                             );
                           })}
                         </div>
-                      ) : (!a.isBlock && apptSvcs.length === 1 && (() => {
-                        const sv = apptSvcs[0];
-                        const opDur = sv.operatorDuration ?? sv.duration;
-                        const procDur = sv.processingDuration ?? 0;
-                        if (procDur > 0 && sv.duration > 0 && totalHeight > 44) {
-                          const availH = Math.max(totalHeight - 34, 20);
-                          const activeH = Math.max((opDur / sv.duration) * availH, 10);
-                          const procH = Math.max((procDur / sv.duration) * availH, 10);
-                          return (
-                            <>
-                              <div style={{ height: activeH, padding: '1px 8px', overflow: 'hidden' }}>
-                                <span style={{ fontSize: 9, color: 'var(--muted)' }}>{sv.name} · {opDur}&apos;</span>
-                              </div>
-                              <div style={{ height: procH, padding: '1px 8px', overflow: 'hidden', background: 'repeating-linear-gradient(-45deg, transparent, transparent 3px, rgba(113,113,122,0.18) 3px, rgba(113,113,122,0.18) 6px)' }}>
-                                <span style={{ fontSize: 9, color: '#71717a', opacity: 0.5 }}>Posa · {procDur}&apos;</span>
-                              </div>
-                            </>
-                          );
-                        }
-                        return <div className="px-2" style={{ fontSize: 10, color: 'var(--muted)' }}>{sv.name} · {sv.duration}&apos;</div>;
-                      })())}
+                      )}
                       <div onMouseDown={e => handleResizeStart(e, a)}
                         className="absolute bottom-0 left-0 right-0 flex items-center justify-center"
                         style={{ height: 10, cursor: 'ns-resize', background: 'rgba(113,113,122,0.2)' }}>
@@ -843,9 +814,9 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                 <div><label style={labelStyle}>Ora fine</label><input type="time" value={form.endTime} onChange={e => setForm(p => ({ ...p, endTime: e.target.value }))} style={inputStyle} /></div>
               </div>
               {!form.isBlock && (
-                <div>
+                <div className="space-y-2">
                   <label style={labelStyle}>Servizi</label>
-                  <div className="flex flex-wrap gap-2 mt-1">
+                  <div className="flex flex-wrap gap-2">
                     {services.filter(s => s.active).map(s => (
                       <button key={s.id} type="button" onClick={() => handleServiceToggle(s.id)}
                         className="text-xs px-2.5 py-1 rounded-lg transition-all"
@@ -854,6 +825,32 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                       </button>
                     ))}
                   </div>
+                  {/* Per-service operator assignment (shown when multiple services selected) */}
+                  {form.serviceIds.length > 0 && (
+                    <div className="rounded-xl p-3 space-y-2" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)' }}>
+                      <p className="text-xs font-medium" style={{ color: 'var(--muted)' }}>Operatore per servizio</p>
+                      {form.serviceIds.map(sid => {
+                        const svc = services.find(s => s.id === sid);
+                        if (!svc) return null;
+                        const assignedOp = form.serviceOperators?.[sid] || form.operatorId;
+                        const hasProc = (svc.processingDuration ?? 0) > 0;
+                        return (
+                          <div key={sid} className="flex items-center gap-2">
+                            <span className="text-xs flex-1 truncate" style={{ color: 'var(--text-2)' }}>
+                              {svc.name}
+                              {hasProc && <span style={{ color: 'var(--muted)', marginLeft: 4 }}>({svc.operatorDuration ?? svc.duration}&apos;+{svc.processingDuration}&apos;)</span>}
+                            </span>
+                            <select
+                              value={assignedOp}
+                              onChange={e => setForm(p => ({ ...p, serviceOperators: { ...(p.serviceOperators ?? {}), [sid]: e.target.value } }))}
+                              style={{ ...inputStyle, width: 'auto', padding: '4px 8px', fontSize: '12px', flex: '0 0 auto' }}>
+                              {operators.filter(o => o.active).map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+                            </select>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
               <div><label style={labelStyle}>Note</label><textarea rows={2} value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} style={{ ...inputStyle, resize: 'vertical' }} /></div>

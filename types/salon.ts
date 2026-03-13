@@ -179,6 +179,7 @@ export interface Appointment {
   clientId: string;   // empty string if block slot
   operatorId: string;
   serviceIds: string[];
+  serviceOperators?: Record<string, string>; // serviceId → operatorId override (for multi-operator)
   date: string;       // YYYY-MM-DD
   startTime: string;  // "HH:mm"
   endTime: string;    // "HH:mm"
