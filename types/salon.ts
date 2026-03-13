@@ -1,5 +1,16 @@
 // ─── Client / CRM ─────────────────────────────────────────────────────────────
 
+export type ClientGender = 'M' | 'F' | '';
+export type AcquisitionSource =
+  | 'passaparola'
+  | 'social'
+  | 'google'
+  | 'volantino'
+  | 'sito_web'
+  | 'evento'
+  | 'altro'
+  | '';
+
 export interface Client {
   id: string;
   firstName: string;
@@ -7,6 +18,13 @@ export interface Client {
   phone: string;
   email: string;
   birthDate: string; // YYYY-MM-DD
+  gender: ClientGender;
+  address: string;
+  city: string;
+  province: string;
+  postalCode: string;
+  acquisitionSource: AcquisitionSource;
+  acquisitionDate: string; // YYYY-MM-DD
   notes: string;
   allergies: string;
   tags: string[];

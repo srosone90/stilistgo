@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useSalon } from '@/context/SalonContext';
-import { Client, TechnicalCard, HairType, HairCondition } from '@/types/salon';
+import { Client, TechnicalCard, HairType, HairCondition, ClientGender, AcquisitionSource } from '@/types/salon';
 import { salonGenerateId } from '@/lib/salonStorage';
 import { getCurrentUser } from '@/lib/supabase';
 import { format, parseISO, differenceInDays } from 'date-fns';
@@ -14,8 +14,21 @@ const labelStyle: React.CSSProperties = { fontSize: '12px', color: 'var(--muted)
 const btnPrimary: React.CSSProperties = { background: 'rgba(99,102,241,0.2)', border: '1px solid rgba(99,102,241,0.4)', color: 'var(--accent-light)', borderRadius: '10px', padding: '8px 16px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' };
 const btnDanger: React.CSSProperties = { background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: '#f87171', borderRadius: '8px', padding: '6px 12px', fontSize: '12px', cursor: 'pointer' };
 
+const ACQUISITION_SOURCES: { value: AcquisitionSource; label: string }[] = [
+  { value: '', label: '—' },
+  { value: 'passaparola', label: 'Passaparola' },
+  { value: 'social', label: 'Social Media' },
+  { value: 'google', label: 'Google' },
+  { value: 'volantino', label: 'Volantino / Affissione' },
+  { value: 'sito_web', label: 'Sito Web' },
+  { value: 'evento', label: 'Evento' },
+  { value: 'altro', label: 'Altro' },
+];
+
 const EMPTY_CLIENT: Omit<Client, 'id' | 'createdAt'> = {
   firstName: '', lastName: '', phone: '', email: '', birthDate: '',
+  gender: '', address: '', city: '', province: '', postalCode: '',
+  acquisitionSource: '', acquisitionDate: '',
   notes: '', allergies: '', tags: [], gdprConsent: false, gdprDate: '', loyaltyPoints: 0,
 };
 
@@ -96,13 +109,61 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
   const [cardForm, setCardForm] = useState<Omit<TechnicalCard, 'id' | 'createdAt'>>(EMPTY_CARD);
   const [activeTab, setActiveTab] = useState<'info' | 'cards' | 'history'>('info');
 
+  // ── Filters ──────────────────────────────────────────────────────────────────
+  const [showFilters, setShowFilters] = useState(false);
+  const [fGender, setFGender] = useState<Record<'M' | 'F', boolean>>({ M: true, F: true });
+  const [fAcqSource, setFAcqSource] = useState<AcquisitionSource>('');
+  const [fHasPhone, setFHasPhone] = useState(false);
+  const [fHasEmail, setFHasEmail] = useState(false);
+  const [fHasGdpr, setFHasGdpr] = useState<'all' | 'yes' | 'no'>('all');
+  const [fCity, setFCity] = useState('');
+  const [fProvince, setFProvince] = useState('');
+  const [fTagSearch, setFTagSearch] = useState('');
+  const [fAcqFrom, setFAcqFrom] = useState('');
+  const [fAcqTo, setFAcqTo] = useState('');
+  const [fBdayFrom, setFBdayFrom] = useState('');
+  const [fBdayTo, setFBdayTo] = useState('');
+  const [fSortOrder, setFSortOrder] = useState<'az' | 'za' | 'newest' | 'oldest'>('az');
+
+  const activeFilterCount = [
+    !fGender.M || !fGender.F, fAcqSource, fHasPhone, fHasEmail, fHasGdpr !== 'all',
+    fCity, fProvince, fTagSearch, fAcqFrom, fAcqTo, fBdayFrom, fBdayTo,
+  ].filter(Boolean).length;
+
+  function resetFilters() {
+    setFGender({ M: true, F: true }); setFAcqSource('');
+    setFHasPhone(false); setFHasEmail(false); setFHasGdpr('all');
+    setFCity(''); setFProvince(''); setFTagSearch('');
+    setFAcqFrom(''); setFAcqTo(''); setFBdayFrom(''); setFBdayTo('');
+  }
+
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
-    return clients.filter(c =>
-      `${c.firstName} ${c.lastName}`.toLowerCase().includes(q) ||
-      c.phone.includes(q) || c.email.toLowerCase().includes(q)
-    ).sort((a, b) => `${a.firstName}${a.lastName}`.localeCompare(`${b.firstName}${b.lastName}`));
-  }, [clients, search]);
+    let list = clients.filter(c => {
+      if (q && !`${c.firstName} ${c.lastName}`.toLowerCase().includes(q) && !c.phone.includes(q) && !c.email.toLowerCase().includes(q)) return false;
+      if (!fGender[c.gender as 'M' | 'F'] && (c.gender === 'M' || c.gender === 'F')) return false;
+      if (fAcqSource && c.acquisitionSource !== fAcqSource) return false;
+      if (fHasPhone && !c.phone.trim()) return false;
+      if (fHasEmail && !c.email.trim()) return false;
+      if (fHasGdpr === 'yes' && !c.gdprConsent) return false;
+      if (fHasGdpr === 'no' && c.gdprConsent) return false;
+      if (fCity && !c.city?.toLowerCase().includes(fCity.toLowerCase())) return false;
+      if (fProvince && c.province?.toUpperCase() !== fProvince.toUpperCase()) return false;
+      if (fTagSearch && !c.tags.some(t => t.toLowerCase().includes(fTagSearch.toLowerCase()))) return false;
+      if (fAcqFrom && c.acquisitionDate && c.acquisitionDate < fAcqFrom) return false;
+      if (fAcqTo && c.acquisitionDate && c.acquisitionDate > fAcqTo) return false;
+      if (fBdayFrom && c.birthDate && c.birthDate.slice(5) < fBdayFrom.slice(5)) return false;
+      if (fBdayTo && c.birthDate && c.birthDate.slice(5) > fBdayTo.slice(5)) return false;
+      return true;
+    });
+    list = list.sort((a, b) => {
+      if (fSortOrder === 'za') return `${b.firstName}${b.lastName}`.localeCompare(`${a.firstName}${a.lastName}`);
+      if (fSortOrder === 'newest') return b.createdAt.localeCompare(a.createdAt);
+      if (fSortOrder === 'oldest') return a.createdAt.localeCompare(b.createdAt);
+      return `${a.firstName}${a.lastName}`.localeCompare(`${b.firstName}${b.lastName}`);
+    });
+    return list;
+  }, [clients, search, fGender, fAcqSource, fHasPhone, fHasEmail, fHasGdpr, fCity, fProvince, fTagSearch, fAcqFrom, fAcqTo, fBdayFrom, fBdayTo, fSortOrder]);
 
   const selected = selectedId ? clients.find(c => c.id === selectedId) ?? null : null;
   const clientCards = useMemo(() => technicalCards.filter(c => c.clientId === selectedId).sort((a, b) => b.date.localeCompare(a.date)), [technicalCards, selectedId]);
@@ -121,7 +182,14 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
 
   function openEdit(c: Client) {
     setEditingClient(c);
-    setForm({ firstName: c.firstName, lastName: c.lastName, phone: c.phone, email: c.email, birthDate: c.birthDate, notes: c.notes, allergies: c.allergies, tags: [...c.tags], gdprConsent: c.gdprConsent, gdprDate: c.gdprDate, loyaltyPoints: c.loyaltyPoints });
+    setForm({
+      firstName: c.firstName, lastName: c.lastName, phone: c.phone, email: c.email,
+      birthDate: c.birthDate, gender: c.gender ?? '', address: c.address ?? '',
+      city: c.city ?? '', province: c.province ?? '', postalCode: c.postalCode ?? '',
+      acquisitionSource: c.acquisitionSource ?? '', acquisitionDate: c.acquisitionDate ?? '',
+      notes: c.notes, allergies: c.allergies, tags: [...c.tags],
+      gdprConsent: c.gdprConsent, gdprDate: c.gdprDate, loyaltyPoints: c.loyaltyPoints,
+    });
     setTagInput('');
     setShowForm(true);
   }
@@ -198,18 +266,24 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
 
     if (fmt === 'csv') {
       const BOM = '\uFEFF';
-      const header = 'Nome;Cognome;Telefono;Email;DataNascita;Note;Allergie;Tag;PuntiFedelta;ConsensoGDPR;DataGDPR;DataCreazione';
+      const header = 'Nome;Cognome;Sesso;Telefono;Email;DataNascita;Indirizzo;Citta;Provincia;CAP;FonteAcquisizione;DataAcquisizione;Note;Allergie;Tag;PuntiFedelta;ConsensoGDPR;DataGDPR;DataCreazione';
       const rows = list.map(c =>
-        [c.firstName, c.lastName, c.phone, c.email, c.birthDate, c.notes, c.allergies,
-          c.tags.join('|'), String(c.loyaltyPoints), c.gdprConsent ? 'Sì' : 'No', c.gdprDate, c.createdAt]
+        [c.firstName, c.lastName, c.gender ?? '', c.phone, c.email, c.birthDate,
+          c.address ?? '', c.city ?? '', c.province ?? '', c.postalCode ?? '',
+          c.acquisitionSource ?? '', c.acquisitionDate ?? '',
+          c.notes, c.allergies, c.tags.join('|'), String(c.loyaltyPoints),
+          c.gdprConsent ? 'Sì' : 'No', c.gdprDate, c.createdAt]
           .map(v => `"${(v ?? '').replace(/"/g, '""')}"`).join(';')
       );
       content = BOM + [header, ...rows].join('\n');
       mimeType = 'text/csv;charset=utf-8'; ext = 'csv';
     } else if (fmt === 'json') {
       content = JSON.stringify(list.map(c => ({
-        nome: c.firstName, cognome: c.lastName, telefono: c.phone, email: c.email,
-        dataNascita: c.birthDate, note: c.notes, allergie: c.allergies, tag: c.tags,
+        nome: c.firstName, cognome: c.lastName, sesso: c.gender ?? '',
+        telefono: c.phone, email: c.email, dataNascita: c.birthDate,
+        indirizzo: c.address ?? '', citta: c.city ?? '', provincia: c.province ?? '', cap: c.postalCode ?? '',
+        fonteAcquisizione: c.acquisitionSource ?? '', dataAcquisizione: c.acquisitionDate ?? '',
+        note: c.notes, allergie: c.allergies, tag: c.tags,
         puntiFedelta: c.loyaltyPoints, gdprConsent: c.gdprConsent, gdprDate: c.gdprDate, dataCreazione: c.createdAt,
       })), null, 2);
       mimeType = 'application/json;charset=utf-8'; ext = 'json';
@@ -222,10 +296,14 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
         if (c.phone) lines.push(`TEL;TYPE=CELL:${c.phone}`);
         if (c.email) lines.push(`EMAIL:${c.email}`);
         if (c.birthDate) lines.push(`BDAY:${c.birthDate.replace(/-/g, '')}`);
+        if (c.address || c.city || c.province || c.postalCode)
+          lines.push(`ADR;TYPE=HOME:;;${c.address ?? ''};${c.city ?? ''};${c.province ?? ''};${c.postalCode ?? ''};IT`);
+        if (c.gender) lines.push(`X-GENDER:${c.gender === 'M' ? 'male' : 'female'}`);
         const noteText = [c.notes, c.allergies ? `Allergie: ${c.allergies}` : ''].filter(Boolean).join(' | ');
         if (noteText) lines.push(`NOTE:${noteText}`);
         if (c.tags.length) lines.push(`CATEGORIES:${c.tags.join(',')}`);
         if (c.loyaltyPoints) lines.push(`X-LOYALTY-POINTS:${c.loyaltyPoints}`);
+        if (c.acquisitionSource) lines.push(`X-ACQUISITION-SOURCE:${c.acquisitionSource}`);
         lines.push('END:VCARD');
         return lines.join('\r\n');
       }).join('\r\n');
@@ -234,10 +312,12 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
       const esc = (s: string) => (s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
       content = `<?xml version="1.0" encoding="UTF-8"?>\n<clienti>\n` +
         list.map(c =>
-          `  <cliente>\n    <nome>${esc(c.firstName)}</nome>\n    <cognome>${esc(c.lastName)}</cognome>\n` +
+          `  <cliente>\n    <nome>${esc(c.firstName)}</nome>\n    <cognome>${esc(c.lastName)}</cognome>\n    <sesso>${esc(c.gender ?? '')}</sesso>\n` +
           `    <telefono>${esc(c.phone)}</telefono>\n    <email>${esc(c.email)}</email>\n` +
-          `    <dataNascita>${esc(c.birthDate)}</dataNascita>\n    <note>${esc(c.notes)}</note>\n` +
-          `    <allergie>${esc(c.allergies)}</allergie>\n    <tag>${c.tags.map(t => `<item>${esc(t)}</item>`).join('')}</tag>\n` +
+          `    <dataNascita>${esc(c.birthDate)}</dataNascita>\n` +
+          `    <indirizzo>${esc(c.address ?? '')}</indirizzo>\n    <citta>${esc(c.city ?? '')}</citta>\n    <provincia>${esc(c.province ?? '')}</provincia>\n    <cap>${esc(c.postalCode ?? '')}</cap>\n` +
+          `    <fonteAcquisizione>${esc(c.acquisitionSource ?? '')}</fonteAcquisizione>\n    <dataAcquisizione>${esc(c.acquisitionDate ?? '')}</dataAcquisizione>\n` +
+          `    <note>${esc(c.notes)}</note>\n    <allergie>${esc(c.allergies)}</allergie>\n    <tag>${c.tags.map(t => `<item>${esc(t)}</item>`).join('')}</tag>\n` +
           `    <puntiFedelta>${c.loyaltyPoints}</puntiFedelta>\n    <gdprConsent>${c.gdprConsent}</gdprConsent>\n` +
           `    <gdprDate>${esc(c.gdprDate)}</gdprDate>\n    <dataCreazione>${esc(c.createdAt)}</dataCreazione>\n  </cliente>`
         ).join('\n') + '\n</clienti>';
@@ -272,6 +352,13 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
           phone: String(r.telefono ?? r.phone ?? '').trim(),
           email: String(r.email ?? '').trim().toLowerCase(),
           birthDate: String(r.dataNascita ?? r.birthDate ?? '').trim(),
+          gender: (['M','F'].includes(String(r.sesso ?? r.gender ?? '').toUpperCase()) ? String(r.sesso ?? r.gender ?? '').toUpperCase() : '') as ClientGender,
+          address: String(r.indirizzo ?? r.address ?? '').trim(),
+          city: String(r.citta ?? r.city ?? '').trim(),
+          province: String(r.provincia ?? r.province ?? '').trim(),
+          postalCode: String(r.cap ?? r.postalCode ?? '').trim(),
+          acquisitionSource: (String(r.fonteAcquisizione ?? r.acquisitionSource ?? '').trim() || '') as AcquisitionSource,
+          acquisitionDate: String(r.dataAcquisizione ?? r.acquisitionDate ?? '').trim(),
           notes: String(r.note ?? r.notes ?? '').trim(),
           allergies: String(r.allergie ?? r.allergies ?? '').trim(),
           tags: Array.isArray(r.tag) ? (r.tag as string[]) : Array.isArray(r.tags) ? (r.tags as string[]) : [],
@@ -294,10 +381,17 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
           const bdayFmt = bday.length === 8 ? `${bday.slice(0,4)}-${bday.slice(4,6)}-${bday.slice(6,8)}` : bday;
           const cats = get('CATEGORIES');
           const lm = block.match(/^X-LOYALTY-POINTS[^:]*:(\d+)$/im);
+          const genderRaw = get('X-GENDER').toLowerCase();
+          const adrParts = get('ADR').split(';');
           return {
             firstName: finalFirst, lastName: finalLast,
             phone: get('TEL'), email: get('EMAIL'),
             birthDate: bdayFmt, notes: get('NOTE'),
+            gender: (genderRaw === 'male' ? 'M' : genderRaw === 'female' ? 'F' : '') as ClientGender,
+            address: adrParts[2]?.trim() ?? '', city: adrParts[3]?.trim() ?? '',
+            province: adrParts[4]?.trim() ?? '', postalCode: adrParts[5]?.trim() ?? '',
+            acquisitionSource: (get('X-ACQUISITION-SOURCE') || '') as AcquisitionSource,
+            acquisitionDate: '',
             allergies: '', tags: cats ? cats.split(',').map(t => t.trim()).filter(Boolean) : [],
             loyaltyPoints: lm ? Number(lm[1]) : 0, gdprConsent: false, gdprDate: '',
           };
@@ -309,8 +403,13 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
         const txt = (el: Element, tag: string) => el.querySelector(tag)?.textContent?.trim() ?? '';
         parsed = items.map(el => ({
           firstName: txt(el, 'nome'), lastName: txt(el, 'cognome'),
+          gender: (['M','F'].includes(txt(el,'sesso').toUpperCase()) ? txt(el,'sesso').toUpperCase() : '') as ClientGender,
           phone: txt(el, 'telefono'), email: txt(el, 'email'),
-          birthDate: txt(el, 'dataNascita'), notes: txt(el, 'note'),
+          birthDate: txt(el, 'dataNascita'),
+          address: txt(el, 'indirizzo'), city: txt(el, 'citta'), province: txt(el, 'provincia'), postalCode: txt(el, 'cap'),
+          acquisitionSource: (txt(el, 'fonteAcquisizione') || '') as AcquisitionSource,
+          acquisitionDate: txt(el, 'dataAcquisizione'),
+          notes: txt(el, 'note'),
           allergies: txt(el, 'allergie'),
           tags: Array.from(el.querySelectorAll('tag item')).map(i => i.textContent?.trim() ?? '').filter(Boolean),
           loyaltyPoints: Number(txt(el, 'puntiFedelta')) || 0,
@@ -339,16 +438,25 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
         const col = (...ns: string[]) => { for (const n of ns) { const i = headers.indexOf(n); if (i >= 0) return i; } return -1; };
         const iFirst = col('nome', 'firstname'); const iLast = col('cognome', 'lastname');
         const iPhone = col('telefono', 'phone', 'tel'); const iEmail = col('email');
-        const iBday = col('datanascita', 'birthdate'); const iNotes = col('note', 'notes');
+        const iBday = col('datanascita', 'birthdate'); const iGender = col('sesso', 'gender');
+        const iAddr = col('indirizzo', 'address'); const iCity = col('citta', 'city');
+        const iProv = col('provincia', 'province'); const iCap = col('cap', 'postalcode');
+        const iAcqSrc = col('fonteacquisizione', 'acquisitionsource'); const iAcqDate = col('dataacquisizione', 'acquisitiondate');
+        const iNotes = col('note', 'notes');
         const iAller = col('allergie', 'allergies'); const iTags = col('tag', 'tags');
         const iLoy = col('puntifedelta', 'loyaltypoints', 'punti'); const iGdpr = col('consensogdpr', 'gdprconsent', 'gdpr');
         parsed = lines.slice(1).map(line => {
           const cols = parseRow(line);
           const get = (i: number) => (i >= 0 ? (cols[i] ?? '').trim() : '');
+          const rawG = get(iGender).toUpperCase();
           return {
             firstName: get(iFirst), lastName: get(iLast), phone: get(iPhone),
-            email: get(iEmail).toLowerCase(), birthDate: get(iBday), notes: get(iNotes),
-            allergies: get(iAller), tags: get(iTags).split('|').map(t => t.trim()).filter(Boolean),
+            email: get(iEmail).toLowerCase(), birthDate: get(iBday),
+            gender: (['M','F'].includes(rawG) ? rawG : '') as ClientGender,
+            address: get(iAddr), city: get(iCity), province: get(iProv), postalCode: get(iCap),
+            acquisitionSource: (get(iAcqSrc) || '') as AcquisitionSource, acquisitionDate: get(iAcqDate),
+            notes: get(iNotes), allergies: get(iAller),
+            tags: get(iTags).split('|').map(t => t.trim()).filter(Boolean),
             loyaltyPoints: Number(get(iLoy)) || 0,
             gdprConsent: ['sì', 'si', 'yes', 'true', '1'].includes(get(iGdpr).toLowerCase()),
             gdprDate: '',
@@ -389,10 +497,12 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
   return (
     <div className="flex flex-col md:flex-row gap-4 md:gap-5 h-full" style={{ minHeight: 0 }}>
       {/* ── LEFT: list ── */}
-      <div className={`flex flex-col gap-4 md:w-80 md:shrink-0${selectedId ? ' hidden md:flex' : ''}`}>
+      <div className={`flex flex-col gap-3 md:w-80 md:shrink-0${selectedId ? ' hidden md:flex' : ''}`}>
         <div>
           <h1 className="text-2xl font-bold text-white">Clienti</h1>
-          <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>{clients.length} clienti registrati</p>
+          <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>
+            {filtered.length !== clients.length ? `${filtered.length} / ${clients.length} clienti` : `${clients.length} clienti registrati`}
+          </p>
         </div>
 
         <div className="flex gap-2">
@@ -402,14 +512,109 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
           </div>
           <button onClick={openNew} style={btnPrimary} title="Nuovo cliente"><UserPlus size={15} /></button>
         </div>
+
+        {/* Filter toggle bar */}
         <div className="flex gap-2">
-          <button onClick={() => setShowExport(true)} style={{ ...btnPrimary, flex: 1, justifyContent: 'center', fontSize: '12px', padding: '6px 10px' }}>
-            <Download size={13} /> Esporta
+          <button onClick={() => setShowFilters(v => !v)}
+            style={{ ...btnPrimary, flex: 1, justifyContent: 'center', fontSize: '12px', padding: '6px 10px', position: 'relative' }}>
+            <Search size={13} />
+            Filtri{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
           </button>
-          <button onClick={() => { setImportData(null); setImportError(''); setShowImport(true); }} style={{ ...btnPrimary, flex: 1, justifyContent: 'center', fontSize: '12px', padding: '6px 10px' }}>
-            <Upload size={13} /> Importa
-          </button>
+          <button onClick={() => setShowExport(true)} style={{ ...btnPrimary, fontSize: '12px', padding: '6px 10px' }}><Download size={13} /></button>
+          <button onClick={() => { setImportData(null); setImportError(''); setShowImport(true); }} style={{ ...btnPrimary, fontSize: '12px', padding: '6px 10px' }}><Upload size={13} /></button>
         </div>
+
+        {/* Filter panel */}
+        {showFilters && (
+          <div className="rounded-xl p-3 space-y-3" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+            {/* Sesso */}
+            <div>
+              <p style={{ ...labelStyle, marginBottom: '6px' }}>Sesso</p>
+              <div className="flex gap-3">
+                {(['M', 'F'] as const).map(g => (
+                  <label key={g} className="flex items-center gap-1.5 text-sm cursor-pointer" style={{ color: 'var(--text-2)' }}>
+                    <input type="checkbox" checked={fGender[g]} onChange={e => setFGender(p => ({ ...p, [g]: e.target.checked }))} />
+                    {g === 'M' ? 'Maschio' : 'Femmina'}
+                  </label>
+                ))}
+              </div>
+            </div>
+            {/* Fonte acquisizione */}
+            <div>
+              <p style={labelStyle}>Fonte di acquisizione</p>
+              <select value={fAcqSource} onChange={e => setFAcqSource(e.target.value as AcquisitionSource)} style={{ ...inputStyle, fontSize: '12px' }}>
+                {ACQUISITION_SOURCES.map(s => <option key={s.value} value={s.value}>{s.value === '' ? 'Tutte le fonti' : s.label}</option>)}
+              </select>
+            </div>
+            {/* Città / Provincia */}
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <p style={labelStyle}>Città</p>
+                <input value={fCity} onChange={e => setFCity(e.target.value)} placeholder="es. Roma" style={{ ...inputStyle, fontSize: '12px' }} />
+              </div>
+              <div>
+                <p style={labelStyle}>Provincia</p>
+                <input value={fProvince} onChange={e => setFProvince(e.target.value)} placeholder="es. RM" maxLength={2} style={{ ...inputStyle, fontSize: '12px', textTransform: 'uppercase' }} />
+              </div>
+            </div>
+            {/* Tag */}
+            <div>
+              <p style={labelStyle}>Etichetta (tag)</p>
+              <input value={fTagSearch} onChange={e => setFTagSearch(e.target.value)} placeholder="es. VIP" style={{ ...inputStyle, fontSize: '12px' }} />
+            </div>
+            {/* Checkboxes */}
+            <div className="flex flex-col gap-1.5">
+              {[
+                { key: 'phone', label: 'Con cellulare', val: fHasPhone, set: setFHasPhone },
+                { key: 'email', label: 'Con email', val: fHasEmail, set: setFHasEmail },
+              ].map(({ key, label, val, set }) => (
+                <label key={key} className="flex items-center gap-1.5 text-sm cursor-pointer" style={{ color: 'var(--text-2)' }}>
+                  <input type="checkbox" checked={val} onChange={e => set(e.target.checked)} />{label}
+                </label>
+              ))}
+            </div>
+            {/* GDPR */}
+            <div>
+              <p style={labelStyle}>Trattamento dati</p>
+              <select value={fHasGdpr} onChange={e => setFHasGdpr(e.target.value as 'all' | 'yes' | 'no')} style={{ ...inputStyle, fontSize: '12px' }}>
+                <option value="all">Tutti</option>
+                <option value="yes">Con consenso</option>
+                <option value="no">Senza consenso</option>
+              </select>
+            </div>
+            {/* Data acquisizione */}
+            <div>
+              <p style={labelStyle}>Data di acquisizione</p>
+              <div className="grid grid-cols-2 gap-2">
+                <input type="date" value={fAcqFrom} onChange={e => setFAcqFrom(e.target.value)} style={{ ...inputStyle, fontSize: '12px' }} />
+                <input type="date" value={fAcqTo} onChange={e => setFAcqTo(e.target.value)} style={{ ...inputStyle, fontSize: '12px' }} />
+              </div>
+            </div>
+            {/* Compleanno */}
+            <div>
+              <p style={labelStyle}>Compleanno (mese/giorno)</p>
+              <div className="grid grid-cols-2 gap-2">
+                <input type="date" value={fBdayFrom} onChange={e => setFBdayFrom(e.target.value)} placeholder="da" style={{ ...inputStyle, fontSize: '12px' }} />
+                <input type="date" value={fBdayTo} onChange={e => setFBdayTo(e.target.value)} placeholder="a" style={{ ...inputStyle, fontSize: '12px' }} />
+              </div>
+            </div>
+            {/* Ordinamento */}
+            <div>
+              <p style={labelStyle}>Ordine</p>
+              <select value={fSortOrder} onChange={e => setFSortOrder(e.target.value as 'az' | 'za' | 'newest' | 'oldest')} style={{ ...inputStyle, fontSize: '12px' }}>
+                <option value="az">Alfabetico A→Z</option>
+                <option value="za">Alfabetico Z→A</option>
+                <option value="newest">Prima i più recenti</option>
+                <option value="oldest">Prima i più vecchi</option>
+              </select>
+            </div>
+            {activeFilterCount > 0 && (
+              <button onClick={resetFilters} className="w-full text-xs py-1.5 rounded-lg" style={{ color: '#f59e0b', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', cursor: 'pointer' }}>
+                Reimposta filtri
+              </button>
+            )}
+          </div>
+        )}
 
         <div className="flex flex-col gap-2 overflow-y-auto" style={{ flex: 1 }}>
           {filtered.length === 0 && <p style={{ color: 'var(--border-light)', fontSize: '13px' }}>Nessun cliente trovato.</p>}
@@ -490,6 +695,7 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
                     <Row label="Telefono" value={selected.phone || '—'} />
                     <Row label="Email" value={selected.email || '—'} />
                     <Row label="Data di nascita" value={selected.birthDate ? format(parseISO(selected.birthDate), 'dd/MM/yyyy') : '—'} />
+                    <Row label="Sesso" value={selected.gender === 'M' ? 'Maschio' : selected.gender === 'F' ? 'Femmina' : '—'} />
                   </div>
                 </div>
 
@@ -498,8 +704,21 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
                   <div className="space-y-2 text-sm">
                     <Row label="Punti fedeltà" value={String(selected.loyaltyPoints)} highlight="#f59e0b" />
                     <Row label="GDPR" value={selected.gdprConsent ? `✓ Consenso del ${selected.gdprDate ? format(parseISO(selected.gdprDate), 'dd/MM/yyyy') : '—'}` : '✗ Non fornito'} highlight={selected.gdprConsent ? '#22c55e' : '#ef4444'} />
+                    {selected.acquisitionSource && <Row label="Fonte" value={ACQUISITION_SOURCES.find(s => s.value === selected.acquisitionSource)?.label ?? selected.acquisitionSource} />}
+                    {selected.acquisitionDate && <Row label="Acquisito il" value={format(parseISO(selected.acquisitionDate), 'dd/MM/yyyy')} />}
                   </div>
                 </div>
+
+                {(selected.address || selected.city || selected.province || selected.postalCode) && (
+                  <div style={card}>
+                    <h3 className="text-sm font-semibold text-white mb-3">Indirizzo</h3>
+                    <div className="space-y-2 text-sm">
+                      {selected.address && <Row label="Via" value={selected.address} />}
+                      {(selected.city || selected.province) && <Row label="Città" value={[selected.city, selected.province].filter(Boolean).join(' (')+`${selected.province ? ')' : ''}`} />}
+                      {selected.postalCode && <Row label="CAP" value={selected.postalCode} />}
+                    </div>
+                  </div>
+                )}
 
                 {selected.allergies && (
                   <div className="col-span-2 rounded-xl px-4 py-3 flex gap-2 items-start" style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)' }}>
@@ -600,16 +819,39 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
       {showForm && (
         <Modal title={editingClient ? 'Modifica Cliente' : 'Nuovo Cliente'} onClose={() => setShowForm(false)}>
           <div className="grid grid-cols-2 gap-3">
+            {/* Anagrafica base */}
             <Field label="Nome *"><input value={form.firstName} onChange={e => setForm(p => ({ ...p, firstName: e.target.value }))} style={inputStyle} /></Field>
             <Field label="Cognome"><input value={form.lastName} onChange={e => setForm(p => ({ ...p, lastName: e.target.value }))} style={inputStyle} /></Field>
             <Field label="Telefono"><input value={form.phone} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))} style={inputStyle} /></Field>
             <Field label="Email"><input type="email" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} style={inputStyle} /></Field>
             <Field label="Data di nascita"><input type="date" value={form.birthDate} onChange={e => setForm(p => ({ ...p, birthDate: e.target.value }))} style={inputStyle} /></Field>
+            <Field label="Sesso">
+              <select value={form.gender} onChange={e => setForm(p => ({ ...p, gender: e.target.value as ClientGender }))} style={inputStyle}>
+                <option value="">—</option>
+                <option value="M">Maschio</option>
+                <option value="F">Femmina</option>
+              </select>
+            </Field>
+            {/* Indirizzo */}
+            <div className="col-span-2"><Field label="Indirizzo"><input value={form.address} onChange={e => setForm(p => ({ ...p, address: e.target.value }))} placeholder="Via/Piazza…" style={inputStyle} /></Field></div>
+            <Field label="Città"><input value={form.city} onChange={e => setForm(p => ({ ...p, city: e.target.value }))} style={inputStyle} /></Field>
+            <div className="grid grid-cols-2 gap-2">
+              <Field label="Provincia"><input value={form.province} onChange={e => setForm(p => ({ ...p, province: e.target.value.toUpperCase().slice(0,2) }))} maxLength={2} placeholder="RM" style={inputStyle} /></Field>
+              <Field label="CAP"><input value={form.postalCode} onChange={e => setForm(p => ({ ...p, postalCode: e.target.value }))} maxLength={5} style={inputStyle} /></Field>
+            </div>
+            {/* Acquisizione */}
+            <Field label="Fonte di acquisizione">
+              <select value={form.acquisitionSource} onChange={e => setForm(p => ({ ...p, acquisitionSource: e.target.value as AcquisitionSource }))} style={inputStyle}>
+                {ACQUISITION_SOURCES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+              </select>
+            </Field>
+            <Field label="Data di acquisizione"><input type="date" value={form.acquisitionDate} onChange={e => setForm(p => ({ ...p, acquisitionDate: e.target.value }))} style={inputStyle} /></Field>
+            {/* Altri campi */}
             <Field label="Punti fedeltà"><input type="number" min={0} value={form.loyaltyPoints} onChange={e => setForm(p => ({ ...p, loyaltyPoints: Number(e.target.value) }))} style={inputStyle} /></Field>
             <div className="col-span-2"><Field label="Allergie / Controindicazioni"><textarea rows={2} value={form.allergies} onChange={e => setForm(p => ({ ...p, allergies: e.target.value }))} style={{ ...inputStyle, resize: 'vertical' }} /></Field></div>
             <div className="col-span-2"><Field label="Note generali"><textarea rows={2} value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} style={{ ...inputStyle, resize: 'vertical' }} /></Field></div>
             <div className="col-span-2">
-              <Field label="Tag">
+              <Field label="Etichette (tag)">
                 <div className="flex gap-2">
                   <input value={tagInput} onChange={e => setTagInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleAddTag())} placeholder="es. VIP, allergia nichel…" style={{ ...inputStyle, flex: 1 }} />
                   <button type="button" onClick={handleAddTag} style={{ ...btnPrimary, flexShrink: 0 }}>+</button>
