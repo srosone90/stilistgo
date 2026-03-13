@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -140,7 +140,7 @@ export default function AuthForm() {
       });
       const json = await res.json();
       if (res.status === 429) { setError(json.error); return; }
-      setSuccess(json.message || "Se l'indirizzo Ã¨ registrato, riceverai le istruzioni a breve.");
+      setSuccess(json.message || "Se l'indirizzo è registrato, riceverai le istruzioni a breve.");
       setMode('login');
     } catch {
       setError('Errore di rete. Riprova.');
@@ -256,7 +256,7 @@ export default function AuthForm() {
         </div>
       )}
 
-      {/* â”€â”€ ModalitÃ : nuova password dopo recovery link â”€â”€ */}
+      {/* ── Modalità: nuova password dopo recovery link ── */}
       {mode === 'reset' && (
         <div className="space-y-4">
           <div>
@@ -264,7 +264,7 @@ export default function AuthForm() {
             <input
               type="password"
               minLength={6}
-              placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+              placeholder="••••••••"
               value={newPassword}
               onChange={e => setNewPassword(e.target.value)}
               style={inputStyle}
@@ -276,7 +276,7 @@ export default function AuthForm() {
             <input
               type="password"
               minLength={6}
-              placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+              placeholder="••••••••"
               value={newPasswordConfirm}
               onChange={e => setNewPasswordConfirm(e.target.value)}
               style={inputStyle}
@@ -295,7 +295,7 @@ export default function AuthForm() {
         </div>
       )}
 
-      {/* â”€â”€ ModalitÃ : login / register / forgot â”€â”€ */}
+      {/* ── Modalità: login / register / forgot ── */}
       {mode !== 'reset' && (
         <form onSubmit={handleSubmit} className="space-y-4">
           {mode === 'register' && (
@@ -346,7 +346,7 @@ export default function AuthForm() {
                 type="password"
                 required
                 minLength={6}
-                placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+                placeholder="••••••••"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 style={inputStyle}
@@ -393,9 +393,9 @@ export default function AuthForm() {
             {mode === 'login' ? (
               <>Non hai un account? <span style={{ color: 'var(--accent-light)' }}>Registrati</span></>
             ) : mode === 'register' ? (
-              <>Hai giÃ  un account? <span style={{ color: 'var(--accent-light)' }}>Accedi</span></>
+              <>Hai già un account? <span style={{ color: 'var(--accent-light)' }}>Accedi</span></>
             ) : (
-              <span style={{ color: 'var(--accent-light)' }}>â† Torna al login</span>
+              <span style={{ color: 'var(--accent-light)' }}>← Torna al login</span>
             )}
           </button>
         </div>
@@ -408,11 +408,10 @@ export default function AuthForm() {
             href="/admin"
             style={{ fontSize: '10px', color: '#1e1e2a', textDecoration: 'none', letterSpacing: '0.05em' }}
           >
-            Â·Â·Â·
+            ···
           </a>
         </div>
       )}
     </div>
   );
 }
-
