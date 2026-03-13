@@ -5,7 +5,7 @@ import { useSalon } from '@/context/SalonContext';
 import { Appointment, AppointmentStatus, STATUS_LABELS } from '@/types/salon';
 import { format, parseISO, addDays, startOfWeek, isSameDay, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, addMonths } from 'date-fns';
 import { it } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Plus, X, UserPlus, LayoutGrid } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, X, UserPlus, ZoomIn, ZoomOut } from 'lucide-react';
 
 const inputStyle: React.CSSProperties = { background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '10px', padding: '9px 13px', color: 'var(--text)', fontSize: '13px', outline: 'none', width: '100%' };
 const labelStyle: React.CSSProperties = { fontSize: '12px', color: 'var(--muted)', marginBottom: '4px', display: 'block' };
@@ -29,7 +29,7 @@ function minutesToTime(m: number) {
   const mm = (clamped % 60).toString().padStart(2, '0');
   return `${h}:${mm}`;
 }
-const HOUR_PX = 64;
+const HOUR_PX_BASE = 80; // base height per hour at zoom 1.0 — 15-min slot = 20px
 
 export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: number; onGoToCash?: (clientId: string, appointmentId: string) => void }) {
   const {
@@ -47,6 +47,60 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
   const [showQuickClient, setShowQuickClient] = useState(false);
   const [quickClient, setQuickClient] = useState(EMPTY_QUICK_CLIENT);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  // ─── Zoom (mouse wheel + pinch) ───────────────────────────────────────────
+  const [zoom, setZoom] = useState(1.0);
+  const HOUR_PX = HOUR_PX_BASE * zoom;
+  const SLOT_PX = HOUR_PX / 4; // 15-min slot height
+  const hourPxRef = useRef(HOUR_PX); // kept in sync — used by drag/resize event closures
+  useEffect(() => { hourPxRef.current = HOUR_PX; }, [HOUR_PX]);
+  const dayGridRef = useRef<HTMLDivElement>(null);
+  const pinchRef = useRef<{ dist: number } | null>(null);
+
+  const clampZoom = (v: number) => Math.min(3.0, Math.max(0.5, v));
+
+  const handleWheelZoom = useCallback((e: WheelEvent) => {
+    if (!e.ctrlKey && !e.metaKey) return;
+    e.preventDefault();
+    setZoom(z => clampZoom(z - e.deltaY * 0.002));
+  }, []);
+
+  const handleTouchStart = useCallback((e: TouchEvent) => {
+    if (e.touches.length === 2) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      pinchRef.current = { dist: Math.hypot(dx, dy) };
+    }
+  }, []);
+
+  const handleTouchMove = useCallback((e: TouchEvent) => {
+    if (e.touches.length === 2 && pinchRef.current) {
+      e.preventDefault();
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const newDist = Math.hypot(dx, dy);
+      const ratio = newDist / pinchRef.current.dist;
+      pinchRef.current.dist = newDist;
+      setZoom(z => clampZoom(z * ratio));
+    }
+  }, []);
+
+  const handleTouchEnd = useCallback(() => { pinchRef.current = null; }, []);
+
+  useEffect(() => {
+    const el = dayGridRef.current;
+    if (!el) return;
+    el.addEventListener('wheel', handleWheelZoom, { passive: false });
+    el.addEventListener('touchstart', handleTouchStart, { passive: true });
+    el.addEventListener('touchmove', handleTouchMove, { passive: false });
+    el.addEventListener('touchend', handleTouchEnd, { passive: true });
+    return () => {
+      el.removeEventListener('wheel', handleWheelZoom);
+      el.removeEventListener('touchstart', handleTouchStart);
+      el.removeEventListener('touchmove', handleTouchMove);
+      el.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, [handleWheelZoom, handleTouchStart, handleTouchMove, handleTouchEnd]);
 
   useEffect(() => {
     if (newTrigger && newTrigger > 0) {
@@ -106,7 +160,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
 
   // If clicking under an appointment, start after it
   function resolveStartTime(dayStr: string, operatorId: string, clickedHour: number): string {
-    const clickedMin = clickedHour * 60;
+    const clickedMin = Math.round(clickedHour * 60 / 15) * 15; // snap to 15-min grid
     const dayAppts = appointments.filter(a => a.date === dayStr && a.operatorId === operatorId);
     let lastEnd = clickedMin;
     for (const a of dayAppts) {
@@ -197,7 +251,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
       // RESIZE
       if (resizeRef.current) {
         const delta = e.clientY - resizeRef.current.startY;
-        const deltaMin = Math.round((delta / HOUR_PX) * 60 / 15) * 15;
+        const deltaMin = Math.round((delta / hourPxRef.current) * 60 / 15) * 15;
         const newEnd = Math.max(resizeRef.current.origStartMin + 15, resizeRef.current.origEndMin + deltaMin);
         setResizingEndTimeState(minutesToTime(newEnd));
         return;
@@ -207,7 +261,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
         const totalDelta = Math.abs(e.clientX - dragRef.current.startX) + Math.abs(e.clientY - dragRef.current.startY);
         if (totalDelta > 5) wasDraggedRef.current = true;
         const deltaY = e.clientY - dragRef.current.startY;
-        const deltaMin = Math.round(deltaY / HOUR_PX * 60 / 15) * 15;
+        const deltaMin = Math.round(deltaY / hourPxRef.current * 60 / 15) * 15;
         const newStartMin = Math.max(openHour * 60, dragRef.current.origStartMin + deltaMin);
         const newEndMin = newStartMin + dragRef.current.durationMin;
         let newDayIdx = dragRef.current.dayIndex;
@@ -304,6 +358,12 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
           <button onClick={() => navigate(-1)} style={{ ...btnPrimary, padding: '7px 10px' }}><ChevronLeft size={16} /></button>
           <button onClick={() => setCurrentDate(new Date())} style={{ ...btnPrimary, fontSize: '12px' }}>Oggi</button>
           <button onClick={() => navigate(1)} style={{ ...btnPrimary, padding: '7px 10px' }}><ChevronRight size={16} /></button>
+          {view === 'day' && (
+            <>
+              <button onClick={() => setZoom(z => clampZoom(z - 0.25))} style={{ ...btnPrimary, padding: '7px 10px' }} title="Zoom out"><ZoomOut size={15} /></button>
+              <button onClick={() => setZoom(z => clampZoom(z + 0.25))} style={{ ...btnPrimary, padding: '7px 10px' }} title="Zoom in"><ZoomIn size={15} /></button>
+            </>
+          )}
           <button onClick={() => openNew()} style={btnPrimary}><Plus size={14} /> Nuovo</button>
         </div>
       </div>
@@ -382,7 +442,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
 
       {/* ─── DAY VIEW: one column per operator ───────────────────────────── */}
       {view === 'day' && (
-      <div className="flex-1 overflow-auto rounded-2xl" style={{ border: '1px solid var(--border)', background: 'var(--bg-card)' }}>
+      <div ref={dayGridRef} className="flex-1 overflow-auto rounded-2xl" style={{ border: '1px solid var(--border)', background: 'var(--bg-card)' }}>
         {/* Sticky header: date on left, operator columns */}
         <div className="flex sticky top-0 z-10" style={{ background: '#18181f', borderBottom: '1px solid var(--border)' }}>
           <div style={{ width: 56, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -400,7 +460,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
               </div>
             </div>
           ))}
-          {/* Unassigned column header — shown only when there are unassigned appointments today */}
+          {/* Unassigned column header */}
           {(() => {
             const dayStr = format(currentDate, 'yyyy-MM-dd');
             const activeOpIds = new Set(activeOperators.map(o => o.id));
@@ -417,29 +477,32 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
         </div>
         {/* Time grid */}
         <div ref={gridRef} className="flex" style={{ minHeight: hours.length * HOUR_PX }}>
-          {/* Hour labels */}
+          {/* Hour + 15-min labels */}
           <div style={{ width: 56, flexShrink: 0 }}>
-            {hours.map(h => (
-              <div key={h} style={{ height: HOUR_PX, borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'flex-start', paddingTop: 4, paddingLeft: 8 }}>
-                <span style={{ fontSize: 11, color: 'var(--border-light)' }}>{String(h).padStart(2, '0')}:00</span>
+            {hours.map(h => [0, 1, 2, 3].map(q => (
+              <div key={`${h}-${q}`} style={{ height: SLOT_PX, borderBottom: q === 3 ? '1px solid var(--border)' : '1px dashed rgba(255,255,255,0.04)', display: 'flex', alignItems: 'flex-start', paddingTop: 2, paddingLeft: 8 }}>
+                {q === 0 && <span style={{ fontSize: 11, color: 'var(--border-light)' }}>{String(h).padStart(2, '0')}:00</span>}
+                {q === 2 && <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)' }}>{String(h).padStart(2, '0')}:30</span>}
               </div>
-            ))}
+            )))}
           </div>
           {/* Operator columns */}
           {activeOperators.map(op => {
             const dayStr = format(currentDate, 'yyyy-MM-dd');
-            // Show appointment in this column based on its effective operatorId while dragging
             const colAppts = filteredAppts.filter(a => {
               const effectiveOp = draggingId === a.id && draggingPos?.operatorId ? draggingPos.operatorId : a.operatorId;
               return a.date === dayStr && effectiveOp === op.id;
             });
             return (
               <div key={op.id} className="flex-1 relative" style={{ borderLeft: '1px solid var(--border)', minWidth: 0 }}>
-                {hours.map(h => (
-                  <div key={h} style={{ height: HOUR_PX, borderBottom: '1px solid #1e1e2e' }}
-                    onClick={() => openNew(dayStr, op.id, resolveStartTime(dayStr, op.id, h))}
+                {/* 15-min slot grid */}
+                {hours.map(h => [0, 1, 2, 3].map(q => (
+                  <div key={`${h}-${q}`}
+                    style={{ height: SLOT_PX, borderBottom: q === 3 ? '1px solid #1e1e2e' : '1px dashed rgba(255,255,255,0.03)' }}
+                    onClick={() => openNew(dayStr, op.id, resolveStartTime(dayStr, op.id, h + q * 0.25))}
                     className="cursor-pointer hover:bg-white/[0.02] transition-colors" />
-                ))}
+                )))}
+                {/* Appointments — split multi-service into visual sub-blocks */}
                 {colAppts.map(a => {
                   const isDragging = draggingId === a.id;
                   const effectiveStart = isDragging && draggingPos ? draggingPos.startTime : a.startTime;
@@ -448,21 +511,42 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                   const effectiveEnd = resizingId === a.id ? resizingEndTime : effectiveEndDrag;
                   const endMin = timeToMinutes(effectiveEnd) - START_MIN;
                   const top = (startMin / 60) * HOUR_PX;
-                  const height = Math.max(((endMin - startMin) / 60) * HOUR_PX, 28);
+                  const totalHeight = Math.max(((endMin - startMin) / 60) * HOUR_PX, 28);
                   const color = op.color || '#6366f1';
                   const client = clients.find(c => c.id === a.clientId);
-                  const svcNames = a.serviceIds.map(sid => services.find(s => s.id === sid)?.name).filter(Boolean).join(', ');
+                  const apptSvcs = a.serviceIds.map(sid => services.find(s => s.id === sid)).filter(Boolean) as (typeof services[0])[];
+                  const totalSvcMin = apptSvcs.reduce((s, sv) => s + sv.duration, 0);
                   return (
                     <div key={a.id}
                       onMouseDown={e => handleDragStart(e, a)}
                       onClick={e => { if (wasDraggedRef.current || draggingId || resizingId) { e.stopPropagation(); return; } e.stopPropagation(); openEdit(a); }}
-                      className="absolute left-1 right-1 rounded-lg px-2 py-1 hover:brightness-110 transition-all overflow-hidden"
-                      style={{ top, height, background: `${color}22`, border: `1px solid ${color}55`, zIndex: isDragging ? 10 : 2, opacity: isDragging ? 0.7 : 1, cursor: isDragging ? 'grabbing' : 'grab', userSelect: 'none' }}>
-                      <p className="text-xs font-semibold truncate" style={{ color }}>
-                        {a.isBlock ? '🔒 ' + (a.blockReason || 'Blocco') : (client ? `${client.firstName} ${client.lastName}` : '—')}
-                      </p>
-                      <p className="text-xs" style={{ color: 'var(--text-3)', fontSize: 10 }}>{effectiveStart}–{effectiveEnd}</p>
-                      {svcNames && <p className="truncate" style={{ color: 'var(--muted)', fontSize: 10 }}>{svcNames}</p>}
+                      className="absolute left-1 right-1 rounded-lg overflow-hidden hover:brightness-110 transition-all"
+                      style={{ top, height: totalHeight, background: `${color}22`, border: `1px solid ${color}55`, zIndex: isDragging ? 10 : 2, opacity: isDragging ? 0.7 : 1, cursor: isDragging ? 'grabbing' : 'grab', userSelect: 'none' }}>
+                      {/* Client name header */}
+                      <div className="px-2 pt-1" style={{ background: `${color}18` }}>
+                        <p className="text-xs font-semibold truncate" style={{ color }}>
+                          {a.isBlock ? '🔒 ' + (a.blockReason || 'Blocco') : (client ? `${client.firstName} ${client.lastName}` : '—')}
+                        </p>
+                        <p style={{ color: 'var(--text-3)', fontSize: 10 }}>{effectiveStart}–{effectiveEnd}</p>
+                      </div>
+                      {/* Service sub-blocks — one per service, proportionally sized */}
+                      {!a.isBlock && apptSvcs.length > 1 ? (
+                        <div className="flex flex-col" style={{ flex: 1 }}>
+                          {apptSvcs.map((sv, si) => {
+                            const proportion = totalSvcMin > 0 ? sv.duration / totalSvcMin : 1 / apptSvcs.length;
+                            const subH = Math.max((totalHeight - 30) * proportion, 12);
+                            // Cycle slightly different hues for multi-service
+                            const hueShift = (si * 25) % 60;
+                            return (
+                              <div key={sv.id} style={{ height: subH, borderTop: `1px solid ${color}33`, padding: '1px 8px', overflow: 'hidden', background: si % 2 === 1 ? `${color}10` : 'transparent', flexShrink: 0 }}>
+                                <span style={{ fontSize: 9, color: color, opacity: 0.85 + hueShift * 0.001 }} className="truncate block">{sv.name} · {sv.duration}&apos;</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (!a.isBlock && apptSvcs.length === 1 && (
+                        <div className="px-2" style={{ fontSize: 10, color: 'var(--muted)' }}>{apptSvcs[0].name} · {apptSvcs[0].duration}&apos;</div>
+                      ))}
                       <div onMouseDown={e => handleResizeStart(e, a)}
                         className="absolute bottom-0 left-0 right-0 flex items-center justify-center"
                         style={{ height: 10, cursor: 'ns-resize', background: `${color}30` }}>
@@ -474,7 +558,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
               </div>
             );
           })}
-          {/* Unassigned column — appointments with no matching active operator */}
+          {/* Unassigned column */}
           {(() => {
             const dayStr = format(currentDate, 'yyyy-MM-dd');
             const activeOpIds = new Set(activeOperators.map(o => o.id));
@@ -482,11 +566,12 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
             if (unassigned.length === 0) return null;
             return (
               <div className="flex-1 relative" style={{ borderLeft: '1px solid var(--border)', minWidth: 0 }}>
-                {hours.map(h => (
-                  <div key={h} style={{ height: HOUR_PX, borderBottom: '1px solid #1e1e2e' }}
-                    onClick={() => openNew(dayStr, '', resolveStartTime(dayStr, '', h))}
+                {hours.map(h => [0, 1, 2, 3].map(q => (
+                  <div key={`${h}-${q}`}
+                    style={{ height: SLOT_PX, borderBottom: q === 3 ? '1px solid #1e1e2e' : '1px dashed rgba(255,255,255,0.03)' }}
+                    onClick={() => openNew(dayStr, '', resolveStartTime(dayStr, '', h + q * 0.25))}
                     className="cursor-pointer hover:bg-white/[0.02] transition-colors" />
-                ))}
+                )))}
                 {unassigned.map(a => {
                   const isDragging = draggingId === a.id;
                   const effectiveStart = isDragging && draggingPos ? draggingPos.startTime : a.startTime;
@@ -495,21 +580,38 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                   const effectiveEnd = resizingId === a.id ? resizingEndTime : effectiveEndDrag;
                   const endMin = timeToMinutes(effectiveEnd) - START_MIN;
                   const top = (startMin / 60) * HOUR_PX;
-                  const height = Math.max(((endMin - startMin) / 60) * HOUR_PX, 28);
+                  const totalHeight = Math.max(((endMin - startMin) / 60) * HOUR_PX, 28);
                   const color = '#71717a';
                   const client = clients.find(c => c.id === a.clientId);
-                  const svcNames = a.serviceIds.map(sid => services.find(s => s.id === sid)?.name).filter(Boolean).join(', ');
+                  const apptSvcs = a.serviceIds.map(sid => services.find(s => s.id === sid)).filter(Boolean) as (typeof services[0])[];
+                  const totalSvcMin = apptSvcs.reduce((s, sv) => s + sv.duration, 0);
                   return (
                     <div key={a.id}
                       onMouseDown={e => handleDragStart(e, a)}
                       onClick={e => { if (wasDraggedRef.current || draggingId || resizingId) { e.stopPropagation(); return; } e.stopPropagation(); openEdit(a); }}
-                      className="absolute left-1 right-1 rounded-lg px-2 py-1 hover:brightness-110 transition-all overflow-hidden"
-                      style={{ top, height, background: 'rgba(113,113,122,0.15)', border: '1px solid rgba(113,113,122,0.4)', zIndex: isDragging ? 10 : 2, opacity: isDragging ? 0.7 : 1, cursor: isDragging ? 'grabbing' : 'grab', userSelect: 'none' }}>
-                      <p className="text-xs font-semibold truncate" style={{ color }}>
-                        {a.isBlock ? '🔒 ' + (a.blockReason || 'Blocco') : (client ? `${client.firstName} ${client.lastName}` : '—')}
-                      </p>
-                      <p className="text-xs" style={{ color: 'var(--text-3)', fontSize: 10 }}>{effectiveStart}–{effectiveEnd}</p>
-                      {svcNames && <p className="truncate" style={{ color: 'var(--muted)', fontSize: 10 }}>{svcNames}</p>}
+                      className="absolute left-1 right-1 rounded-lg overflow-hidden hover:brightness-110 transition-all"
+                      style={{ top, height: totalHeight, background: 'rgba(113,113,122,0.15)', border: '1px solid rgba(113,113,122,0.4)', zIndex: isDragging ? 10 : 2, opacity: isDragging ? 0.7 : 1, cursor: isDragging ? 'grabbing' : 'grab', userSelect: 'none' }}>
+                      <div className="px-2 pt-1">
+                        <p className="text-xs font-semibold truncate" style={{ color }}>
+                          {a.isBlock ? '🔒 ' + (a.blockReason || 'Blocco') : (client ? `${client.firstName} ${client.lastName}` : '—')}
+                        </p>
+                        <p style={{ color: 'var(--text-3)', fontSize: 10 }}>{effectiveStart}–{effectiveEnd}</p>
+                      </div>
+                      {!a.isBlock && apptSvcs.length > 1 ? (
+                        <div className="flex flex-col">
+                          {apptSvcs.map((sv, si) => {
+                            const proportion = totalSvcMin > 0 ? sv.duration / totalSvcMin : 1 / apptSvcs.length;
+                            const subH = Math.max((totalHeight - 30) * proportion, 12);
+                            return (
+                              <div key={sv.id} style={{ height: subH, borderTop: '1px solid rgba(113,113,122,0.2)', padding: '1px 8px', overflow: 'hidden', flexShrink: 0, background: si % 2 === 1 ? 'rgba(113,113,122,0.1)' : 'transparent' }}>
+                                <span style={{ fontSize: 9, color: '#71717a' }} className="truncate block">{sv.name} · {sv.duration}&apos;</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (!a.isBlock && apptSvcs.length === 1 && (
+                        <div className="px-2" style={{ fontSize: 10, color: 'var(--muted)' }}>{apptSvcs[0].name} · {apptSvcs[0].duration}&apos;</div>
+                      ))}
                       <div onMouseDown={e => handleResizeStart(e, a)}
                         className="absolute bottom-0 left-0 right-0 flex items-center justify-center"
                         style={{ height: 10, cursor: 'ns-resize', background: 'rgba(113,113,122,0.2)' }}>

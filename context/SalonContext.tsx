@@ -780,10 +780,21 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
   }, []); // latestStateRef is a ref — no dep needed
 
   const deletePayment = useCallback((id: string) => {
+    // First, find the payment to check if it's linked to an appointment
+    const pay = (latestStateRef.current.payments as Payment[] | undefined)?.find(x => x.id === id);
     setPayments(prev => { const n = prev.filter(x => x.id !== id); storageSavePayments(n); return n; });
-    // Update localSavedAt immediately so a rapid page-refresh doesn't let the cloud (which still
-    // has the deleted payment) win the cloudIsNewer comparison and restore the deleted entry.
+    // Update localSavedAt so a rapid refresh doesn't restore the deleted entry from cloud
     setLocalSavedAt(Date.now());
+    // If this payment was linked to an appointment, restore it to 'scheduled' in the agenda
+    if (pay?.appointmentId) {
+      setAppointments(prev => {
+        const appt = prev.find(a => a.id === pay.appointmentId);
+        if (!appt || appt.status !== 'completed') return prev;
+        const updated = prev.map(a => a.id === appt.id ? { ...a, status: 'scheduled' as const } : a);
+        storageSaveAppointments(updated);
+        return updated;
+      });
+    }
   }, []);
 
   const addCashSession = useCallback((openingBalance: number) => {
