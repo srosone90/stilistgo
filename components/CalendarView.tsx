@@ -696,8 +696,8 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                       <div
                         onMouseDown={e => handleServiceDragStart(e, a.id, sid, startAbsMin, op.id)}
                         onClick={e => { if (wasDraggedRef.current) { e.stopPropagation(); return; } e.stopPropagation(); openEdit(a); }}
-                        className="absolute left-1 right-1 rounded-lg overflow-hidden hover:brightness-110 transition-all"
-                        style={{ top: activeTop, height: activeBlockH, background: `${svColor}22`, border: `1px solid ${svColor}55`, zIndex: isDragging ? 10 : 2, opacity: isDragging ? 0.7 : 1, cursor: isDragging ? 'grabbing' : 'grab', userSelect: 'none' }}>
+                        className="absolute left-1 right-1 overflow-hidden hover:brightness-110 transition-all"
+                        style={{ top: activeTop, height: activeBlockH, background: `${svColor}22`, border: `1px solid ${svColor}55`, borderRadius: procDur > 0 ? '8px 8px 0 0' : '8px', zIndex: isDragging ? 10 : 2, opacity: isDragging ? 0.7 : 1, cursor: isDragging ? 'grabbing' : 'grab', userSelect: 'none' }}>
                         {/* × rimuovi servizio */}
                         <button
                           onMouseDown={e => e.stopPropagation()}
@@ -719,27 +719,32 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                           <div style={{ width: 20, height: 2, borderRadius: 2, background: svColor, opacity: 0.8 }} />
                         </div>
                       </div>
-                      {/* ── Posa block (separate, linked visually) ── */}
+                      {/* ── Posa block (separate, clearly linked) ── */}
                       {procDur > 0 && (
                         <div
                           onMouseDown={e => handleServiceDragStart(e, a.id, sid, startAbsMin, op.id)}
                           onClick={e => { if (wasDraggedRef.current) { e.stopPropagation(); return; } e.stopPropagation(); openEdit(a); }}
-                          className="absolute left-1 right-1 rounded-lg overflow-hidden"
+                          className="absolute overflow-hidden"
                           style={{
                             top: procTop,
                             height: procBlockH,
-                            borderLeft: `3px solid ${svColor}80`,
-                            borderRight: `1px solid ${svColor}40`,
-                            borderTop: `1px dashed ${svColor}60`,
-                            borderBottom: `1px solid ${svColor}40`,
-                            background: `repeating-linear-gradient(-45deg, transparent, transparent 4px, ${svColor}18 4px, ${svColor}18 8px)`,
-                            zIndex: isDragging ? 9 : 1,
+                            left: 'calc(0.25rem + 3px)',
+                            right: '0.25rem',
+                            borderLeft: `3px solid ${svColor}`,
+                            borderRight: `1px solid ${svColor}70`,
+                            borderBottom: `1px solid ${svColor}70`,
+                            borderTop: 'none',
+                            borderBottomLeftRadius: '6px',
+                            borderBottomRightRadius: '6px',
+                            background: `repeating-linear-gradient(-45deg, ${svColor}28, ${svColor}28 4px, ${svColor}10 4px, ${svColor}10 8px)`,
+                            zIndex: isDragging ? 9 : 2,
                             opacity: isDragging ? 0.7 : 1,
                             cursor: isDragging ? 'grabbing' : 'grab',
                             userSelect: 'none',
                           }}>
-                          <div style={{ padding: '2px 8px', overflow: 'hidden' }}>
-                            <span style={{ fontSize: 9, color: svColor, opacity: 0.8, fontStyle: 'italic' }}>⏳ posa {procDur}&apos;</span>
+                          <div style={{ padding: '3px 8px', display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <span style={{ fontSize: 10, color: svColor, fontWeight: 600 }}>⏳</span>
+                            <span style={{ fontSize: 10, color: svColor, fontWeight: 600 }}>Posa {procDur}&apos;</span>
                           </div>
                         </div>
                       )}
