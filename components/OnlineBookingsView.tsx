@@ -98,6 +98,8 @@ export default function OnlineBookingsView() {
         email: b.client_email,
         birthDate: '', notes: `Prenotato online il ${format(parseISO(b.created_at), 'dd/MM/yyyy')}`,
         allergies: '', tags: [], gdprConsent: false, gdprDate: '', loyaltyPoints: 0,
+        gender: '', address: '', city: '', province: '', postalCode: '',
+        acquisitionSource: 'sito_web', acquisitionDate: format(parseISO(b.created_at), 'yyyy-MM-dd'),
       });
     }
     // Find matching service
