@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { useSalon } from '@/context/SalonContext';
@@ -45,7 +45,7 @@ function computeServiceStartMin(a: Appointment, targetSid: string, svcs: Service
   }
   return timeToMinutes(a.startTime);
 }
-const HOUR_PX_BASE = 80; // base height per hour at zoom 1.0 — 15-min slot = 20px
+const HOUR_PX_BASE = 80; // base height per hour at zoom 1.0 � 15-min slot = 20px
 
 export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: number; onGoToCash?: (clientId: string, appointmentId: string) => void }) {
   const {
@@ -64,23 +64,23 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
   const [quickClient, setQuickClient] = useState(EMPTY_QUICK_CLIENT);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-  // ─── Bottom toolbar: search, slot size, duplicate ─────────────────────────
+  // --- Bottom toolbar: search, slot size, duplicate -------------------------
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [slotSizeMin, setSlotSizeMin] = useState(15); // 15 | 30 | 60
   const [selectedApptId, setSelectedApptId] = useState<string | null>(null);
 
-  // ─── Sidebar cliente ──────────────────────────────────────────────────────
+  // --- Sidebar cliente ------------------------------------------------------
   const [showClientSidebar, setShowClientSidebar] = useState(false);
   const [sidebarSearch, setSidebarSearch] = useState('');
 
-  // ─── Zoom (mouse wheel + pinch) ───────────────────────────────────────────
+  // --- Zoom (mouse wheel + pinch) -------------------------------------------
   const [zoom, setZoom] = useState(1.0);
   // slotSizeMin controls displayed time granularity; zoom controls px height
   const HOUR_PX = HOUR_PX_BASE * zoom;
   const SLOT_MIN = slotSizeMin; // 15 | 30 | 60
   const SLOT_PX = (HOUR_PX / 60) * SLOT_MIN;
-  const hourPxRef = useRef(HOUR_PX); // kept in sync — used by drag/resize event closures
+  const hourPxRef = useRef(HOUR_PX); // kept in sync � used by drag/resize event closures
   useEffect(() => { hourPxRef.current = HOUR_PX; }, [HOUR_PX]);
   const dayGridRef = useRef<HTMLDivElement>(null);
   const pinchRef = useRef<{ dist: number } | null>(null);
@@ -167,7 +167,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
   const hours = Array.from({ length: closeHour - openHour }, (_, i) => openHour + i);
   const START_MIN = openHour * 60;
 
-  // ─── Current time indicator ───────────────────────────────────────────────
+  // --- Current time indicator -----------------------------------------------
   const [nowMin, setNowMin] = useState(() => { const n = new Date(); return n.getHours() * 60 + n.getMinutes(); });
   useEffect(() => {
     const tick = () => { const n = new Date(); setNowMin(n.getHours() * 60 + n.getMinutes()); };
@@ -206,11 +206,11 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
       return inRange && opOk && a.status !== 'completed';
     }), [appointments, days, filterOperator]);
 
-  // ─── Go-to-date picker ─────────────────────────────────────────────────────
+  // --- Go-to-date picker -----------------------------------------------------
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [gotoDateValue, setGotoDateValue] = useState('');
 
-  // ─── Search filter ────────────────────────────────────────────────────────
+  // --- Search filter --------------------------------------------------------
   const searchResults = useMemo(() => {
     if (!searchQuery.trim()) return [];
     const q = searchQuery.toLowerCase();
@@ -222,7 +222,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
     }).slice(0, 20);
   }, [searchQuery, appointments, clients, services]);
 
-  // ─── Overlap detection per operator column ────────────────────────────────
+  // --- Overlap detection per operator column --------------------------------
   function getOverlapColumns(appts: { id: string; startMin: number; endMin: number }[]): Map<string, { col: number; totalCols: number }> {
     const sorted = [...appts].sort((a, b) => a.startMin - b.startMin);
     const cols: { endMin: number }[] = [];
@@ -240,7 +240,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
     return result;
   }
 
-  // ─── Daily appointment count ──────────────────────────────────────────────
+  // --- Daily appointment count ----------------------------------------------
   const todayStr = format(currentDate, 'yyyy-MM-dd');
   const dailyCount = useMemo(() =>
     appointments.filter(a => a.date === todayStr && a.status !== 'cancelled').length,
@@ -388,7 +388,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
       if (serviceDragRef.current) {
         const totalDelta = Math.hypot(e.clientX - serviceDragRef.current.startX, e.clientY - serviceDragRef.current.startY);
         if (totalDelta > 5) wasDraggedRef.current = true;
-        // Free movement — round to 1 min, no snap
+        // Free movement � round to 1 min, no snap
         const rawDelta = (e.clientY - serviceDragRef.current.startY) / hourPxRef.current * 60;
         const deltaMin = Math.round(rawDelta);
         const newStartMin = Math.max(openHour * 60, serviceDragRef.current.origStartMin + deltaMin);
@@ -521,7 +521,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
     return () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };
   }, [appointments, updateAppointment, openHour]);
 
-  // ─── Mobile day-list (shown only on small screens) ───────────────────────
+  // --- Mobile day-list (shown only on small screens) -----------------------
   const mobileDayStr = format(currentDate, 'yyyy-MM-dd');
   const mobileDayAppts = useMemo(() =>
     appointments
@@ -570,7 +570,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2">
         {mobileDayAppts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 gap-3" style={{ color: 'var(--muted)' }}>
-            <span style={{ fontSize: 40 }}>📅</span>
+            <span style={{ fontSize: 40 }}>??</span>
             <p className="text-sm">Nessun appuntamento</p>
             <button onClick={() => openNew(mobileDayStr, operators[0]?.id)} style={{ background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', color: 'var(--accent-light)', borderRadius: 10, padding: '8px 20px', fontSize: 13, cursor: 'pointer' }}>
               + Nuovo appuntamento
@@ -598,7 +598,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
                       <p className="font-semibold text-sm truncate" style={{ color: 'var(--text)' }}>
-                        {a.isBlock ? '🔒 ' + (a.blockReason || 'Blocco') : (client ? `${client.firstName} ${client.lastName}` : '—')}
+                        {a.isBlock ? '?? ' + (a.blockReason || 'Blocco') : (client ? `${client.firstName} ${client.lastName}` : '�')}
                       </p>
                       <p className="text-xs font-bold flex-shrink-0" style={{ color }}>
                         {a.startTime}
@@ -608,9 +608,9 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                       <p className="text-xs truncate mt-0.5" style={{ color: 'var(--text-3)' }}>{svcNames}</p>
                     )}
                     <div className="flex items-center gap-3 mt-1">
-                      <span className="text-xs" style={{ color: 'var(--muted)' }}>{a.startTime} – {a.endTime} · {durationMin}&apos;</span>
+                      <span className="text-xs" style={{ color: 'var(--muted)' }}>{a.startTime} � {a.endTime} � {durationMin}&apos;</span>
                       {op && <span className="text-xs" style={{ color }}>{op.name}</span>}
-                      {a.status === 'no-show' && <span className="text-xs" style={{ color: '#f59e0b' }}>⚠ No-show</span>}
+                      {a.status === 'no-show' && <span className="text-xs" style={{ color: '#f59e0b' }}>? No-show</span>}
                       {a.notes?.trim() && <FileText size={11} color={color} opacity={0.7} />}
                     </div>
                   </div>
@@ -634,9 +634,9 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
   return (
     <div className="flex flex-col gap-0 h-full" style={{ minHeight: 0 }}>
       {MobileView}
-      {/* ─── Desktop layout (hidden on mobile) ───────────────────────────── */}
+      {/* --- Desktop layout (hidden on mobile) ----------------------------- */}
       <div className="hidden md:flex flex-col gap-0 flex-1" style={{ minHeight: 0 }}>
-      {/* ─── Toolbar ──────────────────────────────────────────────────────── */}
+      {/* --- Toolbar -------------------------------------------------------- */}
       <div className="flex items-center justify-between flex-wrap gap-2 pt-2 pb-1 px-0">
         <div>
           <h1 className="text-2xl font-bold" style={{ color: 'var(--text)' }}>Agenda</h1>
@@ -674,7 +674,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
           {/* Vai a data */}
           <div style={{ position: 'relative' }}>
             <button onClick={() => setShowDatePicker(p => !p)} style={{ ...btnPrimary, gap: 6 }} title="Vai a data">
-              📅 Vai a data
+              ?? Vai a data
             </button>
             {showDatePicker && (
               <div style={{ position: 'absolute', top: '110%', right: 0, zIndex: 50, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, padding: '12px', boxShadow: '0 8px 32px rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column', gap: 8, minWidth: 220 }}>
@@ -699,7 +699,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
         </div>
       </div>
 
-      {/* Operator legend — only shown in week/month views */}
+      {/* Operator legend � only shown in week/month views */}
       {view !== 'day' && activeOperators.length > 1 && (
         <div className="flex gap-3 flex-wrap">
           {activeOperators.map(o => (
@@ -756,7 +756,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                           return (
                             <div key={a.id} className="text-xs truncate rounded px-1 py-0.5"
                               style={{ background: `${op?.color || '#6366f1'}25`, color: op?.color || 'var(--accent-light)', fontSize: 10 }}>
-                              {a.startTime} {client ? `${client.firstName}` : a.isBlock ? 'Blocco' : '—'}
+                              {a.startTime} {client ? `${client.firstName}` : a.isBlock ? 'Blocco' : '�'}
                             </div>
                           );
                         })}
@@ -773,7 +773,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
         );
       })()}
 
-      {/* ─── DAY VIEW: one column per operator ───────────────────────────── */}
+      {/* --- DAY VIEW: one column per operator ----------------------------- */}
       {view === 'day' && (
       <div ref={dayGridRef} className="flex-1 overflow-auto rounded-2xl" style={{ border: '1px solid var(--border)', background: 'var(--bg-card)' }}>
         {/* Sticky header: date on left, operator columns */}
@@ -910,7 +910,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                         <div className="px-2 pt-1 pb-0.5" style={{ background: `${color}28` }}>
                           <div className="flex items-start gap-1">
                             <p className="text-xs font-semibold truncate flex-1" style={{ color }}>
-                              {a.isBlock ? '🔒 ' + (a.blockReason || 'Blocco') : (client ? `${client.firstName} ${client.lastName}` : '—')}
+                              {a.isBlock ? '?? ' + (a.blockReason || 'Blocco') : (client ? `${client.firstName} ${client.lastName}` : '�')}
                             </p>
                             {/* Status icons */}
                             <div className="flex gap-0.5 flex-shrink-0">
@@ -918,7 +918,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                               {hasWarning && <AlertCircle size={9} color="#f59e0b" />}
                             </div>
                           </div>
-                          <p style={{ color: 'var(--text-3)', fontSize: 10 }}>{effectiveStart}–{effectiveEnd}</p>
+                          <p style={{ color: 'var(--text-3)', fontSize: 10 }}>{effectiveStart}�{effectiveEnd}</p>
                         </div>
                         <div onMouseDown={e => handleResizeStart(e, a)}
                           className="absolute bottom-0 left-0 right-0 flex items-center justify-center"
@@ -965,22 +965,22 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                   };
                   return (
                     <React.Fragment key={dragKey}>
-                      {/* ── Active phase block ── */}
+                      {/* -- Active phase block -- */}
                       <div
                         onMouseDown={e => handleServiceDragStart(e, a.id, sid, startAbsMin, op.id)}
                         onClick={e => { if (wasDraggedRef.current) { e.stopPropagation(); return; } e.stopPropagation(); setSelectedApptId(a.id === selectedApptId ? null : a.id); openEdit(a); }}
                         className="absolute left-1 right-1 overflow-hidden hover:brightness-110 transition-all"
                         style={{ top: activeTop, height: activeBlockH, background: `${svColor}22`, border: `1.5px solid ${isSelected ? svColor : svColor + '55'}`, borderRadius: procDur > 0 ? '8px 8px 0 0' : '8px', boxShadow: isSelected ? `0 0 0 2px ${svColor}80` : 'none', zIndex: isDragging ? 10 : 2, opacity: isDragging ? 0.7 : 1, cursor: isDragging ? 'grabbing' : 'grab', userSelect: 'none' }}>
-                        {/* × rimuovi servizio */}
+                        {/* � rimuovi servizio */}
                         <button
                           onMouseDown={e => e.stopPropagation()}
                           onClick={removeService}
                           style={{ position: 'absolute', top: 2, right: 2, zIndex: 4, background: 'rgba(0,0,0,0.35)', border: 'none', color: 'rgba(255,255,255,0.65)', borderRadius: '3px', padding: '0 4px', fontSize: '11px', lineHeight: '15px', cursor: 'pointer' }}
-                          title="Rimuovi servizio dall'appuntamento">×</button>
+                          title="Rimuovi servizio dall'appuntamento">�</button>
                         <div style={{ padding: '2px 24px 0 8px', overflow: 'hidden' }}>
                           <div className="flex items-start gap-1">
                             <p className="text-xs font-semibold truncate flex-1" style={{ color: svColor }}>
-                              {client ? `${client.firstName} ${client.lastName}` : '—'}
+                              {client ? `${client.firstName} ${client.lastName}` : '�'}
                             </p>
                             <div className="flex gap-0.5 flex-shrink-0" style={{ marginRight: 16 }}>
                               {hasNote && <FileText size={9} color={svColor} opacity={0.8} />}
@@ -988,7 +988,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                             </div>
                           </div>
                           <p style={{ color: 'var(--text-3)', fontSize: 9 }} className="truncate">
-                            {minutesToTime(startAbsMin)}–{minutesToTime(startAbsMin + opDur + procDur)} · {svc.name}
+                            {minutesToTime(startAbsMin)}�{minutesToTime(startAbsMin + opDur + procDur)} � {svc.name}
                           </p>
                           <p style={{ color: svColor, fontSize: 9, opacity: 0.7 }}>{opDur}&apos; operatore</p>
                         </div>
@@ -998,7 +998,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                           <div style={{ width: 20, height: 2, borderRadius: 2, background: svColor, opacity: 0.8 }} />
                         </div>
                       </div>
-                      {/* ── Posa block (separate, clearly linked) ── */}
+                      {/* -- Posa block (separate, clearly linked) -- */}
                       {procDur > 0 && (
                         <div
                           onMouseDown={e => handleServiceDragStart(e, a.id, sid, startAbsMin, op.id)}
@@ -1022,7 +1022,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                             userSelect: 'none',
                           }}>
                           <div style={{ padding: '3px 8px', display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <span style={{ fontSize: 10, color: svColor, fontWeight: 600 }}>⏳</span>
+                            <span style={{ fontSize: 10, color: svColor, fontWeight: 600 }}>?</span>
                             <span style={{ fontSize: 10, color: svColor, fontWeight: 600 }}>Posa {procDur}&apos;</span>
                           </div>
                         </div>
@@ -1073,14 +1073,14 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                       <div className="px-2 pt-1 pb-0.5" style={{ background: 'rgba(113,113,122,0.15)' }}>
                         <div className="flex items-start gap-1">
                           <p className="text-xs font-semibold truncate flex-1" style={{ color }}>
-                            {a.isBlock ? '🔒 ' + (a.blockReason || 'Blocco') : (client ? `${client.firstName} ${client.lastName}` : '—')}
+                            {a.isBlock ? '?? ' + (a.blockReason || 'Blocco') : (client ? `${client.firstName} ${client.lastName}` : '�')}
                           </p>
                           <div className="flex gap-0.5 flex-shrink-0">
                             {hasNote && <FileText size={9} color={color} opacity={0.8} />}
                             {hasWarning && <AlertCircle size={9} color="#f59e0b" />}
                           </div>
                         </div>
-                        <p style={{ color: 'var(--text-3)', fontSize: 10 }}>{effectiveStart}–{effectiveEnd}</p>
+                        <p style={{ color: 'var(--text-3)', fontSize: 10 }}>{effectiveStart}�{effectiveEnd}</p>
                         {svcNames && totalHeight > 44 && <p className="truncate" style={{ color: 'var(--muted)', fontSize: 9 }}>{svcNames}</p>}
                       </div>
                       <div onMouseDown={e => handleResizeStart(e, a)}
@@ -1098,7 +1098,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
       </div>
       )}
 
-      {/* ─── WEEK VIEW: one column per day ───────────────────────────────── */}
+      {/* --- WEEK VIEW: one column per day --------------------------------- */}
       {view === 'week' && (
       <div className="flex-1 overflow-auto rounded-2xl" style={{ border: '1px solid var(--border)', background: 'var(--bg-card)' }}>
         <div className="flex sticky top-0 z-10" style={{ background: 'var(--bg-card)', borderBottom: '1px solid var(--border)' }}>
@@ -1165,14 +1165,14 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                       style={{ top, height, left: `calc(${leftPct}% + 2px)`, width: `calc(${colW}% - 4px)`, background: `${color}25`, border: `1px solid ${color}60`, zIndex: isDragging ? 10 : 2, opacity: isDragging ? 0.7 : 1, cursor: isDragging ? 'grabbing' : 'grab', userSelect: 'none' }}>
                       <div className="flex items-start gap-1">
                         <p className="text-xs font-semibold truncate flex-1" style={{ color }}>
-                          {a.isBlock ? 'Blocco: ' + a.blockReason : (client ? `${client.firstName} ${client.lastName}` : '—')}
+                          {a.isBlock ? 'Blocco: ' + a.blockReason : (client ? `${client.firstName} ${client.lastName}` : '�')}
                         </p>
                         <div className="flex gap-0.5 flex-shrink-0">
                           {hasNote && <FileText size={9} color={color} opacity={0.8} />}
                           {hasWarning && <AlertCircle size={9} color="#f59e0b" />}
                         </div>
                       </div>
-                      <p className="text-xs truncate" style={{ color: 'var(--text-3)', fontSize: 10 }}>{a.startTime}–{effectiveEnd}</p>
+                      <p className="text-xs truncate" style={{ color: 'var(--text-3)', fontSize: 10 }}>{a.startTime}�{effectiveEnd}</p>
                       {svcNames && height > 38 && <p className="truncate" style={{ color: 'var(--muted)', fontSize: 10 }}>{svcNames}</p>}
                       <div onMouseDown={e => handleResizeStart(e, a)}
                         className="absolute bottom-0 left-0 right-0 flex items-center justify-center"
@@ -1189,7 +1189,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
       </div>
       )}
 
-      {/* ─── Bottom toolbar ────────────────────────────────────────────────── */}
+      {/* --- Bottom toolbar -------------------------------------------------- */}
       <div className="flex items-center gap-2 flex-wrap pt-2 pb-1 px-0 flex-shrink-0" style={{ borderTop: '1px solid var(--border)' }}>
         {/* Cerca appuntamento */}
         <button
@@ -1232,7 +1232,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
         </button>
       </div>
 
-      {/* ─── Search results overlay ───────────────────────────────────────── */}
+      {/* --- Search results overlay ----------------------------------------- */}
       {showSearch && (
         <div className="rounded-2xl p-4" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', flexShrink: 0 }}>
           <div className="flex items-center gap-2 mb-3">
@@ -1241,7 +1241,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
               autoFocus
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Cerca per cliente, servizio o note…"
+              placeholder="Cerca per cliente, servizio o note�"
               style={{ ...inputStyle, flex: 1 }}
             />
             <button onClick={() => { setShowSearch(false); setSearchQuery(''); }} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}><X size={16} /></button>
@@ -1259,7 +1259,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                     <span className="inline-block w-2 h-2 rounded-full flex-shrink-0" style={{ background: op?.color || '#6366f1' }} />
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-semibold truncate" style={{ color: 'var(--text)' }}>
-                        {client ? `${client.firstName} ${client.lastName}` : '—'}
+                        {client ? `${client.firstName} ${client.lastName}` : '�'}
                       </p>
                       {svcNames && <p className="text-xs truncate" style={{ color: 'var(--muted)' }}>{svcNames}</p>}
                     </div>
@@ -1277,7 +1277,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
         </div>
       )}
 
-      {/* ─── Client sidebar ───────────────────────────────────────────────── */}
+      {/* --- Client sidebar ------------------------------------------------- */}
       {showClientSidebar && (
         <div className="fixed top-0 right-0 bottom-0 z-40 flex flex-col"
           style={{ width: 280, background: 'var(--bg-card)', borderLeft: '1px solid var(--border)', boxShadow: '-4px 0 24px rgba(0,0,0,0.4)' }}>
@@ -1290,7 +1290,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
               autoFocus
               value={sidebarSearch}
               onChange={e => setSidebarSearch(e.target.value)}
-              placeholder="Nome, cognome, telefono…"
+              placeholder="Nome, cognome, telefono�"
               style={{ ...inputStyle }}
             />
           </div>
@@ -1361,7 +1361,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                         title="Segna come No-show"
                         onClick={() => { changeAppointmentStatus(editAppt.id, 'no-show'); setEditAppt(prev => prev ? { ...prev, status: 'no-show' } : null); }}
                         style={{ background: '#ef4444', border: 'none', color: '#fff', borderRadius: '6px', padding: '4px 8px', fontSize: '11px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                        🚫 No-show
+                        ?? No-show
                       </button>
                     )}
                   </>
@@ -1385,9 +1385,9 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                     </button>
                   </div>
                   <select value={form.clientId} onChange={e => setForm(p => ({ ...p, clientId: e.target.value }))} style={inputStyle}>
-                    <option value="">— Seleziona cliente —</option>
+                    <option value="">� Seleziona cliente �</option>
                     {[...clients].sort((a, b) => `${a.firstName}${a.lastName}`.localeCompare(`${b.firstName}${b.lastName}`)).map(c => (
-                      <option key={c.id} value={c.id}>{c.firstName} {c.lastName}{c.phone ? ` · ${c.phone}` : ''}</option>
+                      <option key={c.id} value={c.id}>{c.firstName} {c.lastName}{c.phone ? ` � ${c.phone}` : ''}</option>
                     ))}
                   </select>
                 </div>
@@ -1397,7 +1397,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                 <div>
                   <label style={labelStyle}>Operatore</label>
                   <select value={form.operatorId} onChange={e => setForm(p => ({ ...p, operatorId: e.target.value }))} style={inputStyle}>
-                    <option value="">—</option>
+                    <option value="">�</option>
                     {operators.filter(o => o.active).map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
                   </select>
                 </div>
@@ -1487,7 +1487,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
           <div className="w-full max-w-sm rounded-2xl p-6" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
             <h3 className="font-semibold mb-2" style={{ color: 'var(--text)' }}>Eliminare appuntamento?</h3>
-            <p className="text-sm mb-4" style={{ color: 'var(--muted)' }}>Questa azione non è reversibile.</p>
+            <p className="text-sm mb-4" style={{ color: 'var(--muted)' }}>Questa azione non � reversibile.</p>
             <div className="flex gap-2">
               <button onClick={() => setConfirmDeleteId(null)} style={{ flex: 1, background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--muted)', borderRadius: '8px', padding: '8px', fontSize: '13px', cursor: 'pointer' }}>Annulla</button>
               <button onClick={() => { deleteAppointment(confirmDeleteId); setConfirmDeleteId(null); setShowForm(false); }}
@@ -1497,3 +1497,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
         </div>
       )}
       </div>{/* end hidden md:flex desktop wrapper */}
+
+    </div>
+  );
+}
