@@ -1,10 +1,11 @@
 ﻿'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useSalon } from '@/context/SalonContext';
 import { Service, ServiceCategory, SERVICE_CATEGORIES, ServiceProductUsage } from '@/types/salon';
 import { formatCurrency } from '@/lib/calculations';
-import { Plus, X, Pencil, Trash2 } from 'lucide-react';
+import { format } from 'date-fns';
+import { Plus, X, Pencil, Trash2, Download, Upload, AlertTriangle, Check } from 'lucide-react';
 
 const card: React.CSSProperties = { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '16px', padding: '20px' };
 const inputStyle: React.CSSProperties = { background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '10px', padding: '9px 13px', color: 'var(--text)', fontSize: '13px', outline: 'none', width: '100%' };
@@ -22,12 +23,35 @@ const CAT_COLORS: Record<ServiceCategory, string> = {
   Sposa: '#ef4444', Altro: 'var(--muted)',
 };
 
+// ─── Import preview row type ─────────────────────────────────────────────────
+interface ImportRow {
+  name: string;
+  category: ServiceCategory;
+  operatorDuration: number;
+  processingDuration: number;
+  price: number;
+  description: string;
+  active: boolean;
+  isDup: boolean;
+  dupId?: string;
+}
+
 export default function ServicesView({ newTrigger }: { newTrigger?: number }) {
   const { services, addService, updateService, deleteService, operators, products } = useSalon();
   const [showForm, setShowForm] = useState(false);
   const [editSvc, setEditSvc] = useState<Service | null>(null);
   const [form, setForm] = useState<Omit<Service, 'id' | 'createdAt'>>(EMPTY_SERVICE);
   const [filterCat, setFilterCat] = useState<ServiceCategory | 'all'>('all');
+
+  // ── Export / Import state ───────────────────────────────────────────────────
+  const [showExport, setShowExport] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [importRows, setImportRows] = useState<ImportRow[]>([]);
+  const [importDupAction, setImportDupAction] = useState<'skip' | 'overwrite'>('skip');
+  const [importStep, setImportStep] = useState<'preview' | 'done'>('preview');
+  const [importStats, setImportStats] = useState({ imported: 0, skipped: 0, overwritten: 0 });
+  const [importError, setImportError] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { if (newTrigger && newTrigger > 0) { setShowForm(true); setEditSvc(null); setForm(EMPTY_SERVICE); } }, [newTrigger]);
 
@@ -68,6 +92,134 @@ export default function ServicesView({ newTrigger }: { newTrigger?: number }) {
     }));
   }
 
+  // ── Export ──────────────────────────────────────────────────────────────────
+  function exportServices(fmt: 'csv' | 'json' | 'xml') {
+    const today = format(new Date(), 'yyyy-MM-dd');
+    let content = ''; let mimeType = 'text/plain;charset=utf-8'; let ext = 'txt';
+    if (fmt === 'csv') {
+      const BOM = '\uFEFF';
+      const header = 'Nome;Categoria;TempoOperatore(min);TempoPosa(min);DurataTotale(min);Prezzo;Descrizione;Attivo';
+      const rows = services.map(s => [
+        s.name, s.category,
+        String(s.operatorDuration ?? s.duration),
+        String(s.processingDuration ?? 0),
+        String(s.duration),
+        s.price.toFixed(2),
+        s.description,
+        s.active ? 'Sì' : 'No',
+      ].map(v => `"${(v ?? '').replace(/"/g, '""')}"`).join(';'));
+      content = BOM + [header, ...rows].join('\n'); mimeType = 'text/csv;charset=utf-8'; ext = 'csv';
+    } else if (fmt === 'json') {
+      content = JSON.stringify(services.map(s => ({
+        nome: s.name, categoria: s.category,
+        tempoOperatore: s.operatorDuration ?? s.duration,
+        tempoPosa: s.processingDuration ?? 0,
+        durataTotale: s.duration,
+        prezzo: s.price, descrizione: s.description, attivo: s.active,
+      })), null, 2); mimeType = 'application/json;charset=utf-8'; ext = 'json';
+    } else {
+      const esc = (v: unknown) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      content = `<?xml version="1.0" encoding="UTF-8"?>\n<servizi>\n` +
+        services.map(s =>
+          `  <servizio>\n    <nome>${esc(s.name)}</nome>\n    <categoria>${esc(s.category)}</categoria>\n` +
+          `    <tempoOperatore>${s.operatorDuration ?? s.duration}</tempoOperatore>\n    <tempoPosa>${s.processingDuration ?? 0}</tempoPosa>\n    <durataTotale>${s.duration}</durataTotale>\n` +
+          `    <prezzo>${s.price.toFixed(2)}</prezzo>\n    <descrizione>${esc(s.description)}</descrizione>\n    <attivo>${s.active}</attivo>\n  </servizio>`
+        ).join('\n') + '\n</servizi>';
+      mimeType = 'application/xml;charset=utf-8'; ext = 'xml';
+    }
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `servizi_${today}.${ext}`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+    setShowExport(false);
+  }
+
+  // ── Import ──────────────────────────────────────────────────────────────────
+  function handleImportFile(file: File) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const text = e.target?.result as string;
+        let rows: ImportRow[] = [];
+        if (file.name.endsWith('.json')) {
+          const parsed = JSON.parse(text);
+          if (!Array.isArray(parsed)) { setImportError('Il file JSON deve contenere un array di oggetti.'); setShowImport(true); return; }
+          rows = parsed.map((r: Record<string, unknown>) => {
+            const opDur = Number(r.tempoOperatore ?? r.operatorDuration ?? r.durataTotale ?? r.duration ?? 30);
+            const procDur = Number(r.tempoPosa ?? r.processingDuration ?? 0);
+            const rawCat = String(r.categoria ?? r.category ?? 'Altro');
+            const cat: ServiceCategory = (SERVICE_CATEGORIES as string[]).includes(rawCat) ? rawCat as ServiceCategory : 'Altro';
+            const name = String(r.nome ?? r.name ?? '').trim();
+            const dup = services.find(s => s.name.toLowerCase() === name.toLowerCase());
+            return { name, category: cat, operatorDuration: opDur, processingDuration: procDur, price: Number(r.prezzo ?? r.price ?? 0), description: String(r.descrizione ?? r.description ?? ''), active: String(r.attivo ?? r.active ?? 'true').toLowerCase() !== 'false' && String(r.attivo ?? r.active ?? 'true') !== '0' && String(r.attivo ?? r.active ?? 'sì').toLowerCase() !== 'no', isDup: !!dup, dupId: dup?.id };
+          }).filter((r: ImportRow) => r.name);
+        } else {
+          // CSV: detect separator
+          const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/).filter(Boolean);
+          if (lines.length < 2) { setImportError('File CSV vuoto o non valido.'); setShowImport(true); return; }
+          const sep = lines[0].includes(';') ? ';' : ',';
+          const headers = lines[0].split(sep).map(h => h.replace(/^"|"$/g, '').trim().toLowerCase());
+          const idx = (k: string[]) => k.map(n => headers.findIndex(h => h === n || h.startsWith(n))).find(i => i >= 0) ?? -1;
+          const iName = idx(['nome', 'name']);
+          const iCat = idx(['categoria', 'category', 'cat']);
+          const iOpDur = idx(['tempooperatore', 'operatorduration', 'tempo operatore', 'op']);
+          const iProcDur = idx(['tempoposa', 'processingduration', 'tempo posa', 'posa']);
+          const iDur = idx(['duratatotale', 'durata', 'duration', 'total']);
+          const iPrice = idx(['prezzo', 'price', 'costo', 'cost']);
+          const iDesc = idx(['descrizione', 'description', 'desc']);
+          const iActive = idx(['attivo', 'active']);
+          if (iName < 0) { setImportError('Colonna "Nome" non trovata nel CSV.'); setShowImport(true); return; }
+          const parseCell = (row: string[], i: number) => i >= 0 ? row[i]?.replace(/^"|"$/g, '').trim() : '';
+          rows = lines.slice(1).map(line => {
+            const cells = line.split(sep);
+            const name = parseCell(cells, iName);
+            if (!name) return null;
+            const rawCat = parseCell(cells, iCat) || 'Altro';
+            const cat: ServiceCategory = (SERVICE_CATEGORIES as string[]).includes(rawCat) ? rawCat as ServiceCategory : 'Altro';
+            const fallbackDur = iDur >= 0 ? Number(parseCell(cells, iDur)) || 30 : 30;
+            const opDur = iOpDur >= 0 ? Number(parseCell(cells, iOpDur)) || fallbackDur : fallbackDur;
+            const procDur = iProcDur >= 0 ? Number(parseCell(cells, iProcDur)) || 0 : 0;
+            const price = iPrice >= 0 ? parseFloat(parseCell(cells, iPrice).replace(',', '.')) || 0 : 0;
+            const desc = parseCell(cells, iDesc);
+            const activeStr = (iActive >= 0 ? parseCell(cells, iActive) : 'Sì').toLowerCase();
+            const active = activeStr !== 'no' && activeStr !== 'false' && activeStr !== '0';
+            const dup = services.find(s => s.name.toLowerCase() === name.toLowerCase());
+            return { name, category: cat, operatorDuration: opDur, processingDuration: procDur, price, description: desc, active, isDup: !!dup, dupId: dup?.id } as ImportRow;
+          }).filter(Boolean) as ImportRow[];
+        }
+        if (rows.length === 0) { setImportError('Nessun servizio valido trovato nel file.'); setShowImport(true); return; }
+        setImportRows(rows);
+        setImportError('');
+        setShowImport(true);
+      } catch {
+        setImportError('Errore nella lettura del file. Verifica che sia un CSV o JSON valido.');
+        setShowImport(true);
+      }
+    };
+    reader.readAsText(file, 'utf-8');
+  }
+
+  function handleImportConfirm() {
+    let imported = 0; let skipped = 0; let overwritten = 0;
+    const now = new Date().toISOString();
+    for (const r of importRows) {
+      const opDur = r.operatorDuration;
+      const procDur = r.processingDuration;
+      const serviceData = { name: r.name, category: r.category, duration: opDur + procDur, operatorDuration: opDur, processingDuration: procDur, price: r.price, description: r.description, operatorIds: [], active: r.active, productUsage: [] };
+      if (r.isDup) {
+        if (importDupAction === 'overwrite' && r.dupId) {
+          const existing = services.find(s => s.id === r.dupId);
+          if (existing) { updateService({ ...existing, ...serviceData }); overwritten++; }
+        } else { skipped++; }
+      } else {
+        addService(serviceData);
+        imported++;
+      }
+    }
+    setImportStats({ imported, skipped, overwritten });
+    setImportStep('done');
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex items-start justify-between">
@@ -75,7 +227,12 @@ export default function ServicesView({ newTrigger }: { newTrigger?: number }) {
           <h1 className="text-2xl font-bold text-white">Listino Servizi</h1>
           <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>{services.filter(s => s.active).length} servizi attivi</p>
         </div>
-        <button onClick={openNew} style={btnPrimary}><Plus size={14} /> Nuovo servizio</button>
+        <div className="flex gap-2">
+          <button onClick={() => setShowExport(true)} style={{ ...btnPrimary, fontSize: '12px', padding: '6px 10px' }} title="Esporta servizi"><Download size={14} /></button>
+          <button onClick={() => { setImportError(''); setImportRows([]); setImportStep('preview'); fileInputRef.current?.click(); }} style={{ ...btnPrimary, fontSize: '12px', padding: '6px 10px' }} title="Importa servizi"><Upload size={14} /></button>
+          <input ref={fileInputRef} type="file" accept=".csv,.json" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) handleImportFile(f); e.target.value = ''; }} />
+          <button onClick={openNew} style={btnPrimary}><Plus size={14} /> Nuovo servizio</button>
+        </div>
       </div>
 
       {/* Category filter */}
@@ -154,6 +311,137 @@ export default function ServicesView({ newTrigger }: { newTrigger?: number }) {
           </div>
         ))}
       </div>
+
+      {/* ── Modal: Esporta Servizi ── */}
+      {showExport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
+          <div className="w-full max-w-sm rounded-2xl p-6" style={{ background: '#18181f', border: '1px solid var(--border)' }}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-semibold text-white">Esporta Servizi ({services.length})</h3>
+              <button onClick={() => setShowExport(false)} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}><X size={18} /></button>
+            </div>
+            <p className="text-sm mb-4" style={{ color: 'var(--muted)' }}>Scegli il formato per esportare tutti i {services.length} servizi.</p>
+            <div className="grid grid-cols-3 gap-3">
+              {([
+                { fmt: 'csv' as const, label: 'CSV', desc: 'Excel / LibreOffice', icon: '📊' },
+                { fmt: 'json' as const, label: 'JSON', desc: 'Backup / sviluppatori', icon: '📋' },
+                { fmt: 'xml' as const, label: 'XML', desc: 'Gestionali', icon: '🖥️' },
+              ]).map(({ fmt, label, desc, icon }) => (
+                <button key={fmt} onClick={() => exportServices(fmt)}
+                  className="flex flex-col items-center gap-1 rounded-xl p-4 transition-all hover:opacity-80"
+                  style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', cursor: 'pointer' }}>
+                  <span style={{ fontSize: '24px', lineHeight: 1 }}>{icon}</span>
+                  <span className="text-sm font-semibold text-white">{label}</span>
+                  <span className="text-xs text-center" style={{ color: 'var(--muted)' }}>{desc}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: Importa Servizi ── */}
+      {showImport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
+          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl p-6" style={{ background: '#18181f', border: '1px solid var(--border)' }}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-semibold text-white">
+                {importStep === 'done' ? 'Importazione completata' : `Anteprima importazione (${importRows.length} servizi)`}
+              </h3>
+              <button onClick={() => { setShowImport(false); setImportRows([]); setImportStep('preview'); }} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}><X size={18} /></button>
+            </div>
+
+            {importError && (
+              <div className="flex items-center gap-2 rounded-xl p-3 mb-4" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)' }}>
+                <AlertTriangle size={16} color="#f87171" />
+                <span className="text-sm" style={{ color: '#f87171' }}>{importError}</span>
+              </div>
+            )}
+
+            {importStep === 'done' ? (
+              <div className="space-y-4">
+                <div className="grid grid-cols-3 gap-3">
+                  {[
+                    { label: 'Importati', value: importStats.imported, color: '#22c55e' },
+                    { label: 'Saltati (dup)', value: importStats.skipped, color: 'var(--muted)' },
+                    { label: 'Sovrascritti', value: importStats.overwritten, color: '#f59e0b' },
+                  ].map(s => (
+                    <div key={s.label} className="rounded-xl p-3 text-center" style={{ background: 'var(--bg-input)', border: '1px solid var(--border)' }}>
+                      <p className="text-xl font-bold" style={{ color: s.color }}>{s.value}</p>
+                      <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>{s.label}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex justify-end">
+                  <button onClick={() => { setShowImport(false); setImportRows([]); setImportStep('preview'); }} style={btnPrimary}><Check size={14} /> Chiudi</button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* Dup action */}
+                {importRows.some(r => r.isDup) && (
+                  <div className="rounded-xl p-3" style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)' }}>
+                    <p className="text-sm font-medium mb-2" style={{ color: '#f59e0b' }}>
+                      <AlertTriangle size={14} style={{ display: 'inline', marginRight: 4 }} />
+                      {importRows.filter(r => r.isDup).length} servizi già esistenti con lo stesso nome.
+                    </p>
+                    <div className="flex gap-3">
+                      {(['skip', 'overwrite'] as const).map(opt => (
+                        <label key={opt} className="flex items-center gap-1.5 cursor-pointer">
+                          <input type="radio" name="dupAction" value={opt} checked={importDupAction === opt} onChange={() => setImportDupAction(opt)} />
+                          <span className="text-xs" style={{ color: 'var(--text-2)' }}>
+                            {opt === 'skip' ? 'Salta i duplicati' : 'Sovrascrivi i duplicati'}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Preview table */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                        {['Nome', 'Categoria', 'T.Op', 'T.Posa', 'Prezzo', 'Attivo', 'Stato'].map(h => (
+                          <th key={h} className="text-left pb-2 pr-3" style={{ color: 'var(--muted)', fontWeight: 500 }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {importRows.map((r, i) => (
+                        <tr key={i} style={{ borderBottom: '1px solid #1e1e2e' }}>
+                          <td className="py-2 pr-3 text-white font-medium">{r.name}</td>
+                          <td className="py-2 pr-3" style={{ color: 'var(--text-2)' }}>{r.category}</td>
+                          <td className="py-2 pr-3" style={{ color: 'var(--text-2)' }}>{r.operatorDuration}&apos;</td>
+                          <td className="py-2 pr-3" style={{ color: 'var(--text-2)' }}>{r.processingDuration}&apos;</td>
+                          <td className="py-2 pr-3" style={{ color: '#22c55e' }}>{formatCurrency(r.price)}</td>
+                          <td className="py-2 pr-3">
+                            <span className="px-1.5 py-0.5 rounded-full text-xs" style={{ background: r.active ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)', color: r.active ? '#22c55e' : '#f87171' }}>
+                              {r.active ? 'Sì' : 'No'}
+                            </span>
+                          </td>
+                          <td className="py-2">
+                            {r.isDup
+                              ? <span className="px-1.5 py-0.5 rounded-full text-xs" style={{ background: 'rgba(245,158,11,0.15)', color: '#f59e0b' }}>Duplicato</span>
+                              : <span className="px-1.5 py-0.5 rounded-full text-xs" style={{ background: 'rgba(99,102,241,0.15)', color: 'var(--accent-light)' }}>Nuovo</span>
+                            }
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="flex justify-end gap-2">
+                  <button onClick={() => { setShowImport(false); setImportRows([]); }} style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--muted)', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', cursor: 'pointer' }}>Annulla</button>
+                  <button onClick={handleImportConfirm} style={btnPrimary}><Check size={14} /> Importa {importRows.filter(r => !r.isDup || importDupAction === 'overwrite').length} servizi</button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Modal */}
       {showForm && (
