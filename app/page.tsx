@@ -244,7 +244,7 @@ export default function Home() {
               <div className="w-5 h-0.5 rounded" style={{ background: 'var(--text-2)' }} />
             </div>
           </button>
-          <p className="font-bold text-white text-sm">Stylistgo</p>
+          <p className="font-bold text-sm" style={{ color: 'var(--text)' }}>Stylistgo</p>
           <button
             onClick={async () => { await signOut(); window.location.href = '/login'; }}
             className="p-2 rounded-lg"
