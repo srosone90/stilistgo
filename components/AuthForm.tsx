@@ -61,14 +61,20 @@ export default function AuthForm() {
   const [newPasswordConfirm, setNewPasswordConfirm] = useState('');
   const [fullName, setFullName] = useState('');
 
-  // Rileva il callback recovery di Supabase nell'URL hash
+  // Rileva il callback recovery di Supabase tramite onAuthStateChange
+  // (l'SDK cancella l'hash PRIMA che useEffect possa leggerlo — race condition)
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const hash = window.location.hash;
-    if (hash.includes('type=recovery')) {
+    const supabase = getSupabaseClient();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setMode('reset');
+      }
+    });
+    // Fallback: controlla anche l'hash nel caso il componente monti dopo l'evento
+    if (typeof window !== 'undefined' && window.location.hash.includes('type=recovery')) {
       setMode('reset');
-      window.history.replaceState(null, '', window.location.pathname + window.location.search);
     }
+    return () => subscription.unsubscribe();
   }, []);
 
   const reset = () => { setError(''); setSuccess(''); setShowResend(false); };
