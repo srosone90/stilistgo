@@ -7,7 +7,7 @@ import type { WhatsAppConfig } from '@/types/salon';
 import { getCurrentUser } from '@/lib/supabase';
 import {
   MessageSquare, Wifi, WifiOff, RefreshCw,
-  CheckCircle2, XCircle, Bell, Cake, ThumbsUp, Star, CalendarCheck, Pencil, ChevronUp, Smartphone,
+  CheckCircle2, XCircle, Bell, Cake, ThumbsUp, Star, CalendarCheck, Pencil, ChevronUp, Smartphone, Moon, CalendarClock,
 } from 'lucide-react';
 
 // ── Style helpers ──────────────────────────────────────────────────────────
@@ -480,6 +480,25 @@ export default function AutomationsView() {
           templateValue={cfg.newClientAppLinkMsg ?? ''}
           onTemplateChange={v => patch({ newClientAppLinkMsg: v })}
           vars={['nome', 'salone', 'link']}
+        />
+        <p style={{ color: 'var(--text-3)', fontWeight: 600, fontSize: 11, margin: '14px 0 4px', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+          Riattivazione clienti
+        </p>
+        <AutomationRow
+          checked={cfg.dormantEnabled ?? false} onChange={v => patch({ dormantEnabled: v })}
+          label="Clienti dormienti" description={`Quando un cliente non si vede da più di ${(salonConfig as any).dormientiDays || 60} giorni`}
+          disabled={!cfg.enabled} icon={<Moon size={15} style={{ color: '#64748b' }} />}
+          templateValue={cfg.dormantMsg ?? ''}
+          onTemplateChange={v => patch({ dormantMsg: v })}
+          vars={['nome', 'giorni', 'salone']}
+        />
+        <AutomationRow
+          checked={cfg.visitFreqReminderEnabled ?? false} onChange={v => patch({ visitFreqReminderEnabled: v })}
+          label="Promemoria frequenza visita" description="Quando la cliente non prenota entro la sua frequenza abituale"
+          disabled={!cfg.enabled} icon={<CalendarClock size={15} style={{ color: '#38bdf8' }} />}
+          templateValue={cfg.visitFreqReminderMsg ?? ''}
+          onTemplateChange={v => patch({ visitFreqReminderMsg: v })}
+          vars={['nome', 'frequenza', 'giorni', 'salone']}
           last
         />
       </div>

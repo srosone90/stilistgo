@@ -10,7 +10,7 @@ import {
   getLast6MonthsData, getIncomeByCategory, formatCurrency,
   filterByMonth,
 } from '@/lib/calculations';
-import { format, parseISO, isToday, isAfter, startOfToday } from 'date-fns';
+import { format, parseISO, isToday, isAfter, startOfToday, differenceInDays } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { CATEGORY_ICONS, EntryCategory } from '@/types';
 import { FileDown, CalendarDays, Users, Package, AlertTriangle, Clock } from 'lucide-react';
@@ -75,6 +75,18 @@ export default function Dashboard({ showAccounting = true }: { showAccounting?: 
     cashSessions.find(s => !s.closedAt),
     [cashSessions]);
 
+  const dormantCount = useMemo(() => {
+    const days = (salonConfig as any).dormientiDays || 60;
+    return clients.filter(c => {
+      const lastPayDate = payments.filter(p => p.clientId === c.id).sort((a, b) => b.date.localeCompare(a.date))[0]?.date;
+      const lastAptDate = appointments.filter(a => a.clientId === c.id && a.status !== 'cancelled').sort((a, b) => b.date.localeCompare(a.date))[0]?.date;
+      const dates = [lastPayDate, lastAptDate, (c as any).lastVisitDate].filter(Boolean) as string[];
+      const lastVisit = dates.sort((a, b) => b.localeCompare(a))[0];
+      if (!lastVisit) return false;
+      return differenceInDays(new Date(), parseISO(lastVisit)) > days;
+    }).length;
+  }, [clients, payments, appointments, salonConfig]);
+
   const activeOp = operators.find(o => o.id === activeOperatorId);
   const isOwner = !activeOperatorId || !activeOp || activeOp.role === 'owner';
 
@@ -138,6 +150,11 @@ export default function Dashboard({ showAccounting = true }: { showAccounting?: 
           <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>
             {clients.filter(c => c.loyaltyPoints > 0).length} con punti fedeltà
           </p>
+          {dormantCount > 0 && (
+            <p className="text-xs mt-0.5" style={{ color: '#f59e0b' }}>
+              {dormantCount} dormienti
+            </p>
+          )}
         </div>
         <div className="rounded-2xl p-4" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
           <div className="flex items-center gap-2 mb-2">

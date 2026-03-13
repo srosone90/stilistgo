@@ -23,6 +23,10 @@ interface WhatsAppConfig {
   loyaltyMilestone: number;
   bookingConfirmEnabled: boolean;
   appointmentConfirmEnabled?: boolean;
+  dormantEnabled?: boolean;
+  dormantMsg?: string;
+  visitFreqReminderEnabled?: boolean;
+  visitFreqReminderMsg?: string;
   // Custom message templates
   reminderMsg?: string;
   birthdayMsg?: string;
@@ -32,18 +36,21 @@ interface WhatsAppConfig {
 interface Client {
   id: string; firstName: string; lastName: string;
   phone: string; birthDate: string; loyaltyPoints: number;
+  visitFrequency?: string; lastVisitDate?: string;
 }
 interface Appointment {
   id: string; clientId: string; date: string;
   startTime: string; status: string; serviceIds: string[];
 }
 interface Service { id: string; name: string; }
-interface SalonConfig { salonName: string; whatsapp?: WhatsAppConfig; }
+interface Payment { id: string; clientId: string; date: string; total: number; }
+interface SalonConfig { salonName: string; whatsapp?: WhatsAppConfig; dormientiDays?: number; }
 interface SalonState {
   salonConfig?: SalonConfig;
   clients?: Client[];
   appointments?: Appointment[];
   services?: Service[];
+  payments?: Payment[];
   whatsappMessages?: WhatsAppLogEntry[];
 }
 interface WhatsAppLogEntry {
@@ -67,6 +74,29 @@ const DEFAULT_REMINDER_MSG    = 'Ciao {nome}! 😊 Ti ricordiamo il tuo appuntam
 const DEFAULT_BIRTHDAY_MSG    = 'Tanti auguri {nome}! 🎂🎉 Tutto il team di {salone} ti augura una splendida giornata!';
 const DEFAULT_POSTVISIT_MSG   = 'Ciao {nome}! Speriamo tu sia soddisfatta della tua visita da {salone}. ⭐ Ci fa sempre piacere sapere come stai!';
 const DEFAULT_LOYALTY_MSG     = 'Complimenti {nome}! 🌟 Hai raggiunto {punti} punti fedeltà da {salone}. Contattaci per scoprire il tuo premio!';
+const DEFAULT_DORMANT_MSG     = 'Ciao {nome}! 😊 Sono passati {giorni} giorni dalla tua ultima visita da {salone}. Ci manchi! Ti aspettiamo quando vuoi 💇';
+const DEFAULT_VISITFREQ_MSG   = 'Ciao {nome}! 💇 È il momento del tuo appuntamento {frequenza} da {salone}. Prenota quando vuoi, ti aspettiamo!'
+
+// Soglie in giorni per ogni frequenza di visita
+const VISIT_FREQ_DAYS: Record<string, number> = {
+  settimanale: 8, frequente: 21, mensile: 31, regolare: 45, occasionale: 90,
+};
+
+/** Restituisce la data più recente di pagamento/appuntamento non cancellato per un cliente */
+function getEffectiveLastVisitDate(client: Client, apts: Appointment[], payments: Payment[]): string | null {
+  const payDates = payments.filter(p => p.clientId === client.id).map(p => p.date);
+  const aptDates = apts.filter(a => a.clientId === client.id && a.status !== 'cancelled').map(a => a.date);
+  const all = [...payDates, ...aptDates].filter(Boolean).sort((a, b) => b.localeCompare(a));
+  return all[0] ?? client.lastVisitDate ?? null;
+}
+
+/** Controlla se è già stato inviato un messaggio di quel tipo per quel cliente negli ultimi N giorni */
+function sentWithinDays(log: WhatsAppLogEntry[], type: string, clientId: string, days: number): boolean {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
+  const cutoffStr = cutoff.toISOString();
+  return log.some(m => m.type === type && m.clientId === clientId && m.sentAt >= cutoffStr);
+}
 
 async function sendUltraMsg(instanceId: string, token: string, to: string, message: string): Promise<boolean> {
   const phone = to.replace(/\D/g, '');
@@ -137,6 +167,7 @@ export default async function handler() {
     const clients   = state.clients ?? [];
     const apts      = state.appointments ?? [];
     const services  = state.services ?? [];
+    const payments  = state.payments ?? [];
     const log: WhatsAppLogEntry[] = [...(state.whatsappMessages ?? [])];
 
     const alreadySent = new Set(log.filter(m => m.sentAt.startsWith(today)).map(m => `${m.type}:${m.clientId}`));
@@ -195,6 +226,42 @@ export default async function handler() {
         const msg = renderTemplate(wa.loyaltyMsg ?? DEFAULT_LOYALTY_MSG, { nome: client.firstName, punti: String(client.loyaltyPoints), salone: salonName });
         const sent = await sendUltraMsg(instanceId, token, client.phone, msg);
         log.push({ id: crypto.randomUUID(), type: 'loyalty', clientId: client.id, clientName: `${client.firstName} ${client.lastName}`, phone: client.phone, templateName: 'loyalty', status: sent ? 'sent' : 'failed', sentAt: new Date().toISOString() });
+      }
+    }
+
+    // ── Clienti dormienti ──
+    if (wa.dormantEnabled) {
+      const dormientiDays = state.salonConfig?.dormientiDays ?? 60;
+      for (const client of clients.filter(c => c.phone)) {
+        const key = `dormant:${client.id}`;
+        if (alreadySent.has(key)) continue;
+        const lastVisit = getEffectiveLastVisitDate(client, apts, payments);
+        if (!lastVisit) continue;
+        const daysSince = Math.floor((Date.now() - new Date(lastVisit).getTime()) / 86400000);
+        if (daysSince < dormientiDays) continue;
+        if (sentWithinDays(log, 'dormant', client.id, 30)) continue;
+        const msg = renderTemplate(wa.dormantMsg ?? DEFAULT_DORMANT_MSG, { nome: client.firstName, giorni: String(daysSince), salone: salonName });
+        const sent = await sendUltraMsg(instanceId, token, client.phone, msg);
+        log.push({ id: crypto.randomUUID(), type: 'dormant', clientId: client.id, clientName: `${client.firstName} ${client.lastName}`, phone: client.phone, templateName: 'dormant', status: sent ? 'sent' : 'failed', sentAt: new Date().toISOString() });
+        alreadySent.add(key);
+      }
+    }
+
+    // ── Promemoria frequenza visita ──
+    if (wa.visitFreqReminderEnabled) {
+      for (const client of clients.filter(c => c.phone && c.visitFrequency && VISIT_FREQ_DAYS[c.visitFrequency!])) {
+        const key = `visitfreq:${client.id}`;
+        if (alreadySent.has(key)) continue;
+        const lastVisit = getEffectiveLastVisitDate(client, apts, payments);
+        if (!lastVisit) continue;
+        const freqDays = VISIT_FREQ_DAYS[client.visitFrequency!]!;
+        const daysSince = Math.floor((Date.now() - new Date(lastVisit).getTime()) / 86400000);
+        if (daysSince < freqDays) continue;
+        if (sentWithinDays(log, 'visitfreq', client.id, Math.max(freqDays - 2, 1))) continue;
+        const msg = renderTemplate(wa.visitFreqReminderMsg ?? DEFAULT_VISITFREQ_MSG, { nome: client.firstName, frequenza: client.visitFrequency!, giorni: String(daysSince), salone: salonName });
+        const sent = await sendUltraMsg(instanceId, token, client.phone, msg);
+        log.push({ id: crypto.randomUUID(), type: 'visitfreq', clientId: client.id, clientName: `${client.firstName} ${client.lastName}`, phone: client.phone, templateName: 'visitfreq', status: sent ? 'sent' : 'failed', sentAt: new Date().toISOString() });
+        alreadySent.add(key);
       }
     }
 

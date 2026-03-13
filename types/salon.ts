@@ -302,6 +302,12 @@ export interface WhatsAppConfig {
   // App link automation
   newClientAppLinkEnabled: boolean;
   newClientAppLinkMsg?: string;
+  // Riattivazione dormienti
+  dormantEnabled: boolean;
+  dormantMsg?: string;
+  // Promemoria frequenza visita
+  visitFreqReminderEnabled: boolean;
+  visitFreqReminderMsg?: string;
   // Message templates (optional — fallback to defaults if not set)
   reminderMsg?: string;
   birthdayMsg?: string;
@@ -324,6 +330,10 @@ export const DEFAULT_WHATSAPP_CONFIG: WhatsAppConfig = {
   loyaltyMilestone: 100,
   newClientAppLinkEnabled: false,
   newClientAppLinkMsg: 'Ciao {nome}! 🎉 Scarica l\'app di {salone} e prenota direttamente dal tuo telefono: {link}',
+  dormantEnabled: false,
+  dormantMsg: 'Ciao {nome}! 😊 Sono passati un po\' di giorni dall\'ultima tua visita da {salone}. Ci manchi! Prenota quando vuoi, ti aspettiamo 💇',
+  visitFreqReminderEnabled: false,
+  visitFreqReminderMsg: 'Ciao {nome}! 💇 È il momento del tuo appuntamento {frequenza} da {salone}. Ti aspettiamo!',
   reminderMsg: 'Ciao {nome}! 😊 Ti ricordiamo il tuo appuntamento di *{servizio}* domani alle {ora} da {salone}. A presto!',
   birthdayMsg: 'Tanti auguri {nome}! 🎂🎉 Tutto il team di {salone} ti augura una splendida giornata!',
   postVisitMsg: 'Ciao {nome}! Speriamo tu sia soddisfatta della tua visita da {salone}. ⭐ Ci fa sempre piacere sapere come stai!',
