@@ -45,7 +45,7 @@ function computeServiceStartMin(a: Appointment, targetSid: string, svcs: Service
   }
   return timeToMinutes(a.startTime);
 }
-const HOUR_PX_BASE = 80; // base height per hour at zoom 1.0 — 15-min slot = 20px
+const HOUR_PX_BASE = 80; // base height per hour at zoom 1.0 ï¿½ 15-min slot = 20px
 
 export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: number; onGoToCash?: (clientId: string, appointmentId: string) => void }) {
   const {
@@ -80,7 +80,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
   const HOUR_PX = HOUR_PX_BASE * zoom;
   const SLOT_MIN = slotSizeMin; // 15 | 30 | 60
   const SLOT_PX = (HOUR_PX / 60) * SLOT_MIN;
-  const hourPxRef = useRef(HOUR_PX); // kept in sync — used by drag/resize event closures
+  const hourPxRef = useRef(HOUR_PX); // kept in sync ï¿½ used by drag/resize event closures
   useEffect(() => { hourPxRef.current = HOUR_PX; }, [HOUR_PX]);
   const dayGridRef = useRef<HTMLDivElement>(null);
   const pinchRef = useRef<{ dist: number } | null>(null);
@@ -388,7 +388,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
       if (serviceDragRef.current) {
         const totalDelta = Math.hypot(e.clientX - serviceDragRef.current.startX, e.clientY - serviceDragRef.current.startY);
         if (totalDelta > 5) wasDraggedRef.current = true;
-        // Free movement — round to 1 min, no snap
+        // Free movement ï¿½ round to 1 min, no snap
         const rawDelta = (e.clientY - serviceDragRef.current.startY) / hourPxRef.current * 60;
         const deltaMin = Math.round(rawDelta);
         const newStartMin = Math.max(openHour * 60, serviceDragRef.current.origStartMin + deltaMin);
@@ -598,7 +598,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
                       <p className="font-semibold text-sm truncate" style={{ color: 'var(--text)' }}>
-                        {a.isBlock ? '?? ' + (a.blockReason || 'Blocco') : (client ? `${client.firstName} ${client.lastName}` : '—')}
+                        {a.isBlock ? '?? ' + (a.blockReason || 'Blocco') : (client ? `${client.firstName} ${client.lastName}` : 'ï¿½')}
                       </p>
                       <p className="text-xs font-bold flex-shrink-0" style={{ color }}>
                         {a.startTime}
@@ -608,7 +608,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                       <p className="text-xs truncate mt-0.5" style={{ color: 'var(--text-3)' }}>{svcNames}</p>
                     )}
                     <div className="flex items-center gap-3 mt-1">
-                      <span className="text-xs" style={{ color: 'var(--muted)' }}>{a.startTime} – {a.endTime} · {durationMin}&apos;</span>
+                      <span className="text-xs" style={{ color: 'var(--muted)' }}>{a.startTime} ï¿½ {a.endTime} ï¿½ {durationMin}&apos;</span>
                       {op && <span className="text-xs" style={{ color }}>{op.name}</span>}
                       {a.status === 'no-show' && <span className="text-xs" style={{ color: '#f59e0b' }}>? No-show</span>}
                       {a.notes?.trim() && <FileText size={11} color={color} opacity={0.7} />}
@@ -699,7 +699,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
         </div>
       </div>
 
-      {/* Operator legend — only shown in week/month views */}
+      {/* Operator legend ï¿½ only shown in week/month views */}
       {view !== 'day' && activeOperators.length > 1 && (
         <div className="flex gap-3 flex-wrap">
           {activeOperators.map(o => (
@@ -756,7 +756,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                           return (
                             <div key={a.id} className="text-xs truncate rounded px-1 py-0.5"
                               style={{ background: `${op?.color || '#6366f1'}25`, color: op?.color || 'var(--accent-light)', fontSize: 10 }}>
-                              {a.startTime} {client ? `${client.firstName}` : a.isBlock ? 'Blocco' : '—'}
+                              {a.startTime} {client ? `${client.firstName}` : a.isBlock ? 'Blocco' : 'ï¿½'}
                             </div>
                           );
                         })}
@@ -910,7 +910,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                         <div className="px-2 pt-1 pb-0.5" style={{ background: `${color}28` }}>
                           <div className="flex items-start gap-1">
                             <p className="text-xs font-semibold truncate flex-1" style={{ color }}>
-                              {a.isBlock ? '?? ' + (a.blockReason || 'Blocco') : (client ? `${client.firstName} ${client.lastName}` : '—')}
+                              {a.isBlock ? '?? ' + (a.blockReason || 'Blocco') : (client ? `${client.firstName} ${client.lastName}` : 'ï¿½')}
                             </p>
                             {/* Status icons */}
                             <div className="flex gap-0.5 flex-shrink-0">
@@ -918,7 +918,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                               {hasWarning && <AlertCircle size={9} color="#f59e0b" />}
                             </div>
                           </div>
-                          <p style={{ color: 'var(--text-3)', fontSize: 10 }}>{effectiveStart}–{effectiveEnd}</p>
+                          <p style={{ color: 'var(--text-3)', fontSize: 10 }}>{effectiveStart}ï¿½{effectiveEnd}</p>
                         </div>
                         <div onMouseDown={e => handleResizeStart(e, a)}
                           className="absolute bottom-0 left-0 right-0 flex items-center justify-center"
@@ -971,16 +971,16 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                         onClick={e => { if (wasDraggedRef.current) { e.stopPropagation(); return; } e.stopPropagation(); setSelectedApptId(a.id === selectedApptId ? null : a.id); openEdit(a); }}
                         className="absolute left-1 right-1 overflow-hidden hover:brightness-110 transition-all"
                         style={{ top: activeTop, height: activeBlockH, background: `${svColor}22`, border: `1.5px solid ${isSelected ? svColor : svColor + '55'}`, borderRadius: procDur > 0 ? '8px 8px 0 0' : '8px', boxShadow: isSelected ? `0 0 0 2px ${svColor}80` : 'none', zIndex: isDragging ? 10 : 2, opacity: isDragging ? 0.7 : 1, cursor: isDragging ? 'grabbing' : 'grab', userSelect: 'none' }}>
-                        {/* × rimuovi servizio */}
+                        {/* ï¿½ rimuovi servizio */}
                         <button
                           onMouseDown={e => e.stopPropagation()}
                           onClick={removeService}
                           style={{ position: 'absolute', top: 2, right: 2, zIndex: 4, background: 'rgba(0,0,0,0.35)', border: 'none', color: 'rgba(255,255,255,0.65)', borderRadius: '3px', padding: '0 4px', fontSize: '11px', lineHeight: '15px', cursor: 'pointer' }}
-                          title="Rimuovi servizio dall'appuntamento">×</button>
+                          title="Rimuovi servizio dall'appuntamento">ï¿½</button>
                         <div style={{ padding: '2px 24px 0 8px', overflow: 'hidden' }}>
                           <div className="flex items-start gap-1">
                             <p className="text-xs font-semibold truncate flex-1" style={{ color: svColor }}>
-                              {client ? `${client.firstName} ${client.lastName}` : '—'}
+                              {client ? `${client.firstName} ${client.lastName}` : 'ï¿½'}
                             </p>
                             <div className="flex gap-0.5 flex-shrink-0" style={{ marginRight: 16 }}>
                               {hasNote && <FileText size={9} color={svColor} opacity={0.8} />}
@@ -988,7 +988,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                             </div>
                           </div>
                           <p style={{ color: 'var(--text-3)', fontSize: 9 }} className="truncate">
-                            {minutesToTime(startAbsMin)}–{minutesToTime(startAbsMin + opDur + procDur)} · {svc.name}
+                            {minutesToTime(startAbsMin)}ï¿½{minutesToTime(startAbsMin + opDur + procDur)} ï¿½ {svc.name}
                           </p>
                           <p style={{ color: svColor, fontSize: 9, opacity: 0.7 }}>{opDur}&apos; operatore</p>
                         </div>
@@ -1073,14 +1073,14 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                       <div className="px-2 pt-1 pb-0.5" style={{ background: 'rgba(113,113,122,0.15)' }}>
                         <div className="flex items-start gap-1">
                           <p className="text-xs font-semibold truncate flex-1" style={{ color }}>
-                            {a.isBlock ? '?? ' + (a.blockReason || 'Blocco') : (client ? `${client.firstName} ${client.lastName}` : '—')}
+                            {a.isBlock ? '?? ' + (a.blockReason || 'Blocco') : (client ? `${client.firstName} ${client.lastName}` : 'ï¿½')}
                           </p>
                           <div className="flex gap-0.5 flex-shrink-0">
                             {hasNote && <FileText size={9} color={color} opacity={0.8} />}
                             {hasWarning && <AlertCircle size={9} color="#f59e0b" />}
                           </div>
                         </div>
-                        <p style={{ color: 'var(--text-3)', fontSize: 10 }}>{effectiveStart}–{effectiveEnd}</p>
+                        <p style={{ color: 'var(--text-3)', fontSize: 10 }}>{effectiveStart}ï¿½{effectiveEnd}</p>
                         {svcNames && totalHeight > 44 && <p className="truncate" style={{ color: 'var(--muted)', fontSize: 9 }}>{svcNames}</p>}
                       </div>
                       <div onMouseDown={e => handleResizeStart(e, a)}
@@ -1165,14 +1165,14 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                       style={{ top, height, left: `calc(${leftPct}% + 2px)`, width: `calc(${colW}% - 4px)`, background: `${color}25`, border: `1px solid ${color}60`, zIndex: isDragging ? 10 : 2, opacity: isDragging ? 0.7 : 1, cursor: isDragging ? 'grabbing' : 'grab', userSelect: 'none' }}>
                       <div className="flex items-start gap-1">
                         <p className="text-xs font-semibold truncate flex-1" style={{ color }}>
-                          {a.isBlock ? 'Blocco: ' + a.blockReason : (client ? `${client.firstName} ${client.lastName}` : '—')}
+                          {a.isBlock ? 'Blocco: ' + a.blockReason : (client ? `${client.firstName} ${client.lastName}` : 'ï¿½')}
                         </p>
                         <div className="flex gap-0.5 flex-shrink-0">
                           {hasNote && <FileText size={9} color={color} opacity={0.8} />}
                           {hasWarning && <AlertCircle size={9} color="#f59e0b" />}
                         </div>
                       </div>
-                      <p className="text-xs truncate" style={{ color: 'var(--text-3)', fontSize: 10 }}>{a.startTime}–{effectiveEnd}</p>
+                      <p className="text-xs truncate" style={{ color: 'var(--text-3)', fontSize: 10 }}>{a.startTime}ï¿½{effectiveEnd}</p>
                       {svcNames && height > 38 && <p className="truncate" style={{ color: 'var(--muted)', fontSize: 10 }}>{svcNames}</p>}
                       <div onMouseDown={e => handleResizeStart(e, a)}
                         className="absolute bottom-0 left-0 right-0 flex items-center justify-center"
@@ -1241,7 +1241,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
               autoFocus
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Cerca per cliente, servizio o note…"
+              placeholder="Cerca per cliente, servizio o noteï¿½"
               style={{ ...inputStyle, flex: 1 }}
             />
             <button onClick={() => { setShowSearch(false); setSearchQuery(''); }} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}><X size={16} /></button>
@@ -1259,7 +1259,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                     <span className="inline-block w-2 h-2 rounded-full flex-shrink-0" style={{ background: op?.color || '#6366f1' }} />
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-semibold truncate" style={{ color: 'var(--text)' }}>
-                        {client ? `${client.firstName} ${client.lastName}` : '—'}
+                        {client ? `${client.firstName} ${client.lastName}` : 'ï¿½'}
                       </p>
                       {svcNames && <p className="text-xs truncate" style={{ color: 'var(--muted)' }}>{svcNames}</p>}
                     </div>
@@ -1290,7 +1290,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
               autoFocus
               value={sidebarSearch}
               onChange={e => setSidebarSearch(e.target.value)}
-              placeholder="Nome, cognome, telefono…"
+              placeholder="Nome, cognome, telefonoï¿½"
               style={{ ...inputStyle }}
             />
           </div>
@@ -1385,9 +1385,9 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                     </button>
                   </div>
                   <select value={form.clientId} onChange={e => setForm(p => ({ ...p, clientId: e.target.value }))} style={inputStyle}>
-                    <option value="">— Seleziona cliente —</option>
+                    <option value="">ï¿½ Seleziona cliente ï¿½</option>
                     {[...clients].sort((a, b) => `${a.firstName}${a.lastName}`.localeCompare(`${b.firstName}${b.lastName}`)).map(c => (
-                      <option key={c.id} value={c.id}>{c.firstName} {c.lastName}{c.phone ? ` · ${c.phone}` : ''}</option>
+                      <option key={c.id} value={c.id}>{c.firstName} {c.lastName}{c.phone ? ` ï¿½ ${c.phone}` : ''}</option>
                     ))}
                   </select>
                 </div>
@@ -1397,7 +1397,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                 <div>
                   <label style={labelStyle}>Operatore</label>
                   <select value={form.operatorId} onChange={e => setForm(p => ({ ...p, operatorId: e.target.value }))} style={inputStyle}>
-                    <option value="">—</option>
+                    <option value="">ï¿½</option>
                     {operators.filter(o => o.active).map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
                   </select>
                 </div>
@@ -1487,7 +1487,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
           <div className="w-full max-w-sm rounded-2xl p-6" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
             <h3 className="font-semibold mb-2" style={{ color: 'var(--text)' }}>Eliminare appuntamento?</h3>
-            <p className="text-sm mb-4" style={{ color: 'var(--muted)' }}>Questa azione non è reversibile.</p>
+            <p className="text-sm mb-4" style={{ color: 'var(--muted)' }}>Questa azione non ï¿½ reversibile.</p>
             <div className="flex gap-2">
               <button onClick={() => setConfirmDeleteId(null)} style={{ flex: 1, background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--muted)', borderRadius: '8px', padding: '8px', fontSize: '13px', cursor: 'pointer' }}>Annulla</button>
               <button onClick={() => { deleteAppointment(confirmDeleteId); setConfirmDeleteId(null); setShowForm(false); }}
