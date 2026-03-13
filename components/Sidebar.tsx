@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { LayoutDashboard, Table2, BarChart3, Settings, Scissors, Wifi, WifiOff, LogOut, CalendarDays, Users, Sparkles, UserCog, Package, Banknote, UserCircle, X, Lock, LogIn, Trophy, Star, Globe, Moon, Sun, MessageSquare, Building2, CreditCard, Gift, Smartphone, BookOpen } from 'lucide-react';
+import { LayoutDashboard, Table2, BarChart3, Settings, Wifi, WifiOff, LogOut, CalendarDays, Users, Sparkles, UserCog, Package, Banknote, UserCircle, X, Lock, LogIn, Trophy, Star, Globe, Moon, Sun, MessageSquare, Building2, CreditCard, Gift, Smartphone, BookOpen } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { getCurrentUser, signOut } from '@/lib/supabase';
 import { useSalon } from '@/context/SalonContext';
@@ -121,13 +121,32 @@ export default function Sidebar({ activeView, onNavigate, onLock, permissions, p
       style={{ background: 'var(--bg-sidebar)', borderRight: '1px solid var(--border)' }}>
       {/* Logo */}
       <div className="flex items-center gap-3 px-6 py-5" style={{ borderBottom: '1px solid var(--border)' }}>
-        <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg"
-          style={{ background: 'linear-gradient(135deg,#6366f1,#a855f7)' }}>
-          <Scissors size={18} className="text-white" />
-        </div>
+        {/* StylistGo logo mark */}
+        <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="sgGrad" x1="0" y1="0" x2="36" y2="36" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stopColor="#a78bfa" />
+              <stop offset="100%" stopColor="#6366f1" />
+            </linearGradient>
+            <filter id="sgGlow" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="1.5" result="blur" />
+              <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+            </filter>
+          </defs>
+          <rect width="36" height="36" rx="10" fill="url(#sgGrad)" opacity="0.15" />
+          {/* Fluid S */}
+          <path d="M22 11c-1.5-1.2-3.5-1.8-5.5-1.2C13.8 10.5 12.5 12.8 13 15c.4 1.8 2.2 2.8 4 3.2 2 .5 4 1.5 4.2 3.5.2 2-1.5 3.8-3.5 4.2-1.8.3-3.5-.3-4.7-1.4"
+            stroke="url(#sgGrad)" strokeWidth="2.2" strokeLinecap="round" fill="none" filter="url(#sgGlow)" />
+          {/* Arrow */}
+          <line x1="20" y1="20" x2="26" y2="14" stroke="url(#sgGrad)" strokeWidth="2" strokeLinecap="round" />
+          <polyline points="22,14 26,14 26,18" stroke="url(#sgGrad)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+          <circle cx="26" cy="14" r="1.2" fill="url(#sgGrad)" />
+        </svg>
         <div className="flex-1 min-w-0">
-          <p className="font-bold text-sm text-white leading-tight">Stylistgo</p>
-          <p className="text-xs" style={{ color: 'var(--muted)' }}>Salon Gestionale</p>
+          <p className="font-bold text-sm leading-tight" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 800 }}>
+            <span style={{ color: 'var(--text)' }}>Stylist</span><span style={{ background: 'linear-gradient(135deg,#a78bfa,#6366f1)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Go</span>
+          </p>
+          <p className="text-xs tracking-wide" style={{ color: 'var(--muted)', letterSpacing: '0.06em' }}>Salon Management</p>
         </div>
         <NotificationBell />
       </div>

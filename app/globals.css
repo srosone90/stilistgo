@@ -3,54 +3,57 @@
 /* ── Dark theme (default) ─────────────────────────────────────────────────── */
 :root,
 [data-theme="dark"] {
-  --background: #0f0f13;
-  --foreground: #f4f4f5;
-  --card: #1c1c27;
-  --card-border: #2e2e40;
+  --background: #0f1117;
+  --foreground: #ffffff;
+  --card: #1a1d27;
+  --card-border: #2a2d3e;
   --accent: #6366f1;
-  --accent-hover: #818cf8;
+  --accent-hover: #a78bfa;
   --success: #22c55e;
   --danger: #ef4444;
   --warning: #f59e0b;
-  --muted: #71717a;
-
-  /* Extended palette used in inline styles */
-  --bg-page: #0f0f13;
-  --bg-sidebar: #16161f;
-  --bg-card: #1c1c27;
-  --bg-input: #12121a;
-  --border: #2e2e40;
-  --border-light: #3f3f5a;
-  --text: #f4f4f5;
-  --text-2: #d4d4d8;
-  --text-3: #a1a1aa;
-  --accent-light: #818cf8;
-  --gradient-bg: linear-gradient(135deg, #0f0f13, #13131e);
+  --muted: #8b8fa8;
+  --bg-page: #0f1117;
+  --bg-sidebar: #1a1d27;
+  --bg-card: #1a1d27;
+  --bg-input: #0d0f16;
+  --border: #2a2d3e;
+  --border-light: #3a3d52;
+  --text: #ffffff;
+  --text-2: #e2e2ea;
+  --text-3: #8b8fa8;
+  --accent-light: #a78bfa;
+  --violet: #8b5cf6;
+  --indigo: #6366f1;
+  --gradient-accent: linear-gradient(135deg, #a78bfa, #6366f1);
+  --gradient-bg: linear-gradient(135deg, #0f1117, #12101e);
 }
 
 /* ── Light theme ─────────────────────────────────────────────────────────── */
 [data-theme="light"] {
   --background: #f4f4f8;
-  --foreground: #09090b;
+  --foreground: #1a1d27;
   --card: #ffffff;
-  --card-border: #e4e4e7;
+  --card-border: #e2e2ea;
   --accent: #6366f1;
   --accent-hover: #4f46e5;
   --success: #16a34a;
   --danger: #dc2626;
   --warning: #d97706;
-  --muted: #71717a;
-
+  --muted: #9999b0;
   --bg-page: #f4f4f8;
   --bg-sidebar: #ffffff;
   --bg-card: #ffffff;
   --bg-input: #f1f1f5;
-  --border: #e4e4e7;
-  --border-light: #d4d4d8;
-  --text: #09090b;
-  --text-2: #3f3f46;
-  --text-3: #52525b;
-  --accent-light: #4f46e5;
+  --border: #e2e2ea;
+  --border-light: #d0d0da;
+  --text: #1a1d27;
+  --text-2: #3f3f52;
+  --text-3: #9999b0;
+  --accent-light: #6366f1;
+  --violet: #8b5cf6;
+  --indigo: #6366f1;
+  --gradient-accent: linear-gradient(135deg, #a78bfa, #6366f1);
   --gradient-bg: linear-gradient(135deg, #f4f4f8, #ecedf5);
 }
 
@@ -70,9 +73,14 @@ html {
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: 'DM Sans', 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   min-height: 100vh;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Plus Jakarta Sans', 'DM Sans', sans-serif;
+  font-weight: 800;
 }
 
 ::-webkit-scrollbar { width: 6px; height: 6px; }
