@@ -112,8 +112,9 @@ export async function signUp(email: string, password: string, fullName: string) 
       return { data: null, error: { message: json.error || 'Errore durante la registrazione.' } };
     }
 
-    // Utente creato e confermato → accedi subito
-    return await signIn(email, password);
+    // Utente creato — email di conferma inviata via Resend (email_confirm: false)
+    // Non fare auto-login: l'utente deve cliccare il link nell'email.
+    return { data: { session: null, user: json.user, check_email: true }, error: null };
   } catch {
     // fetch ha lanciato eccezione (Supabase non raggiungibile) → fallback locale
     return localSignUp(email, password, fullName);

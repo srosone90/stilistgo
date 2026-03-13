@@ -51,13 +51,15 @@ export default function AuthForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [showResend, setShowResend] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
 
   // Fields
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
 
-  const reset = () => { setError(''); setSuccess(''); };
+  const reset = () => { setError(''); setSuccess(''); setShowResend(false); };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,7 +74,16 @@ export default function AuthForm() {
     try {
       if (mode === 'login') {
         const { data, error: err } = await signIn(email, password);
-        if (err) { setError(err.message); return; }
+        if (err) {
+          const msg = err.message;
+          if (msg.toLowerCase().includes('email not confirmed') || msg.toLowerCase().includes('email_not_confirmed')) {
+            setError('Email non ancora confermata. Controlla la tua casella di posta e clicca il link di conferma.');
+            setShowResend(true);
+          } else {
+            setError(msg);
+          }
+          return;
+        }
         if (data?.session) {
           router.push('/');
           router.refresh();
@@ -80,15 +91,16 @@ export default function AuthForm() {
       } else {
         const { data, error: err } = await signUp(email, password, fullName);
         if (err) { setError(err.message); return; }
+        if ((data as { check_email?: boolean })?.check_email) {
+          setSuccess('Account creato! Controlla la tua email e clicca il link di conferma per accedere.');
+          return;
+        }
         if (data?.session) {
           router.push('/');
           router.refresh();
         } else {
           setSuccess('Account creato! Accesso in corso...');
-          setTimeout(() => {
-            router.push('/');
-            router.refresh();
-          }, 1000);
+          setTimeout(() => { router.push('/'); router.refresh(); }, 1000);
         }
       }
     } catch (e: unknown) {
@@ -102,6 +114,27 @@ export default function AuthForm() {
   const toggleMode = () => {
     setMode(m => (m === 'login' ? 'register' : 'login'));
     reset();
+  };
+
+  const handleResend = async () => {
+    if (!email) { setError('Inserisci la tua email per ricevere il nuovo link.'); return; }
+    setResendLoading(true);
+    try {
+      const res = await fetch('/api/auth/resend-confirmation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const json = await res.json();
+      if (!res.ok) { setError(json.error || 'Errore durante il reinvio.'); return; }
+      setError('');
+      setShowResend(false);
+      setSuccess('Email di conferma reinviata! Controlla la tua casella.');
+    } catch {
+      setError('Errore di rete. Riprova.');
+    } finally {
+      setResendLoading(false);
+    }
   };
 
   return (
@@ -134,6 +167,27 @@ export default function AuthForm() {
           }}
         >
           {error}
+          {showResend && (
+            <button
+              type="button"
+              onClick={handleResend}
+              disabled={resendLoading}
+              style={{
+                display: 'block',
+                marginTop: '8px',
+                background: 'rgba(239,68,68,0.2)',
+                border: '1px solid rgba(239,68,68,0.4)',
+                borderRadius: '6px',
+                color: '#fca5a5',
+                padding: '5px 12px',
+                fontSize: '12px',
+                cursor: resendLoading ? 'not-allowed' : 'pointer',
+                opacity: resendLoading ? 0.6 : 1,
+              }}
+            >
+              {resendLoading ? 'Invio...' : 'Rimanda email di conferma'}
+            </button>
+          )}
         </div>
       )}
 
