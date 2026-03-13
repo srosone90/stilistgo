@@ -61,10 +61,11 @@ export async function POST(req: NextRequest) {
     });
 
     if (!linkError && linkData.properties?.action_link) {
-      // Fire-and-forget: non bloccare la risposta per l'invio email
-      sendSignupConfirmationEmail(email, linkData.properties.action_link).catch((err) =>
-        console.error('[signup] sendSignupConfirmationEmail failed:', err),
-      );
+      try {
+        await sendSignupConfirmationEmail(email, linkData.properties.action_link);
+      } catch (err) {
+        console.error('[signup] sendSignupConfirmationEmail failed:', err);
+      }
     } else {
       console.error('[signup] generateLink failed:', linkError?.message);
     }

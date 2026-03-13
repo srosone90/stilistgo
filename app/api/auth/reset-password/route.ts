@@ -60,9 +60,13 @@ export async function POST(req: NextRequest) {
     });
 
     if (!linkError && linkData?.properties?.action_link) {
-      sendPasswordResetEmail(normalizedEmail, linkData.properties.action_link).catch((err) =>
-        console.error('[reset-password] sendPasswordResetEmail failed:', err),
-      );
+      try {
+        await sendPasswordResetEmail(normalizedEmail, linkData.properties.action_link);
+      } catch (err) {
+        console.error('[reset-password] sendPasswordResetEmail failed:', err);
+      }
+    } else if (linkError) {
+      console.error('[reset-password] generateLink failed:', linkError.message);
     }
     // Se l'email non esiste (linkError), non riveliamo nulla (anti-enumerazione)
 
