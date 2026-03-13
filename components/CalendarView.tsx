@@ -558,7 +558,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
               }}>
               {showMonth && <span style={{ display: 'block', fontSize: 9, opacity: 0.7, letterSpacing: '0.04em' }}>{w.monthLabel}</span>}
               {!showMonth && <span style={{ display: 'block', fontSize: 9, opacity: 0 }}>--</span>}
-              <span>{isToday ? 'OGGI' : `W${w.label}`}</span>
+              <span>{isToday ? 'OGGI' : format(w.weekStart, 'd MMM', { locale: it })}</span>
             </button>
           );
         })}
