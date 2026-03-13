@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { useSalon } from '@/context/SalonContext';
-import { Appointment, AppointmentStatus, STATUS_LABELS } from '@/types/salon';
+import { Appointment, AppointmentStatus, STATUS_LABELS, Service } from '@/types/salon';
 import { format, parseISO, addDays, startOfWeek, isSameDay, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, addMonths } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, Plus, X, UserPlus, ZoomIn, ZoomOut } from 'lucide-react';
@@ -12,7 +12,7 @@ const labelStyle: React.CSSProperties = { fontSize: '12px', color: 'var(--muted)
 const btnPrimary: React.CSSProperties = { background: 'rgba(99,102,241,0.2)', border: '1px solid rgba(99,102,241,0.4)', color: 'var(--accent-light)', borderRadius: '10px', padding: '8px 16px', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' };
 
 const EMPTY_APPT: Omit<Appointment, 'id' | 'createdAt' | 'history'> = {
-  clientId: '', operatorId: '', serviceIds: [], serviceOperators: {},
+  clientId: '', operatorId: '', serviceIds: [], serviceOperators: {}, serviceStartTimes: {}, serviceOperatorDurations: {},
   date: format(new Date(), 'yyyy-MM-dd'), startTime: '09:00', endTime: '10:00',
   status: 'scheduled', notes: '', isBlock: false, blockReason: '',
   recurringGroupId: '', feedbackScore: 0,
@@ -28,6 +28,22 @@ function minutesToTime(m: number) {
   const h = Math.floor(clamped / 60).toString().padStart(2, '0');
   const mm = (clamped % 60).toString().padStart(2, '0');
   return `${h}:${mm}`;
+}
+// Per-service helpers (pure, used in column rendering)
+function getServiceOpDurForAppt(a: Appointment, sid: string, svcs: Service[]): number {
+  if (a.serviceOperatorDurations?.[sid] !== undefined) return a.serviceOperatorDurations[sid];
+  const svc = svcs.find(s => s.id === sid);
+  return svc ? (svc.operatorDuration ?? svc.duration) : 30;
+}
+function computeServiceStartMin(a: Appointment, targetSid: string, svcs: Service[]): number {
+  if (a.serviceStartTimes?.[targetSid]) return timeToMinutes(a.serviceStartTimes[targetSid]);
+  let cumMin = timeToMinutes(a.startTime);
+  for (const sid of a.serviceIds) {
+    if (sid === targetSid) return cumMin;
+    const svc = svcs.find(s => s.id === sid);
+    cumMin += (a.serviceOperatorDurations?.[sid] ?? (svc?.operatorDuration ?? svc?.duration ?? 30)) + (svc?.processingDuration ?? 0);
+  }
+  return timeToMinutes(a.startTime);
 }
 const HOUR_PX_BASE = 80; // base height per hour at zoom 1.0 — 15-min slot = 20px
 
@@ -124,6 +140,14 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [draggingPos, setDraggingPos] = useState<{ date: string; startTime: string; endTime: string; operatorId?: string } | null>(null);
 
+  // Per-service drag & resize
+  const serviceDragRef = useRef<{ apptId: string; serviceId: string; origStartMin: number; startY: number } | null>(null);
+  const [serviceDraggingKey, setServiceDraggingKey] = useState<string | null>(null);
+  const [serviceDraggingStart, setServiceDraggingStart] = useState<string | null>(null);
+  const serviceResizeRef = useRef<{ apptId: string; serviceId: string; origOpDur: number; startY: number } | null>(null);
+  const [serviceResizingKey, setServiceResizingKey] = useState<string | null>(null);
+  const [serviceResizingOpDur, setServiceResizingOpDur] = useState<number>(0);
+
   const openHour = parseInt(salonConfig.openTime.split(':')[0], 10);
   const closeHour = parseInt(salonConfig.closeTime.split(':')[0], 10);
   const hours = Array.from({ length: closeHour - openHour }, (_, i) => openHour + i);
@@ -183,7 +207,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
 
   function openEdit(a: Appointment) {
     setEditAppt(a);
-    setForm({ clientId: a.clientId, operatorId: a.operatorId, serviceIds: [...a.serviceIds], serviceOperators: { ...(a.serviceOperators ?? {}) }, date: a.date, startTime: a.startTime, endTime: a.endTime, status: a.status, notes: a.notes, isBlock: a.isBlock, blockReason: a.blockReason, recurringGroupId: a.recurringGroupId, feedbackScore: a.feedbackScore });
+    setForm({ clientId: a.clientId, operatorId: a.operatorId, serviceIds: [...a.serviceIds], serviceOperators: { ...(a.serviceOperators ?? {}) }, serviceStartTimes: { ...(a.serviceStartTimes ?? {}) }, serviceOperatorDurations: { ...(a.serviceOperatorDurations ?? {}) }, date: a.date, startTime: a.startTime, endTime: a.endTime, status: a.status, notes: a.notes, isBlock: a.isBlock, blockReason: a.blockReason, recurringGroupId: a.recurringGroupId, feedbackScore: a.feedbackScore });
     setShowForm(true);
   }
 
@@ -201,7 +225,11 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
         return sum + (svc?.duration || 0);
       }, 0);
       const end = totalMin > 0 ? minutesToTime(timeToMinutes(p.startTime) + totalMin) : p.endTime;
-      return { ...p, serviceIds: ids, endTime: end };
+      const newSvcOps = { ...(p.serviceOperators ?? {}) };
+      const newSvcStarts = { ...(p.serviceStartTimes ?? {}) };
+      const newSvcOpDurs = { ...(p.serviceOperatorDurations ?? {}) };
+      if (!ids.includes(id)) { delete newSvcOps[id]; delete newSvcStarts[id]; delete newSvcOpDurs[id]; }
+      return { ...p, serviceIds: ids, endTime: end, serviceOperators: newSvcOps, serviceStartTimes: newSvcStarts, serviceOperatorDurations: newSvcOpDurs };
     });
   }
 
@@ -246,8 +274,38 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
     setDraggingPos({ date: appt.date, startTime: appt.startTime, endTime: appt.endTime });
   }, []);
 
-  useEffect(() => {
+  const handleServiceDragStart = useCallback((e: React.MouseEvent, apptId: string, serviceId: string, startAbsMin: number) => {
+    if (e.button !== 0) return;
+    e.stopPropagation(); e.preventDefault();
+    serviceDragRef.current = { apptId, serviceId, origStartMin: startAbsMin, startY: e.clientY };
+    wasDraggedRef.current = false;
+    setServiceDraggingKey(`${apptId}:${serviceId}`);
+    setServiceDraggingStart(minutesToTime(startAbsMin));
+  }, []);
+
+  const handleServiceResizeStart = useCallback((e: React.MouseEvent, apptId: string, serviceId: string, currentOpDur: number) => {
+    e.stopPropagation(); e.preventDefault();
+    serviceResizeRef.current = { apptId, serviceId, origOpDur: currentOpDur, startY: e.clientY };
+    setServiceResizingKey(`${apptId}:${serviceId}`);
+    setServiceResizingOpDur(currentOpDur);
+  }, []);
     function onMove(e: MouseEvent) {
+      // SERVICE RESIZE
+      if (serviceResizeRef.current) {
+        const delta = e.clientY - serviceResizeRef.current.startY;
+        const deltaMin = Math.round((delta / hourPxRef.current) * 60 / 15) * 15;
+        setServiceResizingOpDur(Math.max(15, serviceResizeRef.current.origOpDur + deltaMin));
+        return;
+      }
+      // SERVICE DRAG
+      if (serviceDragRef.current) {
+        const totalDelta = Math.abs(e.clientY - serviceDragRef.current.startY);
+        if (totalDelta > 5) wasDraggedRef.current = true;
+        const deltaMin = Math.round((e.clientY - serviceDragRef.current.startY) / hourPxRef.current * 60);
+        const newStartMin = Math.max(openHour * 60, serviceDragRef.current.origStartMin + deltaMin);
+        setServiceDraggingStart(minutesToTime(newStartMin));
+        return;
+      }
       // RESIZE
       if (resizeRef.current) {
         const delta = e.clientY - resizeRef.current.startY;
@@ -284,6 +342,32 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
       }
     }
     function onUp() {
+      // SERVICE RESIZE
+      if (serviceResizeRef.current) {
+        const { apptId, serviceId } = serviceResizeRef.current;
+        serviceResizeRef.current = null;
+        setServiceResizingKey(null);
+        setServiceResizingOpDur(prev => {
+          if (prev <= 0) return 0;
+          const appt = appointments.find(a => a.id === apptId);
+          if (appt) updateAppointment({ ...appt, serviceOperatorDurations: { ...(appt.serviceOperatorDurations ?? {}), [serviceId]: prev } }, 'Durata servizio modificata');
+          return 0;
+        });
+        return;
+      }
+      // SERVICE DRAG
+      if (serviceDragRef.current) {
+        const { apptId, serviceId } = serviceDragRef.current;
+        serviceDragRef.current = null;
+        setServiceDraggingKey(null);
+        setServiceDraggingStart(prev => {
+          if (!wasDraggedRef.current || !prev) return null;
+          const appt = appointments.find(a => a.id === apptId);
+          if (appt) updateAppointment({ ...appt, serviceStartTimes: { ...(appt.serviceStartTimes ?? {}), [serviceId]: prev } }, 'Servizio spostato');
+          return null;
+        });
+        return;
+      }
       // RESIZE
       if (resizeRef.current) {
         const { apptId } = resizeRef.current;
@@ -489,9 +573,18 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
           {/* Operator columns */}
           {activeOperators.map(op => {
             const dayStr = format(currentDate, 'yyyy-MM-dd');
-            const colAppts = filteredAppts.filter(a => {
+            // Block/no-service appointments for this operator (appointment-level drag)
+            const opBlockAppts = filteredAppts.filter(a => {
               const effectiveOp = draggingId === a.id && draggingPos?.operatorId ? draggingPos.operatorId : a.operatorId;
-              return a.date === dayStr && effectiveOp === op.id;
+              return a.date === dayStr && (a.isBlock || a.serviceIds.length === 0) && effectiveOp === op.id;
+            });
+            // Per-service blocks: one independent block per service assigned to this operator
+            type SvcBlock = { a: Appointment; sid: string };
+            const opSvcBlocks: SvcBlock[] = [];
+            filteredAppts.filter(a => a.date === dayStr && !a.isBlock && a.serviceIds.length > 0).forEach(a => {
+              a.serviceIds.forEach(sid => {
+                if ((a.serviceOperators?.[sid] || a.operatorId) === op.id) opSvcBlocks.push({ a, sid });
+              });
             });
             return (
               <div key={op.id} className="flex-1 relative" style={{ borderLeft: '1px solid var(--border)', minWidth: 0 }}>
@@ -502,8 +595,8 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                     onClick={() => openNew(dayStr, op.id, resolveStartTime(dayStr, op.id, h + q * 0.25))}
                     className="cursor-pointer hover:bg-white/[0.02] transition-colors" />
                 )))}
-                {/* Appointments — split multi-service into visual sub-blocks */}
-                {colAppts.map(a => {
+                {/* Whole-appointment blocks (isBlock or no services) */}
+                {opBlockAppts.map(a => {
                   const isDragging = draggingId === a.id;
                   const effectiveStart = isDragging && draggingPos ? draggingPos.startTime : a.startTime;
                   const effectiveEndDrag = isDragging && draggingPos ? draggingPos.endTime : a.endTime;
@@ -514,57 +607,75 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                   const totalHeight = Math.max(((endMin - startMin) / 60) * HOUR_PX, 28);
                   const color = op.color || '#6366f1';
                   const client = clients.find(c => c.id === a.clientId);
-                  const apptSvcs = a.serviceIds.map(sid => services.find(s => s.id === sid)).filter(Boolean) as (typeof services[0])[];
-                  const totalSvcMin = apptSvcs.reduce((s, sv) => s + sv.duration, 0);
-                  const bodyH = Math.max(totalHeight - 30, 0);
                   return (
                     <div key={a.id}
                       onMouseDown={e => handleDragStart(e, a)}
                       onClick={e => { if (wasDraggedRef.current || draggingId || resizingId) { e.stopPropagation(); return; } e.stopPropagation(); openEdit(a); }}
                       className="absolute left-1 right-1 rounded-lg overflow-hidden hover:brightness-110 transition-all"
                       style={{ top, height: totalHeight, background: `${color}22`, border: `1px solid ${color}55`, zIndex: isDragging ? 10 : 2, opacity: isDragging ? 0.7 : 1, cursor: isDragging ? 'grabbing' : 'grab', userSelect: 'none' }}>
-                      {/* Header */}
                       <div className="px-2 pt-1 pb-0.5" style={{ background: `${color}28` }}>
                         <p className="text-xs font-semibold truncate" style={{ color }}>
                           {a.isBlock ? '🔒 ' + (a.blockReason || 'Blocco') : (client ? `${client.firstName} ${client.lastName}` : '—')}
                         </p>
                         <p style={{ color: 'var(--text-3)', fontSize: 10 }}>{effectiveStart}–{effectiveEnd}</p>
                       </div>
-                      {/* Service sub-blocks with per-operator color and posa phase */}
-                      {!a.isBlock && apptSvcs.length > 0 && bodyH > 8 && (
-                        <div className="flex flex-col" style={{ height: bodyH, overflow: 'hidden' }}>
-                          {apptSvcs.map((sv) => {
-                            const proportion = totalSvcMin > 0 ? sv.duration / totalSvcMin : 1 / apptSvcs.length;
-                            const subH = Math.max(bodyH * proportion, 14);
-                            const svOpId = a.serviceOperators?.[sv.id] || a.operatorId;
-                            const svOp = operators.find(o => o.id === svOpId);
-                            const svColor = svOp?.color || color;
-                            const opDur = sv.operatorDuration ?? sv.duration;
-                            const procDur = sv.processingDuration ?? 0;
-                            const hasProc = procDur > 0 && sv.duration > 0;
-                            const activeH = hasProc ? Math.max((opDur / sv.duration) * subH, 10) : subH;
-                            const procH = hasProc ? Math.max((procDur / sv.duration) * subH, 10) : 0;
-                            return (
-                              <div key={sv.id} style={{ borderTop: `1px solid ${svColor}30`, flexShrink: 0 }}>
-                                <div style={{ height: activeH, padding: '1px 8px', overflow: 'hidden', background: `${svColor}18` }}>
-                                  <span style={{ fontSize: 9, color: svColor, fontWeight: 600 }} className="truncate block">
-                                    {sv.name} · {opDur}&apos;{svColor !== color && svOp ? ` · ${svOp.name}` : ''}
-                                  </span>
-                                </div>
-                                {hasProc && (
-                                  <div style={{ height: procH, padding: '1px 8px', overflow: 'hidden', background: `repeating-linear-gradient(-45deg, transparent, transparent 3px, ${svColor}20 3px, ${svColor}20 6px)`, borderTop: `1px dashed ${svColor}40` }}>
-                                    <span style={{ fontSize: 9, color: svColor, opacity: 0.6 }} className="truncate block">⏳ Posa · {procDur}&apos;</span>
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
                       <div onMouseDown={e => handleResizeStart(e, a)}
                         className="absolute bottom-0 left-0 right-0 flex items-center justify-center"
                         style={{ height: 10, cursor: 'ns-resize', background: `${color}30` }}>
                         <div style={{ width: 20, height: 2, borderRadius: 2, background: color, opacity: 0.8 }} />
+                      </div>
+                    </div>
+                  );
+                })}
+                {/* Per-service independent blocks */}
+                {opSvcBlocks.map(({ a, sid }) => {
+                  const dragKey = `${a.id}:${sid}`;
+                  const isDragging = serviceDraggingKey === dragKey;
+                  const isResizing = serviceResizingKey === dragKey;
+                  const svc = services.find(s => s.id === sid);
+                  if (!svc) return null;
+                  const svColor = op.color || '#6366f1';
+                  const opDur = isResizing ? serviceResizingOpDur : getServiceOpDurForAppt(a, sid, services);
+                  const procDur = svc.processingDuration ?? 0;
+                  const totalDur = opDur + procDur;
+                  const startAbsMin = isDragging && serviceDraggingStart
+                    ? timeToMinutes(serviceDraggingStart)
+                    : computeServiceStartMin(a, sid, services);
+                  const top = ((startAbsMin - START_MIN) / 60) * HOUR_PX;
+                  const height = Math.max((totalDur / 60) * HOUR_PX, 28);
+                  const headerH = 28;
+                  const bodyH = Math.max(height - headerH, 0);
+                  const activeH = procDur > 0 && totalDur > 0 ? Math.max(Math.round((opDur / totalDur) * bodyH), 0) : bodyH;
+                  const procH = bodyH - activeH;
+                  const client = clients.find(c => c.id === a.clientId);
+                  return (
+                    <div key={dragKey}
+                      onMouseDown={e => handleServiceDragStart(e, a.id, sid, startAbsMin)}
+                      onClick={e => { if (wasDraggedRef.current) { e.stopPropagation(); return; } e.stopPropagation(); openEdit(a); }}
+                      className="absolute left-1 right-1 rounded-lg overflow-hidden hover:brightness-110 transition-all"
+                      style={{ top, height, background: `${svColor}22`, border: `1px solid ${svColor}55`, zIndex: isDragging ? 10 : 2, opacity: isDragging ? 0.7 : 1, cursor: isDragging ? 'grabbing' : 'grab', userSelect: 'none' }}>
+                      <div style={{ height: headerH, padding: '2px 8px 0', background: `${svColor}28`, overflow: 'hidden' }}>
+                        <p className="text-xs font-semibold truncate" style={{ color: svColor }}>
+                          {client ? `${client.firstName} ${client.lastName}` : '—'}
+                        </p>
+                        <p style={{ color: 'var(--text-3)', fontSize: 9 }} className="truncate">
+                          {minutesToTime(startAbsMin)}–{minutesToTime(startAbsMin + totalDur)} · {svc.name}
+                        </p>
+                      </div>
+                      {activeH > 4 && (
+                        <div style={{ height: activeH, padding: '1px 8px', overflow: 'hidden' }}>
+                          <span style={{ fontSize: 9, color: svColor, opacity: 0.8 }}>{opDur}&apos;</span>
+                        </div>
+                      )}
+                      {procDur > 0 && procH > 4 && (
+                        <div style={{ height: procH, background: `repeating-linear-gradient(-45deg, transparent, transparent 3px, ${svColor}20 3px, ${svColor}20 6px)`, borderTop: `1px dashed ${svColor}40`, padding: '1px 8px', overflow: 'hidden' }}>
+                          <span style={{ fontSize: 9, color: svColor, opacity: 0.6 }}>⏳ {procDur}&apos;</span>
+                        </div>
+                      )}
+                      <div onMouseDown={e => handleServiceResizeStart(e, a.id, sid, opDur)}
+                        className="absolute bottom-0 left-0 right-0 flex items-center justify-center"
+                        style={{ height: 10, cursor: 'ns-resize', background: `${svColor}30` }}>
+                        <div style={{ width: 20, height: 2, borderRadius: 2, background: svColor, opacity: 0.8 }} />
                       </div>
                     </div>
                   );
@@ -597,9 +708,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                   const totalHeight = Math.max(((endMin - startMin) / 60) * HOUR_PX, 28);
                   const color = '#71717a';
                   const client = clients.find(c => c.id === a.clientId);
-                  const apptSvcs = a.serviceIds.map(sid => services.find(s => s.id === sid)).filter(Boolean) as (typeof services[0])[];
-                  const totalSvcMin = apptSvcs.reduce((s, sv) => s + sv.duration, 0);
-                  const bodyH = Math.max(totalHeight - 30, 0);
+                  const svcNames = a.serviceIds.map(sid => services.find(s => s.id === sid)?.name).filter(Boolean).join(', ');
                   return (
                     <div key={a.id}
                       onMouseDown={e => handleDragStart(e, a)}
@@ -611,37 +720,8 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                           {a.isBlock ? '🔒 ' + (a.blockReason || 'Blocco') : (client ? `${client.firstName} ${client.lastName}` : '—')}
                         </p>
                         <p style={{ color: 'var(--text-3)', fontSize: 10 }}>{effectiveStart}–{effectiveEnd}</p>
+                        {svcNames && totalHeight > 44 && <p className="truncate" style={{ color: 'var(--muted)', fontSize: 9 }}>{svcNames}</p>}
                       </div>
-                      {!a.isBlock && apptSvcs.length > 0 && bodyH > 8 && (
-                        <div className="flex flex-col" style={{ height: bodyH, overflow: 'hidden' }}>
-                          {apptSvcs.map((sv) => {
-                            const proportion = totalSvcMin > 0 ? sv.duration / totalSvcMin : 1 / apptSvcs.length;
-                            const subH = Math.max(bodyH * proportion, 14);
-                            const svOpId = a.serviceOperators?.[sv.id] || a.operatorId;
-                            const svOp = operators.find(o => o.id === svOpId);
-                            const svColor = svOp?.color || color;
-                            const opDur = sv.operatorDuration ?? sv.duration;
-                            const procDur = sv.processingDuration ?? 0;
-                            const hasProc = procDur > 0 && sv.duration > 0;
-                            const activeH = hasProc ? Math.max((opDur / sv.duration) * subH, 10) : subH;
-                            const procH = hasProc ? Math.max((procDur / sv.duration) * subH, 10) : 0;
-                            return (
-                              <div key={sv.id} style={{ borderTop: `1px solid ${svColor}30`, flexShrink: 0 }}>
-                                <div style={{ height: activeH, padding: '1px 8px', overflow: 'hidden', background: `${svColor}18` }}>
-                                  <span style={{ fontSize: 9, color: svColor, fontWeight: 600 }} className="truncate block">
-                                    {sv.name} · {opDur}&apos;{svOp ? ` · ${svOp.name}` : ''}
-                                  </span>
-                                </div>
-                                {hasProc && (
-                                  <div style={{ height: procH, padding: '1px 8px', overflow: 'hidden', background: `repeating-linear-gradient(-45deg, transparent, transparent 3px, ${svColor}20 3px, ${svColor}20 6px)`, borderTop: `1px dashed ${svColor}40` }}>
-                                    <span style={{ fontSize: 9, color: svColor, opacity: 0.6 }} className="truncate block">⏳ Posa · {procDur}&apos;</span>
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
                       <div onMouseDown={e => handleResizeStart(e, a)}
                         className="absolute bottom-0 left-0 right-0 flex items-center justify-center"
                         style={{ height: 10, cursor: 'ns-resize', background: 'rgba(113,113,122,0.2)' }}>

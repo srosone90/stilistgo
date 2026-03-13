@@ -180,6 +180,8 @@ export interface Appointment {
   operatorId: string;
   serviceIds: string[];
   serviceOperators?: Record<string, string>; // serviceId → operatorId override (for multi-operator)
+  serviceStartTimes?: Record<string, string>; // serviceId → "HH:mm" independent start time
+  serviceOperatorDurations?: Record<string, number>; // serviceId → operator phase duration override
   date: string;       // YYYY-MM-DD
   startTime: string;  // "HH:mm"
   endTime: string;    // "HH:mm"
