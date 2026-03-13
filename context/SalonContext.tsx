@@ -263,6 +263,8 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
             phone: b.client_phone, email: b.client_email || '', birthDate: '',
             notes: `Prenotato online il ${b.created_at?.slice(0, 10) ?? ''}`,
             allergies: '', tags: [], gdprConsent: false, gdprDate: '', loyaltyPoints: 0,
+            gender: '', address: '', city: '', province: '', postalCode: '',
+            acquisitionSource: 'sito_web', acquisitionDate: b.created_at?.slice(0, 10) ?? '',
             createdAt: new Date().toISOString(),
           };
           mergedClients.push(nc);
