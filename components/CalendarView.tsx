@@ -141,9 +141,11 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
   const [draggingPos, setDraggingPos] = useState<{ date: string; startTime: string; endTime: string; operatorId?: string } | null>(null);
 
   // Per-service drag & resize
-  const serviceDragRef = useRef<{ apptId: string; serviceId: string; origStartMin: number; startY: number } | null>(null);
+  const serviceDragRef = useRef<{ apptId: string; serviceId: string; origStartMin: number; startY: number; startX: number } | null>(null);
+  const serviceDragTargetOpRef = useRef<string | null>(null);
   const [serviceDraggingKey, setServiceDraggingKey] = useState<string | null>(null);
   const [serviceDraggingStart, setServiceDraggingStart] = useState<string | null>(null);
+  const [serviceDraggingTargetOpId, setServiceDraggingTargetOpId] = useState<string | null>(null);
   const serviceResizeRef = useRef<{ apptId: string; serviceId: string; origOpDur: number; startY: number } | null>(null);
   const [serviceResizingKey, setServiceResizingKey] = useState<string | null>(null);
   const [serviceResizingOpDur, setServiceResizingOpDur] = useState<number>(0);
@@ -274,13 +276,15 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
     setDraggingPos({ date: appt.date, startTime: appt.startTime, endTime: appt.endTime });
   }, []);
 
-  const handleServiceDragStart = useCallback((e: React.MouseEvent, apptId: string, serviceId: string, startAbsMin: number) => {
+  const handleServiceDragStart = useCallback((e: React.MouseEvent, apptId: string, serviceId: string, startAbsMin: number, currentOpId: string) => {
     if (e.button !== 0) return;
     e.stopPropagation(); e.preventDefault();
-    serviceDragRef.current = { apptId, serviceId, origStartMin: startAbsMin, startY: e.clientY };
+    serviceDragRef.current = { apptId, serviceId, origStartMin: startAbsMin, startY: e.clientY, startX: e.clientX };
+    serviceDragTargetOpRef.current = currentOpId;
     wasDraggedRef.current = false;
     setServiceDraggingKey(`${apptId}:${serviceId}`);
     setServiceDraggingStart(minutesToTime(startAbsMin));
+    setServiceDraggingTargetOpId(currentOpId);
   }, []);
 
   const handleServiceResizeStart = useCallback((e: React.MouseEvent, apptId: string, serviceId: string, currentOpDur: number) => {
@@ -301,11 +305,25 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
       }
       // SERVICE DRAG
       if (serviceDragRef.current) {
-        const totalDelta = Math.abs(e.clientY - serviceDragRef.current.startY);
+        const totalDelta = Math.hypot(e.clientX - serviceDragRef.current.startX, e.clientY - serviceDragRef.current.startY);
         if (totalDelta > 5) wasDraggedRef.current = true;
-        const deltaMin = Math.round((e.clientY - serviceDragRef.current.startY) / hourPxRef.current * 60);
+        // Soft 5-min snap
+        const rawDelta = (e.clientY - serviceDragRef.current.startY) / hourPxRef.current * 60;
+        const deltaMin = Math.round(rawDelta / 5) * 5;
         const newStartMin = Math.max(openHour * 60, serviceDragRef.current.origStartMin + deltaMin);
         setServiceDraggingStart(minutesToTime(newStartMin));
+        // Detect target operator column from X
+        if (gridRef.current && daysRef.current.length === 1 && activeOpColsRef.current.length > 0) {
+          const rect = gridRef.current.getBoundingClientRect();
+          const relX = e.clientX - rect.left - 56;
+          const colW = (rect.width - 56) / activeOpColsRef.current.length;
+          const opIdx = Math.max(0, Math.min(activeOpColsRef.current.length - 1, Math.floor(relX / colW)));
+          const targetOpId = activeOpColsRef.current[opIdx]?.id ?? null;
+          if (targetOpId !== serviceDragTargetOpRef.current) {
+            serviceDragTargetOpRef.current = targetOpId;
+            setServiceDraggingTargetOpId(targetOpId);
+          }
+        }
         return;
       }
       // RESIZE
@@ -365,9 +383,17 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
         setServiceDraggingStart(prev => {
           if (!wasDraggedRef.current || !prev) return null;
           const appt = appointments.find(a => a.id === apptId);
-          if (appt) updateAppointment({ ...appt, serviceStartTimes: { ...(appt.serviceStartTimes ?? {}), [serviceId]: prev } }, 'Servizio spostato');
+          if (appt) {
+            const newSvcStarts = { ...(appt.serviceStartTimes ?? {}), [serviceId]: prev };
+            const targetOp = serviceDragTargetOpRef.current;
+            const newSvcOps = targetOp
+              ? { ...(appt.serviceOperators ?? {}), [serviceId]: targetOp }
+              : (appt.serviceOperators ?? {});
+            updateAppointment({ ...appt, serviceStartTimes: newSvcStarts, serviceOperators: newSvcOps }, 'Servizio spostato');
+          }
           return null;
         });
+        setServiceDraggingTargetOpId(null);
         return;
       }
       // RESIZE
@@ -585,7 +611,11 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
             const opSvcBlocks: SvcBlock[] = [];
             filteredAppts.filter(a => a.date === dayStr && !a.isBlock && a.serviceIds.length > 0).forEach(a => {
               a.serviceIds.forEach(sid => {
-                if ((a.serviceOperators?.[sid] || a.operatorId) === op.id) opSvcBlocks.push({ a, sid });
+                const isDraggingThisService = serviceDraggingKey === `${a.id}:${sid}`;
+                const effectiveOpId = isDraggingThisService && serviceDraggingTargetOpId
+                  ? serviceDraggingTargetOpId
+                  : (a.serviceOperators?.[sid] || a.operatorId);
+                if (effectiveOpId === op.id) opSvcBlocks.push({ a, sid });
               });
             });
             return (
@@ -644,19 +674,37 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                     ? timeToMinutes(serviceDraggingStart)
                     : computeServiceStartMin(a, sid, services);
                   const top = ((startAbsMin - START_MIN) / 60) * HOUR_PX;
-                  const height = Math.max((totalDur / 60) * HOUR_PX, 28);
                   const headerH = 28;
-                  const bodyH = Math.max(height - headerH, 0);
-                  const activeH = procDur > 0 && totalDur > 0 ? Math.max(Math.round((opDur / totalDur) * bodyH), 0) : bodyH;
-                  const procH = bodyH - activeH;
+                  const minH = headerH + (procDur > 0 ? 18 : 4);
+                  const height = Math.max((totalDur / 60) * HOUR_PX, minH);
+                  const bodyH = height - headerH;
+                  // Ensure posa always gets at least 12px when it exists
+                  const procH = procDur > 0 ? Math.max(Math.round((procDur / totalDur) * bodyH), 12) : 0;
+                  const activeH = Math.max(bodyH - procH, 0);
                   const client = clients.find(c => c.id === a.clientId);
                   return (
                     <div key={dragKey}
-                      onMouseDown={e => handleServiceDragStart(e, a.id, sid, startAbsMin)}
+                      onMouseDown={e => handleServiceDragStart(e, a.id, sid, startAbsMin, op.id)}
                       onClick={e => { if (wasDraggedRef.current) { e.stopPropagation(); return; } e.stopPropagation(); openEdit(a); }}
                       className="absolute left-1 right-1 rounded-lg overflow-hidden hover:brightness-110 transition-all"
                       style={{ top, height, background: `${svColor}22`, border: `1px solid ${svColor}55`, zIndex: isDragging ? 10 : 2, opacity: isDragging ? 0.7 : 1, cursor: isDragging ? 'grabbing' : 'grab', userSelect: 'none' }}>
-                      <div style={{ height: headerH, padding: '2px 8px 0', background: `${svColor}28`, overflow: 'hidden' }}>
+                      {/* × rimuovi servizio */}
+                      <button
+                        onMouseDown={e => e.stopPropagation()}
+                        onClick={e => {
+                          e.stopPropagation();
+                          const appt = appointments.find(ap => ap.id === a.id);
+                          if (!appt) return;
+                          const newSvcIds = appt.serviceIds.filter(s => s !== sid);
+                          const newSvcOps = { ...(appt.serviceOperators ?? {}) };
+                          const newSvcStarts = { ...(appt.serviceStartTimes ?? {}) };
+                          const newSvcOpDurs = { ...(appt.serviceOperatorDurations ?? {}) };
+                          delete newSvcOps[sid]; delete newSvcStarts[sid]; delete newSvcOpDurs[sid];
+                          updateAppointment({ ...appt, serviceIds: newSvcIds, serviceOperators: newSvcOps, serviceStartTimes: newSvcStarts, serviceOperatorDurations: newSvcOpDurs }, 'Servizio rimosso');
+                        }}
+                        style={{ position: 'absolute', top: 2, right: 2, zIndex: 4, background: 'rgba(0,0,0,0.35)', border: 'none', color: 'rgba(255,255,255,0.65)', borderRadius: '3px', padding: '0 4px', fontSize: '11px', lineHeight: '15px', cursor: 'pointer' }}
+                        title="Rimuovi servizio dall'appuntamento">×</button>
+                      <div style={{ height: headerH, padding: '2px 24px 0 8px', background: `${svColor}28`, overflow: 'hidden' }}>
                         <p className="text-xs font-semibold truncate" style={{ color: svColor }}>
                           {client ? `${client.firstName} ${client.lastName}` : '—'}
                         </p>
@@ -664,12 +712,12 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                           {minutesToTime(startAbsMin)}–{minutesToTime(startAbsMin + totalDur)} · {svc.name}
                         </p>
                       </div>
-                      {activeH > 4 && (
+                      {activeH > 0 && (
                         <div style={{ height: activeH, padding: '1px 8px', overflow: 'hidden' }}>
                           <span style={{ fontSize: 9, color: svColor, opacity: 0.8 }}>{opDur}&apos;</span>
                         </div>
                       )}
-                      {procDur > 0 && procH > 4 && (
+                      {procDur > 0 && (
                         <div style={{ height: procH, background: `repeating-linear-gradient(-45deg, transparent, transparent 3px, ${svColor}20 3px, ${svColor}20 6px)`, borderTop: `1px dashed ${svColor}40`, padding: '1px 8px', overflow: 'hidden' }}>
                           <span style={{ fontSize: 9, color: svColor, opacity: 0.6 }}>⏳ {procDur}&apos;</span>
                         </div>
