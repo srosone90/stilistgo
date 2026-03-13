@@ -67,7 +67,9 @@ export interface Service {
   id: string;
   name: string;
   category: ServiceCategory;
-  duration: number; // minutes
+  duration: number; // minutes total (operatorDuration + processingDuration)
+  operatorDuration?: number; // active work phase in minutes (operator is busy with client)
+  processingDuration?: number; // waiting/posa phase in minutes (operator is free)
   price: number;
   description: string;
   operatorIds: string[]; // empty = all operators

@@ -47,14 +47,17 @@ export default function ServicesView({ newTrigger }: { newTrigger?: number }) {
 
   function openEdit(s: Service) {
     setEditSvc(s);
-    setForm({ name: s.name, category: s.category, duration: s.duration, price: s.price, description: s.description, operatorIds: [...s.operatorIds], active: s.active, productUsage: [...(s.productUsage ?? [])] });
+    setForm({ name: s.name, category: s.category, duration: s.duration, operatorDuration: s.operatorDuration ?? s.duration, processingDuration: s.processingDuration ?? 0, price: s.price, description: s.description, operatorIds: [...s.operatorIds], active: s.active, productUsage: [...(s.productUsage ?? [])] });
     setShowForm(true);
   }
 
   function handleSave() {
     if (!form.name.trim()) return;
-    if (editSvc) updateService({ ...editSvc, ...form });
-    else addService(form);
+    const opDur = form.operatorDuration ?? form.duration;
+    const procDur = form.processingDuration ?? 0;
+    const serviceData = { ...form, duration: opDur + procDur, operatorDuration: opDur, processingDuration: procDur };
+    if (editSvc) updateService({ ...editSvc, ...serviceData });
+    else addService(serviceData);
     setShowForm(false);
   }
 
@@ -111,7 +114,11 @@ export default function ServicesView({ newTrigger }: { newTrigger?: number }) {
                     <p className="text-white font-medium">{s.name}</p>
                     {s.description && <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>{s.description}</p>}
                   </td>
-                  <td className="py-2.5 pr-4" style={{ color: 'var(--text-2)' }}>{s.duration} min</td>
+                  <td className="py-2.5 pr-4" style={{ color: 'var(--text-2)' }}>
+                    {(s.processingDuration ?? 0) > 0
+                      ? <span title={`Operatore: ${s.operatorDuration ?? s.duration}' + Posa: ${s.processingDuration}'`}>{s.operatorDuration ?? s.duration}'+{s.processingDuration}'</span>
+                      : <span>{s.duration} min</span>}
+                  </td>
                   <td className="py-2.5 pr-4 font-semibold" style={{ color: '#22c55e' }}>{formatCurrency(s.price)}</td>
                   <td className="py-2.5 pr-4" style={{ color: 'var(--muted)', fontSize: '12px' }}>
                     {s.operatorIds.length === 0 ? 'Tutti' : s.operatorIds.map(id => operators.find(o => o.id === id)?.name).filter(Boolean).join(', ')}
@@ -164,8 +171,18 @@ export default function ServicesView({ newTrigger }: { newTrigger?: number }) {
                   {SERVICE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
-              <div><label style={labelStyle}>Durata (min)</label><input type="number" min={5} step={5} value={form.duration} onChange={e => setForm(p => ({ ...p, duration: Number(e.target.value) }))} style={inputStyle} /></div>
+              <div>
+                <label style={labelStyle}>Tempo operatore (min)</label>
+                <input type="number" min={5} step={5} value={form.operatorDuration ?? form.duration} onChange={e => setForm(p => ({ ...p, operatorDuration: Number(e.target.value) }))} style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>Tempo posa/attesa (min)</label>
+                <input type="number" min={0} step={5} value={form.processingDuration ?? 0} onChange={e => setForm(p => ({ ...p, processingDuration: Number(e.target.value) }))} style={inputStyle} />
+              </div>
               <div><label style={labelStyle}>Prezzo (€)</label><input type="number" min={0} step={0.5} value={form.price} onChange={e => setForm(p => ({ ...p, price: Number(e.target.value) }))} style={inputStyle} /></div>
+              <div className="flex items-center gap-2 pt-6 col-span-1">
+                <span style={{ fontSize: '12px', color: 'var(--muted)' }}>Totale: <strong style={{ color: 'var(--text)' }}>{(form.operatorDuration ?? form.duration) + (form.processingDuration ?? 0)} min</strong></span>
+              </div>
               <div className="flex items-center gap-2 pt-6">
                 <input type="checkbox" id="active" checked={form.active} onChange={e => setForm(p => ({ ...p, active: e.target.checked }))} />
                 <label htmlFor="active" style={{ fontSize: '13px', color: 'var(--text-2)' }}>Servizio attivo</label>

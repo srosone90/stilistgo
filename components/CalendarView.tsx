@@ -400,7 +400,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
             <div className="grid grid-cols-7" style={{ flex: 1 }}>
               {gridDays.map((day, i) => {
                 const dayStr = format(day, 'yyyy-MM-dd');
-                const dayAppts = appointments.filter(a => a.date === dayStr && a.status !== 'cancelled' && (!filterOperator || a.operatorId === filterOperator));
+                const dayAppts = appointments.filter(a => a.date === dayStr && a.status !== 'cancelled' && a.status !== 'completed' && (!filterOperator || a.operatorId === filterOperator));
                 const isThisMonth = isSameMonth(day, currentDate);
                 const isNow = isSameDay(day, new Date());
                 return (
@@ -534,19 +534,48 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                         <div className="flex flex-col" style={{ flex: 1 }}>
                           {apptSvcs.map((sv, si) => {
                             const proportion = totalSvcMin > 0 ? sv.duration / totalSvcMin : 1 / apptSvcs.length;
-                            const subH = Math.max((totalHeight - 30) * proportion, 12);
-                            // Cycle slightly different hues for multi-service
+                            const subH = Math.max((totalHeight - 30) * proportion, 14);
                             const hueShift = (si * 25) % 60;
+                            const opDur = sv.operatorDuration ?? sv.duration;
+                            const procDur = sv.processingDuration ?? 0;
+                            const hasProc = procDur > 0 && sv.duration > 0;
+                            const activeH = hasProc ? Math.max((opDur / sv.duration) * subH, 10) : subH;
+                            const procH = hasProc ? Math.max((procDur / sv.duration) * subH, 10) : 0;
                             return (
-                              <div key={sv.id} style={{ height: subH, borderTop: `1px solid ${color}33`, padding: '1px 8px', overflow: 'hidden', background: si % 2 === 1 ? `${color}10` : 'transparent', flexShrink: 0 }}>
-                                <span style={{ fontSize: 9, color: color, opacity: 0.85 + hueShift * 0.001 }} className="truncate block">{sv.name} · {sv.duration}&apos;</span>
+                              <div key={sv.id} style={{ borderTop: `1px solid ${color}33`, overflow: 'hidden', flexShrink: 0 }}>
+                                <div style={{ height: activeH, padding: '1px 8px', overflow: 'hidden', background: si % 2 === 1 ? `${color}10` : 'transparent' }}>
+                                  <span style={{ fontSize: 9, color: color, opacity: 0.85 + hueShift * 0.001 }} className="truncate block">{sv.name} · {opDur}&apos;</span>
+                                </div>
+                                {hasProc && (
+                                  <div style={{ height: procH, padding: '1px 8px', overflow: 'hidden', background: `repeating-linear-gradient(-45deg, transparent, transparent 3px, ${color}18 3px, ${color}18 6px)` }}>
+                                    <span style={{ fontSize: 9, color, opacity: 0.55 }} className="truncate block">Posa · {procDur}&apos;</span>
+                                  </div>
+                                )}
                               </div>
                             );
                           })}
                         </div>
-                      ) : (!a.isBlock && apptSvcs.length === 1 && (
-                        <div className="px-2" style={{ fontSize: 10, color: 'var(--muted)' }}>{apptSvcs[0].name} · {apptSvcs[0].duration}&apos;</div>
-                      ))}
+                      ) : (!a.isBlock && apptSvcs.length === 1 && (() => {
+                        const sv = apptSvcs[0];
+                        const opDur = sv.operatorDuration ?? sv.duration;
+                        const procDur = sv.processingDuration ?? 0;
+                        if (procDur > 0 && sv.duration > 0 && totalHeight > 44) {
+                          const availH = Math.max(totalHeight - 34, 20);
+                          const activeH = Math.max((opDur / sv.duration) * availH, 10);
+                          const procH = Math.max((procDur / sv.duration) * availH, 10);
+                          return (
+                            <>
+                              <div style={{ height: activeH, padding: '1px 8px', overflow: 'hidden' }}>
+                                <span style={{ fontSize: 9, color: 'var(--muted)' }}>{sv.name} · {opDur}&apos;</span>
+                              </div>
+                              <div style={{ height: procH, padding: '1px 8px', overflow: 'hidden', background: `repeating-linear-gradient(-45deg, transparent, transparent 3px, ${color}18 3px, ${color}18 6px)` }}>
+                                <span style={{ fontSize: 9, color, opacity: 0.5 }}>Posa · {procDur}&apos;</span>
+                              </div>
+                            </>
+                          );
+                        }
+                        return <div className="px-2" style={{ fontSize: 10, color: 'var(--muted)' }}>{sv.name} · {sv.duration}&apos;</div>;
+                      })())}
                       <div onMouseDown={e => handleResizeStart(e, a)}
                         className="absolute bottom-0 left-0 right-0 flex items-center justify-center"
                         style={{ height: 10, cursor: 'ns-resize', background: `${color}30` }}>
@@ -601,17 +630,47 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                         <div className="flex flex-col">
                           {apptSvcs.map((sv, si) => {
                             const proportion = totalSvcMin > 0 ? sv.duration / totalSvcMin : 1 / apptSvcs.length;
-                            const subH = Math.max((totalHeight - 30) * proportion, 12);
+                            const subH = Math.max((totalHeight - 30) * proportion, 14);
+                            const opDur = sv.operatorDuration ?? sv.duration;
+                            const procDur = sv.processingDuration ?? 0;
+                            const hasProc = procDur > 0 && sv.duration > 0;
+                            const activeH = hasProc ? Math.max((opDur / sv.duration) * subH, 10) : subH;
+                            const procH = hasProc ? Math.max((procDur / sv.duration) * subH, 10) : 0;
                             return (
-                              <div key={sv.id} style={{ height: subH, borderTop: '1px solid rgba(113,113,122,0.2)', padding: '1px 8px', overflow: 'hidden', flexShrink: 0, background: si % 2 === 1 ? 'rgba(113,113,122,0.1)' : 'transparent' }}>
-                                <span style={{ fontSize: 9, color: '#71717a' }} className="truncate block">{sv.name} · {sv.duration}&apos;</span>
+                              <div key={sv.id} style={{ borderTop: '1px solid rgba(113,113,122,0.2)', overflow: 'hidden', flexShrink: 0 }}>
+                                <div style={{ height: activeH, padding: '1px 8px', overflow: 'hidden', background: si % 2 === 1 ? 'rgba(113,113,122,0.1)' : 'transparent' }}>
+                                  <span style={{ fontSize: 9, color: '#71717a' }} className="truncate block">{sv.name} · {opDur}&apos;</span>
+                                </div>
+                                {hasProc && (
+                                  <div style={{ height: procH, padding: '1px 8px', overflow: 'hidden', background: 'repeating-linear-gradient(-45deg, transparent, transparent 3px, rgba(113,113,122,0.18) 3px, rgba(113,113,122,0.18) 6px)' }}>
+                                    <span style={{ fontSize: 9, color: '#71717a', opacity: 0.55 }} className="truncate block">Posa · {procDur}&apos;</span>
+                                  </div>
+                                )}
                               </div>
                             );
                           })}
                         </div>
-                      ) : (!a.isBlock && apptSvcs.length === 1 && (
-                        <div className="px-2" style={{ fontSize: 10, color: 'var(--muted)' }}>{apptSvcs[0].name} · {apptSvcs[0].duration}&apos;</div>
-                      ))}
+                      ) : (!a.isBlock && apptSvcs.length === 1 && (() => {
+                        const sv = apptSvcs[0];
+                        const opDur = sv.operatorDuration ?? sv.duration;
+                        const procDur = sv.processingDuration ?? 0;
+                        if (procDur > 0 && sv.duration > 0 && totalHeight > 44) {
+                          const availH = Math.max(totalHeight - 34, 20);
+                          const activeH = Math.max((opDur / sv.duration) * availH, 10);
+                          const procH = Math.max((procDur / sv.duration) * availH, 10);
+                          return (
+                            <>
+                              <div style={{ height: activeH, padding: '1px 8px', overflow: 'hidden' }}>
+                                <span style={{ fontSize: 9, color: 'var(--muted)' }}>{sv.name} · {opDur}&apos;</span>
+                              </div>
+                              <div style={{ height: procH, padding: '1px 8px', overflow: 'hidden', background: 'repeating-linear-gradient(-45deg, transparent, transparent 3px, rgba(113,113,122,0.18) 3px, rgba(113,113,122,0.18) 6px)' }}>
+                                <span style={{ fontSize: 9, color: '#71717a', opacity: 0.5 }}>Posa · {procDur}&apos;</span>
+                              </div>
+                            </>
+                          );
+                        }
+                        return <div className="px-2" style={{ fontSize: 10, color: 'var(--muted)' }}>{sv.name} · {sv.duration}&apos;</div>;
+                      })())}
                       <div onMouseDown={e => handleResizeStart(e, a)}
                         className="absolute bottom-0 left-0 right-0 flex items-center justify-center"
                         style={{ height: 10, cursor: 'ns-resize', background: 'rgba(113,113,122,0.2)' }}>
