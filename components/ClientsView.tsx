@@ -6,7 +6,7 @@ import { Client, TechnicalCard, HairType, HairCondition, ClientGender, Acquisiti
 import { salonGenerateId } from '@/lib/salonStorage';
 import { getCurrentUser } from '@/lib/supabase';
 import { format, parseISO, differenceInDays } from 'date-fns';
-import { UserPlus, Search, Trash2, ChevronDown, ChevronUp, X, Star, AlertTriangle, FlaskConical, Clock, Camera, ImagePlus, Download, ShieldOff, Upload } from 'lucide-react';
+import { UserPlus, Search, Trash2, ChevronDown, ChevronUp, X, Star, AlertTriangle, FlaskConical, Clock, Camera, ImagePlus, Download, ShieldOff, Upload, CheckSquare, Square, CheckCheck, Trash } from 'lucide-react';
 
 const card: React.CSSProperties = { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '16px', padding: '20px' };
 const inputStyle: React.CSSProperties = { background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '10px', padding: '9px 13px', color: 'var(--text)', fontSize: '13px', outline: 'none', width: '100%' };
@@ -56,6 +56,46 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
   const [importData, setImportData] = useState<Omit<Client, 'id' | 'createdAt'>[] | null>(null);
   const [importError, setImportError] = useState('');
   const [importDupCount, setImportDupCount] = useState(0);
+
+  // ── Multi-select ──────────────────────────────────────────────────────────────
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showBulkExport, setShowBulkExport] = useState(false);
+
+  function toggleSelectMode() {
+    setSelectMode(v => { if (v) setSelectedIds(new Set()); return !v; });
+  }
+
+  function toggleSelectId(id: string) {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function selectAll() {
+    setSelectedIds(new Set(filtered.map(c => c.id)));
+  }
+
+  function deselectAll() {
+    setSelectedIds(new Set());
+  }
+
+  function bulkDelete() {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`Eliminare definitivamente ${selectedIds.size} client${selectedIds.size === 1 ? 'e' : 'i'} selezionat${selectedIds.size === 1 ? 'o' : 'i'}?\nQuesta azione non può essere annullata.`)) return;
+    selectedIds.forEach(id => deleteClient(id));
+    if (selectedId && selectedIds.has(selectedId)) setSelectedId(null);
+    setSelectedIds(new Set());
+    setSelectMode(false);
+  }
+
+  function bulkExport(fmt: 'csv' | 'json' | 'vcf' | 'xml') {
+    const sel = clients.filter(c => selectedIds.has(c.id));
+    exportSelectedClients(sel, fmt);
+    setShowBulkExport(false);
+  }
 
   const gdprExport = async (clientId: string) => {
     setGdprExporting(true);
@@ -257,13 +297,9 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
   }
 
   // ── Export ──────────────────────────────────────────────────────────────────
-  function exportClients(fmt: 'csv' | 'json' | 'vcf' | 'xml') {
-    const list = clients;
+  function exportSelectedClients(list: typeof clients, fmt: 'csv' | 'json' | 'vcf' | 'xml') {
     const today = format(new Date(), 'yyyy-MM-dd');
-    let content = '';
-    let mimeType = 'text/plain;charset=utf-8';
-    let ext = 'txt';
-
+    let content = ''; let mimeType = 'text/plain;charset=utf-8'; let ext = 'txt';
     if (fmt === 'csv') {
       const BOM = '\uFEFF';
       const header = 'Nome;Cognome;Sesso;Telefono;Email;DataNascita;Indirizzo;Citta;Provincia;CAP;FonteAcquisizione;DataAcquisizione;Note;Allergie;Tag;PuntiFedelta;ConsensoGDPR;DataGDPR;DataCreazione';
@@ -272,11 +308,10 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
           c.address ?? '', c.city ?? '', c.province ?? '', c.postalCode ?? '',
           c.acquisitionSource ?? '', c.acquisitionDate ?? '',
           c.notes, c.allergies, c.tags.join('|'), String(c.loyaltyPoints),
-          c.gdprConsent ? 'Sì' : 'No', c.gdprDate, c.createdAt]
+          c.gdprConsent ? 'S\u00ec' : 'No', c.gdprDate, c.createdAt]
           .map(v => `"${(v ?? '').replace(/"/g, '""')}"`).join(';')
       );
-      content = BOM + [header, ...rows].join('\n');
-      mimeType = 'text/csv;charset=utf-8'; ext = 'csv';
+      content = BOM + [header, ...rows].join('\n'); mimeType = 'text/csv;charset=utf-8'; ext = 'csv';
     } else if (fmt === 'json') {
       content = JSON.stringify(list.map(c => ({
         nome: c.firstName, cognome: c.lastName, sesso: c.gender ?? '',
@@ -285,14 +320,10 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
         fonteAcquisizione: c.acquisitionSource ?? '', dataAcquisizione: c.acquisitionDate ?? '',
         note: c.notes, allergie: c.allergies, tag: c.tags,
         puntiFedelta: c.loyaltyPoints, gdprConsent: c.gdprConsent, gdprDate: c.gdprDate, dataCreazione: c.createdAt,
-      })), null, 2);
-      mimeType = 'application/json;charset=utf-8'; ext = 'json';
+      })), null, 2); mimeType = 'application/json;charset=utf-8'; ext = 'json';
     } else if (fmt === 'vcf') {
       content = list.map(c => {
-        const lines = ['BEGIN:VCARD', 'VERSION:3.0',
-          `N:${c.lastName};${c.firstName};;;`,
-          `FN:${[c.firstName, c.lastName].filter(Boolean).join(' ')}`,
-        ];
+        const lines = ['BEGIN:VCARD', 'VERSION:3.0', `N:${c.lastName};${c.firstName};;;`, `FN:${[c.firstName, c.lastName].filter(Boolean).join(' ')}` ];
         if (c.phone) lines.push(`TEL;TYPE=CELL:${c.phone}`);
         if (c.email) lines.push(`EMAIL:${c.email}`);
         if (c.birthDate) lines.push(`BDAY:${c.birthDate.replace(/-/g, '')}`);
@@ -304,33 +335,28 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
         if (c.tags.length) lines.push(`CATEGORIES:${c.tags.join(',')}`);
         if (c.loyaltyPoints) lines.push(`X-LOYALTY-POINTS:${c.loyaltyPoints}`);
         if (c.acquisitionSource) lines.push(`X-ACQUISITION-SOURCE:${c.acquisitionSource}`);
-        lines.push('END:VCARD');
-        return lines.join('\r\n');
-      }).join('\r\n');
-      mimeType = 'text/vcard;charset=utf-8'; ext = 'vcf';
-    } else if (fmt === 'xml') {
+        lines.push('END:VCARD'); return lines.join('\r\n');
+      }).join('\r\n'); mimeType = 'text/vcard;charset=utf-8'; ext = 'vcf';
+    } else {
       const esc = (s: string) => (s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
       content = `<?xml version="1.0" encoding="UTF-8"?>\n<clienti>\n` +
         list.map(c =>
           `  <cliente>\n    <nome>${esc(c.firstName)}</nome>\n    <cognome>${esc(c.lastName)}</cognome>\n    <sesso>${esc(c.gender ?? '')}</sesso>\n` +
-          `    <telefono>${esc(c.phone)}</telefono>\n    <email>${esc(c.email)}</email>\n` +
-          `    <dataNascita>${esc(c.birthDate)}</dataNascita>\n` +
+          `    <telefono>${esc(c.phone)}</telefono>\n    <email>${esc(c.email)}</email>\n    <dataNascita>${esc(c.birthDate)}</dataNascita>\n` +
           `    <indirizzo>${esc(c.address ?? '')}</indirizzo>\n    <citta>${esc(c.city ?? '')}</citta>\n    <provincia>${esc(c.province ?? '')}</provincia>\n    <cap>${esc(c.postalCode ?? '')}</cap>\n` +
           `    <fonteAcquisizione>${esc(c.acquisitionSource ?? '')}</fonteAcquisizione>\n    <dataAcquisizione>${esc(c.acquisitionDate ?? '')}</dataAcquisizione>\n` +
           `    <note>${esc(c.notes)}</note>\n    <allergie>${esc(c.allergies)}</allergie>\n    <tag>${c.tags.map(t => `<item>${esc(t)}</item>`).join('')}</tag>\n` +
-          `    <puntiFedelta>${c.loyaltyPoints}</puntiFedelta>\n    <gdprConsent>${c.gdprConsent}</gdprConsent>\n` +
-          `    <gdprDate>${esc(c.gdprDate)}</gdprDate>\n    <dataCreazione>${esc(c.createdAt)}</dataCreazione>\n  </cliente>`
-        ).join('\n') + '\n</clienti>';
-      mimeType = 'application/xml;charset=utf-8'; ext = 'xml';
+          `    <puntiFedelta>${c.loyaltyPoints}</puntiFedelta>\n    <gdprConsent>${c.gdprConsent}</gdprConsent>\n    <gdprDate>${esc(c.gdprDate)}</gdprDate>\n    <dataCreazione>${esc(c.createdAt)}</dataCreazione>\n  </cliente>`
+        ).join('\n') + '\n</clienti>'; mimeType = 'application/xml;charset=utf-8'; ext = 'xml';
     }
-
     const blob = new Blob([content], { type: mimeType });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `clienti_${today}.${ext}`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    const a = document.createElement('a'); a.href = url; a.download = `clienti_${today}.${ext}`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+  }
+
+  function exportClients(fmt: 'csv' | 'json' | 'vcf' | 'xml') {
+    exportSelectedClients(clients, fmt);
     setShowExport(false);
   }
 
@@ -520,9 +546,49 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
             <Search size={13} />
             Filtri{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
           </button>
+          <button onClick={toggleSelectMode}
+            title={selectMode ? 'Esci dalla selezione' : 'Seleziona più clienti'}
+            style={{ ...btnPrimary, fontSize: '12px', padding: '6px 10px', ...(selectMode ? { background: 'rgba(99,102,241,0.4)', border: '1px solid rgba(99,102,241,0.7)' } : {}) }}>
+            <CheckSquare size={13} />
+          </button>
           <button onClick={() => setShowExport(true)} style={{ ...btnPrimary, fontSize: '12px', padding: '6px 10px' }}><Download size={13} /></button>
           <button onClick={() => { setImportData(null); setImportError(''); setShowImport(true); }} style={{ ...btnPrimary, fontSize: '12px', padding: '6px 10px' }}><Upload size={13} /></button>
         </div>
+
+        {/* Bulk action bar */}
+        {selectMode && (
+          <div className="rounded-xl p-2.5 space-y-2" style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.3)' }}>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium" style={{ color: 'var(--accent-light)' }}>
+                {selectedIds.size} selezionat{selectedIds.size === 1 ? 'o' : 'i'} / {filtered.length}
+              </span>
+              <div className="flex gap-1.5">
+                <button onClick={selectAll} className="text-xs px-2 py-1 rounded-lg" style={{ background: 'rgba(99,102,241,0.2)', color: 'var(--accent-light)', border: '1px solid rgba(99,102,241,0.3)', cursor: 'pointer' }}>
+                  Tutti
+                </button>
+                {selectedIds.size > 0 && (
+                  <button onClick={deselectAll} className="text-xs px-2 py-1 rounded-lg" style={{ background: 'var(--bg-input)', color: 'var(--muted)', border: '1px solid var(--border)', cursor: 'pointer' }}>
+                    Nessuno
+                  </button>
+                )}
+              </div>
+            </div>
+            {selectedIds.size > 0 && (
+              <div className="flex gap-1.5 flex-wrap">
+                <button onClick={bulkDelete}
+                  className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg flex-1 justify-center"
+                  style={{ background: 'rgba(239,68,68,0.15)', color: '#f87171', border: '1px solid rgba(239,68,68,0.3)', cursor: 'pointer' }}>
+                  <Trash size={12} /> Elimina ({selectedIds.size})
+                </button>
+                <button onClick={() => setShowBulkExport(true)}
+                  className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg flex-1 justify-center"
+                  style={{ ...btnPrimary, fontSize: '12px', padding: '6px 10px' }}>
+                  <Download size={12} /> Esporta ({selectedIds.size})
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Filter panel */}
         {showFilters && (
@@ -618,27 +684,46 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
 
         <div className="flex flex-col gap-2 overflow-y-auto" style={{ flex: 1 }}>
           {filtered.length === 0 && <p style={{ color: 'var(--border-light)', fontSize: '13px' }}>Nessun cliente trovato.</p>}
-          {filtered.map(c => (
-            <button key={c.id} onClick={() => { setSelectedId(c.id); setActiveTab('info'); }}
-              className="text-left rounded-xl px-4 py-3 transition-all"
-              style={{ background: selectedId === c.id ? 'rgba(99,102,241,0.15)' : 'var(--bg-card)', border: `1px solid ${selectedId === c.id ? 'rgba(99,102,241,0.5)' : 'var(--border)'}` }}>
-              <div className="flex items-center justify-between">
-                <span className="font-medium text-white text-sm">{c.firstName} {c.lastName}</span>
-                <div className="flex items-center gap-1">
-                  {c.allergies && <AlertTriangle size={12} style={{ color: '#f59e0b' }} />}
-                  {isDormant(c) && <Clock size={12} style={{ color: 'var(--muted)' }} />}
+          {filtered.map(c => {
+            const isChecked = selectedIds.has(c.id);
+            return (
+              <button key={c.id}
+                onClick={() => {
+                  if (selectMode) { toggleSelectId(c.id); }
+                  else { setSelectedId(c.id); setActiveTab('info'); }
+                }}
+                className="text-left rounded-xl px-4 py-3 transition-all"
+                style={{
+                  background: isChecked ? 'rgba(99,102,241,0.2)' : selectedId === c.id && !selectMode ? 'rgba(99,102,241,0.15)' : 'var(--bg-card)',
+                  border: `1px solid ${isChecked ? 'rgba(99,102,241,0.6)' : selectedId === c.id && !selectMode ? 'rgba(99,102,241,0.5)' : 'var(--border)'}`,
+                }}>
+                <div className="flex items-center gap-2">
+                  {selectMode && (
+                    <span style={{ color: isChecked ? 'var(--accent-light)' : 'var(--border)', flexShrink: 0 }}>
+                      {isChecked ? <CheckSquare size={15} /> : <Square size={15} />}
+                    </span>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium text-white text-sm">{c.firstName} {c.lastName}</span>
+                      <div className="flex items-center gap-1">
+                        {c.allergies && <AlertTriangle size={12} style={{ color: '#f59e0b' }} />}
+                        {isDormant(c) && <Clock size={12} style={{ color: 'var(--muted)' }} />}
+                      </div>
+                    </div>
+                    <p style={{ fontSize: '12px', color: 'var(--muted)' }}>{c.phone || c.email || '—'}</p>
+                    {c.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {c.tags.slice(0, 3).map(t => (
+                          <span key={t} className="text-xs px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(99,102,241,0.1)', color: 'var(--accent-light)', border: '1px solid rgba(99,102,241,0.2)' }}>{t}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-              <p style={{ fontSize: '12px', color: 'var(--muted)' }}>{c.phone || c.email || '—'}</p>
-              {c.tags.length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {c.tags.slice(0, 3).map(t => (
-                    <span key={t} className="text-xs px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(99,102,241,0.1)', color: 'var(--accent-light)', border: '1px solid rgba(99,102,241,0.2)' }}>{t}</span>
-                  ))}
-                </div>
-              )}
-            </button>
-          ))}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -984,6 +1069,29 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
               { fmt: 'xml' as const, label: 'XML', desc: 'Gestionali / TeamSystem / Zucchetti', icon: '🖥️' },
             ]).map(({ fmt, label, desc, icon }) => (
               <button key={fmt} onClick={() => exportClients(fmt)}
+                className="flex flex-col items-center gap-1 rounded-xl p-4 transition-all hover:opacity-80"
+                style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', cursor: 'pointer' }}>
+                <span style={{ fontSize: '28px', lineHeight: 1 }}>{icon}</span>
+                <span className="text-sm font-semibold text-white">{label}</span>
+                <span className="text-xs text-center" style={{ color: 'var(--muted)' }}>{desc}</span>
+              </button>
+            ))}
+          </div>
+        </Modal>
+      )}
+
+      {/* ── Modal: Esporta Selezione ── */}
+      {showBulkExport && (
+        <Modal title={`Esporta ${selectedIds.size} client${selectedIds.size === 1 ? 'e' : 'i'} selezionat${selectedIds.size === 1 ? 'o' : 'i'}`} onClose={() => setShowBulkExport(false)}>
+          <p className="text-sm mb-4" style={{ color: 'var(--muted)' }}>Scegli il formato per esportare la selezione.</p>
+          <div className="grid grid-cols-2 gap-3">
+            {([
+              { fmt: 'csv' as const, label: 'CSV', desc: 'Excel / LibreOffice / Numbers', icon: '📊' },
+              { fmt: 'json' as const, label: 'JSON', desc: 'Backup / API / sviluppatori', icon: '📋' },
+              { fmt: 'vcf' as const, label: 'vCard .vcf', desc: 'Rubrica / Outlook / iPhone', icon: '👤' },
+              { fmt: 'xml' as const, label: 'XML', desc: 'Gestionali / TeamSystem / Zucchetti', icon: '🖥️' },
+            ]).map(({ fmt, label, desc, icon }) => (
+              <button key={fmt} onClick={() => bulkExport(fmt)}
                 className="flex flex-col items-center gap-1 rounded-xl p-4 transition-all hover:opacity-80"
                 style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', cursor: 'pointer' }}>
                 <span style={{ fontSize: '28px', lineHeight: 1 }}>{icon}</span>

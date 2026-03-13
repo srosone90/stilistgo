@@ -241,6 +241,8 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
       firstName: quickClient.firstName, lastName: quickClient.lastName,
       phone: quickClient.phone, email: '', birthDate: '', notes: '',
       allergies: '', tags: [], gdprConsent: false, gdprDate: '', loyaltyPoints: 0,
+      gender: '', address: '', city: '', province: '', postalCode: '',
+      acquisitionSource: '', acquisitionDate: '',
     });
     setForm(p => ({ ...p, clientId: newId }));
     setShowQuickClient(false);
