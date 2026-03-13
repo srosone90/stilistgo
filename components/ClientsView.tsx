@@ -196,11 +196,20 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
   const [fAcqTo, setFAcqTo] = useState('');
   const [fBdayFrom, setFBdayFrom] = useState('');
   const [fBdayTo, setFBdayTo] = useState('');
-  const [fSortOrder, setFSortOrder] = useState<'az' | 'za' | 'newest' | 'oldest'>('az');
+  const [fSortOrder, setFSortOrder] = useState<'az' | 'za' | 'newest' | 'oldest' | 'revenue-desc' | 'revenue-asc' | 'lastvisit-desc' | 'lastvisit-asc' | 'visits-desc' | 'visits-asc'>('az');
+  // Nuovi filtri statistiche
+  const [fFrequency, setFFrequency] = useState('');
+  const [fLastVisitFrom, setFLastVisitFrom] = useState('');
+  const [fLastVisitTo, setFLastVisitTo] = useState('');
+  const [fMinVisits, setFMinVisits] = useState('');
+  const [fMaxVisits, setFMaxVisits] = useState('');
+  const [fMinRevenue, setFMinRevenue] = useState('');
+  const [fMaxRevenue, setFMaxRevenue] = useState('');
 
   const activeFilterCount = [
     !fGender.M || !fGender.F, fAcqSource, fHasPhone, fHasEmail, fHasGdpr !== 'all',
     fCity, fProvince, fTagSearch, fAcqFrom, fAcqTo, fBdayFrom, fBdayTo,
+    fFrequency, fLastVisitFrom, fLastVisitTo, fMinVisits, fMaxVisits, fMinRevenue, fMaxRevenue,
   ].filter(Boolean).length;
 
   function resetFilters() {
@@ -208,6 +217,8 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
     setFHasPhone(false); setFHasEmail(false); setFHasGdpr('all');
     setFCity(''); setFProvince(''); setFTagSearch('');
     setFAcqFrom(''); setFAcqTo(''); setFBdayFrom(''); setFBdayTo('');
+    setFFrequency(''); setFLastVisitFrom(''); setFLastVisitTo('');
+    setFMinVisits(''); setFMaxVisits(''); setFMinRevenue(''); setFMaxRevenue('');
   }
 
   const filtered = useMemo(() => {
