@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { signIn, signUp } from '@/lib/supabase';
 import { Scissors } from 'lucide-react';
 
-type Mode = 'login' | 'register';
+type Mode = 'login' | 'register' | 'forgot';
 
 const inputStyle: React.CSSProperties = {
   width: '100%',
@@ -61,6 +61,27 @@ export default function AuthForm() {
 
   const reset = () => { setError(''); setSuccess(''); setShowResend(false); };
 
+  const handleForgot = async () => {
+    reset();
+    if (!email) { setError('Inserisci la tua email sopra.'); return; }
+    setLoading(true);
+    try {
+      const res = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const json = await res.json();
+      if (res.status === 429) { setError(json.error); return; }
+      setSuccess(json.message || "Se l'indirizzo è registrato, riceverai le istruzioni a breve.");
+      setMode('login');
+    } catch {
+      setError('Errore di rete. Riprova.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     reset();
@@ -112,7 +133,7 @@ export default function AuthForm() {
   };
 
   const toggleMode = () => {
-    setMode(m => (m === 'login' ? 'register' : 'login'));
+    setMode(m => m === 'login' ? 'register' : 'login');
     reset();
   };
 
@@ -152,7 +173,7 @@ export default function AuthForm() {
         </div>
         <h1 className="text-xl font-bold text-white">Stylistgo</h1>
         <p className="text-sm mt-1" style={{ color: 'var(--muted)' }}>
-          {mode === 'login' ? 'Accedi al gestionale' : 'Crea il tuo account'}
+          {mode === 'login' ? 'Accedi al gestionale' : mode === 'register' ? 'Crea il tuo account' : 'Reimposta password'}
         </p>
       </div>
 
@@ -235,32 +256,59 @@ export default function AuthForm() {
           />
         </div>
 
-        <div>
-          <label style={labelStyle}>Password {mode === 'register' && <span style={{ color: 'var(--border-light)' }}>(min. 6 caratteri)</span>}</label>
-          <input
-            type="password"
-            required
-            minLength={6}
-            placeholder="••••••••"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            style={inputStyle}
-            autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-          />
-        </div>
+        {mode !== 'forgot' && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <label style={{ ...labelStyle, marginBottom: 0 }}>
+                Password {mode === 'register' && <span style={{ color: 'var(--border-light)' }}>(min. 6 caratteri)</span>}
+              </label>
+              {mode === 'login' && (
+                <button
+                  type="button"
+                  onClick={() => { reset(); setMode('forgot'); }}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px', color: 'var(--accent-light)', padding: 0 }}
+                >
+                  Password dimenticata?
+                </button>
+              )}
+            </div>
+            <input
+              type="password"
+              required
+              minLength={6}
+              placeholder="••••••••"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              style={inputStyle}
+              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+            />
+          </div>
+        )}
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-white transition-all disabled:opacity-60 mt-2"
-          style={{ background: 'linear-gradient(135deg,#6366f1,#a855f7)', border: 'none' }}
-        >
-          {loading ? (
-            <><Spinner />{mode === 'login' ? 'Accesso...' : 'Registrazione...'}</>
-          ) : (
-            mode === 'login' ? 'Accedi' : 'Crea Account'
-          )}
-        </button>
+        {mode === 'forgot' ? (
+          <button
+            type="button"
+            onClick={handleForgot}
+            disabled={loading}
+            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-white transition-all disabled:opacity-60 mt-2"
+            style={{ background: 'linear-gradient(135deg,#6366f1,#a855f7)', border: 'none', cursor: loading ? 'not-allowed' : 'pointer' }}
+          >
+            {loading ? <><Spinner />Invio...</> : 'Invia link di reset'}
+          </button>
+        ) : (
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-white transition-all disabled:opacity-60 mt-2"
+            style={{ background: 'linear-gradient(135deg,#6366f1,#a855f7)', border: 'none' }}
+          >
+            {loading ? (
+              <><Spinner />{mode === 'login' ? 'Accesso...' : 'Registrazione...'}</>
+            ) : (
+              mode === 'login' ? 'Accedi' : 'Crea Account'
+            )}
+          </button>
+        )}
       </form>
 
       {/* Toggle */}
@@ -272,8 +320,10 @@ export default function AuthForm() {
         >
           {mode === 'login' ? (
             <>Non hai un account? <span style={{ color: 'var(--accent-light)' }}>Registrati</span></>
-          ) : (
+          ) : mode === 'register' ? (
             <>Hai già un account? <span style={{ color: 'var(--accent-light)' }}>Accedi</span></>
+          ) : (
+            <><span style={{ color: 'var(--accent-light)' }}>← Torna al login</span></>
           )}
         </button>
       </div>
