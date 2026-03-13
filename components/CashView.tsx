@@ -5,7 +5,7 @@ import { useSalon } from '@/context/SalonContext';
 import { Payment, PaymentMethod, PAYMENT_METHOD_LABELS, PaymentItem, CashSession } from '@/types/salon';
 import { format, parseISO } from 'date-fns';
 import { it } from 'date-fns/locale';
-import { Plus, X, Trash2, CreditCard, Banknote, Gift, TrendingUp, ChevronDown, ChevronUp, Printer, Package, RotateCcw } from 'lucide-react';
+import { Plus, X, Trash2, CreditCard, Banknote, Gift, TrendingUp, ChevronDown, ChevronUp, Printer, Package, RotateCcw, EyeOff } from 'lucide-react';
 import { formatCurrency } from '@/lib/calculations';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -37,6 +37,7 @@ type FormState = {
   giftCardCode: string;
   giftCardAmount: number;
   notes: string;
+  isHidden: boolean; // nascosto: visibile solo con PIN privato titolare
 };
 
 const EMPTY_FORM: FormState = {
@@ -45,6 +46,7 @@ const EMPTY_FORM: FormState = {
   items: [], discountPct: 0, discountEur: 0,
   paymentMethod: 'cash', cashAmount: 0, cardAmount: 0,
   giftCardCode: '', giftCardAmount: 0, notes: '',
+  isHidden: false,
 };
 
 export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
@@ -58,6 +60,7 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
     clients, operators, services, appointments,
     giftCards, redeemGiftCard, salonConfig, changeAppointmentStatus,
     products, addStockMovement,
+    isPrivateMode,
   } = useSalon();
 
   const [showForm, setShowForm] = useState(false);
@@ -106,10 +109,13 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
     cashSessions.find(s => s.date === selectedDate && !s.closedAt) ?? null,
     [cashSessions, selectedDate]);
 
-  // Payments for selected date
+  // Payments for selected date (hidden only visible in private mode)
   const dayPayments = useMemo(() =>
-    payments.filter(p => p.date === selectedDate).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
-    [payments, selectedDate]);
+    payments
+      .filter(p => p.date === selectedDate)
+      .filter(p => isPrivateMode || !p.isHidden)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    [payments, selectedDate, isPrivateMode]);
 
   // Totals
   const totals = useMemo(() => {
@@ -334,6 +340,7 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
       giftCardCode: form.giftCardCode,
       giftCardAmount: finalGc,
       notes: form.notes,
+      isHidden: form.isHidden,
     });
     // Mark appointment completed
     if (form.appointmentId) {
@@ -420,14 +427,15 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
         {dayPayments.length === 0 && <p style={{ color: 'var(--border-light)', fontSize: '13px' }}>Nessun pagamento registrato per questa data.</p>}
         <div className="space-y-2">
           {dayPayments.map(p => (
-            <div key={p.id} style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '12px' }}>
+            <div key={p.id} style={{ background: 'var(--bg-input)', border: `1px solid ${p.isHidden ? 'rgba(168,85,247,0.4)' : 'var(--border)'}`, borderRadius: '12px' }}>
               <div className="flex items-center justify-between p-3 cursor-pointer" onClick={() => setExpandedPaymentId(expandedPaymentId === p.id ? null : p.id)}>
                 <div className="flex items-center gap-3">
                   {METHOD_ICONS[p.paymentMethod]}
                   <div>
                     <p className="text-sm font-medium text-white">{p.clientName || '— Cliente non registrato —'}</p>
                     <p style={{ fontSize: '11px', color: 'var(--muted)' }}>
-                      {PAYMENT_METHOD_LABELS[p.paymentMethod]} · {p.items.map(i => i.serviceName).join(', ')}
+                      {p.isHidden ? <><EyeOff size={10} style={{ display: 'inline', marginRight: 3, color: '#c084fc' }} /><span style={{ color: '#c084fc' }}>Nascosta</span> · </> : <>{PAYMENT_METHOD_LABELS[p.paymentMethod]} · </>}
+                      {p.items.map(i => i.serviceName).join(', ')}
                     </p>
                   </div>
                 </div>
@@ -730,13 +738,31 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
                 <label style={labelStyle}>Metodo di pagamento</label>
                 <div className="flex gap-2 flex-wrap">
                   {(Object.keys(PAYMENT_METHOD_LABELS) as PaymentMethod[]).map(m => (
-                    <button key={m} onClick={() => { setForm(p => ({ ...p, paymentMethod: m })); setGiftCardInfo(null); setGcAmountToUse(0); }}
+                    <button key={m} onClick={() => { setForm(p => ({ ...p, paymentMethod: m, isHidden: false })); setGiftCardInfo(null); setGcAmountToUse(0); }}
                       className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg"
-                      style={{ background: form.paymentMethod === m ? 'rgba(99,102,241,0.2)' : 'var(--bg-input)', border: `1px solid ${form.paymentMethod === m ? 'rgba(99,102,241,0.5)' : 'var(--border)'}`, color: form.paymentMethod === m ? 'var(--accent-light)' : 'var(--muted)', cursor: 'pointer' }}>
+                      style={{ background: form.paymentMethod === m && !form.isHidden ? 'rgba(99,102,241,0.2)' : 'var(--bg-input)', border: `1px solid ${form.paymentMethod === m && !form.isHidden ? 'rgba(99,102,241,0.5)' : 'var(--border)'}`, color: form.paymentMethod === m && !form.isHidden ? 'var(--accent-light)' : 'var(--muted)', cursor: 'pointer' }}>
                       {METHOD_ICONS[m]} {PAYMENT_METHOD_LABELS[m]}
                     </button>
                   ))}
+                  {/* Nessun metodo: hidden cash (solo titolare con PIN privato) */}
+                  <button
+                    onClick={() => { setForm(p => ({ ...p, paymentMethod: 'cash', isHidden: true })); setGiftCardInfo(null); setGcAmountToUse(0); }}
+                    className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg"
+                    style={{
+                      background: form.isHidden ? 'rgba(168,85,247,0.2)' : 'var(--bg-input)',
+                      border: `1px solid ${form.isHidden ? 'rgba(168,85,247,0.5)' : 'var(--border)'}`,
+                      color: form.isHidden ? '#d8b4fe' : 'var(--muted)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <EyeOff size={14} style={{ color: form.isHidden ? '#d8b4fe' : 'var(--muted)' }} /> Nessun metodo
+                  </button>
                 </div>
+                {form.isHidden && (
+                  <p className="text-xs mt-2 px-3 py-2 rounded-lg" style={{ background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.25)', color: '#c084fc' }}>
+                    🔒 Transazione nascosta — visibile solo accedendo con il PIN privato del titolare.
+                  </p>
+                )}
               </div>
 
               {form.paymentMethod === 'mixed' && (

@@ -127,7 +127,8 @@ export interface Operator {
   commissionRate: number; // 0-100%
   schedule: WorkShift[];
   active: boolean;
-  pin?: string; // PIN per accesso staff
+  pin?: string; // PIN pubblico per accesso staff
+  privatePin?: string; // PIN privato (solo titolare) — mostra transazioni nascoste
   permissions?: OperatorPermissions; // undefined = accesso completo (titolare)
   createdAt: string;
 }
@@ -334,6 +335,9 @@ export interface SalonConfig {
   vatNumber: string;   // P.IVA
   invoiceNote: string; // note standard in stampe/fatture
   currency: string;    // default '€'
+  // PIN titolare (usato quando nessun operatore owner è configurato)
+  ownerPublicPin?: string;
+  ownerPrivatePin?: string;
   whatsapp?: WhatsAppConfig;
 }
 
@@ -397,6 +401,7 @@ export interface Payment {
   giftCardCode: string;
   giftCardAmount: number;
   subscriptionId?: string;   // if paid/redeemed via subscription
+  isHidden?: boolean;        // nascosto: visibile solo con PIN privato titolare
   notes: string;
   createdAt: string;
 }

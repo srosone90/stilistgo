@@ -115,6 +115,10 @@ interface SalonContextValue {
   activeOperatorId: string | null;
   setActiveOperatorId: (id: string | null) => void;
   verifyOperatorPin: (operatorId: string, pin: string) => boolean;
+  // Private mode: unlocked with PIN privato del titolare
+  isPrivateMode: boolean;
+  setPrivateMode: (v: boolean) => void;
+  checkPinMode: (operatorId: string | null, pin: string) => 'public' | 'private' | 'invalid';
 
   // Gamification
   gamificationConfig: GamificationConfig;
@@ -161,6 +165,7 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
   const [cashSessions, setCashSessions] = useState<CashSession[]>([]);
   const [whatsappMessages, setWhatsappMessages] = useState<WhatsAppMessage[]>([]);
   const [activeOperatorId, setActiveOperatorIdState] = useState<string | null>(null);
+  const [isPrivateMode, setPrivateModeState] = useState(false);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [subscriptions, setSubscriptions] = useState<ClientSubscription[]>([]);
   const [salonLoading, setSalonLoading] = useState(true);
@@ -768,18 +773,46 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
 
   // ─── Active Operator (PIN) ──────────────────────────────────────────────────────
 
+  const setPrivateMode = useCallback((v: boolean) => {
+    setPrivateModeState(v);
+  }, []);
+
   const setActiveOperatorId = useCallback((id: string | null) => {
     storageSaveActiveOperatorId(id);
     setActiveOperatorIdState(id);
+    setPrivateModeState(false); // reset private mode on operator change
   }, []);
 
   const verifyOperatorPin = useCallback((operatorId: string, pin: string): boolean => {
-    // Use the always-current ref rather than stale localStorage to get latest operators
     const ops = (latestStateRef.current.operators as Operator[] | undefined) ?? storageGetOperators();
     const op = ops.find(o => o.id === operatorId);
     if (!op) return false;
     if (!op.pin) return true; // no PIN set = always accept
     return op.pin === pin;
+  }, []);
+
+  const checkPinMode = useCallback((operatorId: string | null, pin: string): 'public' | 'private' | 'invalid' => {
+    const ops = (latestStateRef.current.operators as Operator[] | undefined) ?? storageGetOperators();
+    const cfg = (latestStateRef.current.salonConfig as SalonConfig | undefined) ?? storageGetSalonConfig();
+
+    if (operatorId === null) {
+      // No-operator titolare: use salonConfig pins
+      const publ = cfg.ownerPublicPin;
+      const priv = cfg.ownerPrivatePin;
+      if (!publ && !priv) return 'public'; // free access
+      if (priv && pin === priv) return 'private';
+      if (!publ || pin === publ) return 'public';
+      return 'invalid';
+    }
+
+    const op = ops.find(o => o.id === operatorId);
+    if (!op) return 'invalid';
+    // Check private PIN first
+    if (op.privatePin && pin === op.privatePin) return 'private';
+    // Check public PIN
+    if (!op.pin) return 'public'; // no public PIN = free access
+    if (pin === op.pin) return 'public';
+    return 'invalid';
   }, []);
 
   const updateGamificationConfig = useCallback((c: Partial<GamificationConfig>) => {
@@ -855,6 +888,7 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
       updateSalonConfig, updateClientAppConfig,
       payments, cashSessions, addPayment, deletePayment, addCashSession, closeCashSession,
       activeOperatorId, setActiveOperatorId, verifyOperatorPin,
+      isPrivateMode, setPrivateMode, checkPinMode,
       gamificationConfig, updateGamificationConfig,
       whatsappMessages, addWhatsAppMessage,
       suppliers, addSupplier, updateSupplier, deleteSupplier,

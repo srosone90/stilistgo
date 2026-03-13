@@ -1,12 +1,12 @@
 ﻿'use client';
 
 import React, { useState } from 'react';
-import { Scissors, Lock } from 'lucide-react';
+import { Scissors, Lock, KeyRound } from 'lucide-react';
 import { useSalon } from '@/context/SalonContext';
 
 export default function OperatorLockScreen({ onUnlock }: { onUnlock: () => void }) {
-  const { operators, setActiveOperatorId, verifyOperatorPin, salonConfig } = useSalon();
-  const [step, setStep] = useState<'select' | 'pin'>('select');
+  const { operators, setActiveOperatorId, checkPinMode, setPrivateMode, salonConfig } = useSalon();
+  const [step, setStep] = useState<'select' | 'pin' | 'owner-pin'>('select');
   const [selectedId, setSelectedId] = useState('');
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState(false);
@@ -16,7 +16,8 @@ export default function OperatorLockScreen({ onUnlock }: { onUnlock: () => void 
   function handleSelect(id: string) {
     const op = operators.find(o => o.id === id);
     if (!op) return;
-    if (!op.pin) {
+    if (!op.pin && !op.privatePin) {
+      setPrivateMode(false);
       setActiveOperatorId(id);
       onUnlock();
       return;
@@ -27,14 +28,32 @@ export default function OperatorLockScreen({ onUnlock }: { onUnlock: () => void 
     setPinError(false);
   }
 
-  function handlePinSubmit() {
-    if (verifyOperatorPin(selectedId, pinInput)) {
-      setActiveOperatorId(selectedId);
-      onUnlock();
+  function handleOwnerDirectAccess() {
+    // No-operator titolare: check if pins are configured
+    const hasPins = salonConfig.ownerPublicPin || salonConfig.ownerPrivatePin;
+    if (hasPins) {
+      setSelectedId('');
+      setStep('owner-pin');
+      setPinInput('');
+      setPinError(false);
     } else {
+      setPrivateMode(false);
+      setActiveOperatorId(null);
+      onUnlock();
+    }
+  }
+
+  function handlePinSubmit() {
+    const opId = step === 'owner-pin' ? null : selectedId;
+    const mode = checkPinMode(opId, pinInput);
+    if (mode === 'invalid') {
       setPinError(true);
       setPinInput('');
+      return;
     }
+    setPrivateMode(mode === 'private');
+    if (step !== 'owner-pin') setActiveOperatorId(selectedId);
+    onUnlock();
   }
 
   const selectedOp = operators.find(o => o.id === selectedId);
@@ -70,7 +89,7 @@ export default function OperatorLockScreen({ onUnlock }: { onUnlock: () => void 
                 Nessun operatore configurato.
               </p>
               <button
-                onClick={onUnlock}
+                onClick={handleOwnerDirectAccess}
                 className="w-full py-3.5 rounded-2xl font-semibold text-white text-sm transition-all hover:scale-[1.02] active:scale-[0.98]"
                 style={{ background: 'linear-gradient(135deg,#6366f1,#a855f7)', border: 'none', cursor: 'pointer' }}
               >
@@ -98,10 +117,10 @@ export default function OperatorLockScreen({ onUnlock }: { onUnlock: () => void 
                 <div className="flex-1">
                   <p className="font-semibold text-white text-sm">{op.name}</p>
                   <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>
-                    {op.pin ? (
+                    {(op.pin || op.privatePin) ? (
                       <>
                         <Lock size={10} style={{ display: 'inline', marginRight: 3 }} />
-                        PIN richiesto
+                        {op.pin && op.privatePin ? 'PIN pubblico / privato' : 'PIN richiesto'}
                       </>
                     ) : (
                       'Accesso libero'
@@ -117,20 +136,32 @@ export default function OperatorLockScreen({ onUnlock }: { onUnlock: () => void 
         </div>
       ) : (
         <div className="w-full max-w-xs">
-          {/* Avatar operatore */}
+          {/* Avatar operatore / titolare */}
           <div className="text-center mb-6">
-            <div
-              className="w-20 h-20 rounded-full flex items-center justify-center text-3xl font-bold mx-auto mb-3"
-              style={{
-                background: (selectedOp?.color || '#6366f1') + '25',
-                color: selectedOp?.color || '#6366f1',
-              }}
-            >
-              {selectedOp?.name.charAt(0).toUpperCase()}
-            </div>
-            <p className="font-semibold text-white text-lg">{selectedOp?.name}</p>
+            {step === 'owner-pin' ? (
+              <div className="w-20 h-20 rounded-full flex items-center justify-center text-3xl font-bold mx-auto mb-3"
+                style={{ background: 'rgba(99,102,241,0.2)', color: '#818cf8' }}>
+                <KeyRound size={32} />
+              </div>
+            ) : (
+              <div
+                className="w-20 h-20 rounded-full flex items-center justify-center text-3xl font-bold mx-auto mb-3"
+                style={{
+                  background: (selectedOp?.color || '#6366f1') + '25',
+                  color: selectedOp?.color || '#6366f1',
+                }}
+              >
+                {selectedOp?.name.charAt(0).toUpperCase()}
+              </div>
+            )}
+            <p className="font-semibold text-white text-lg">
+              {step === 'owner-pin' ? 'Titolare' : selectedOp?.name}
+            </p>
             <p className="text-sm mt-1" style={{ color: 'var(--muted)' }}>
-              Inserisci il tuo PIN
+              {step === 'owner-pin'
+                ? 'Inserisci PIN pubblico o privato'
+                : 'Inserisci il tuo PIN'
+              }
             </p>
           </div>
 
@@ -176,17 +207,19 @@ export default function OperatorLockScreen({ onUnlock }: { onUnlock: () => void 
             Accedi
           </button>
 
-          <button
-            onClick={() => {
-              setStep('select');
-              setPinInput('');
-              setPinError(false);
-            }}
-            className="w-full mt-2 py-2 text-xs"
-            style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}
-          >
-            ← Cambia operatore
-          </button>
+          {activeOps.length > 0 && (
+            <button
+              onClick={() => {
+                setStep('select');
+                setPinInput('');
+                setPinError(false);
+              }}
+              className="w-full mt-2 py-2 text-xs"
+              style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}
+            >
+              ← Cambia operatore
+            </button>
+          )}
         </div>
       )}
     </div>

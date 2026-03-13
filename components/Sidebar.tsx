@@ -76,7 +76,7 @@ interface SidebarProps {
 
 export default function Sidebar({ activeView, onNavigate, onLock, permissions, planFeatures }: SidebarProps) {
   const { dataSource } = useApp();
-  const { operators, activeOperatorId, setActiveOperatorId, verifyOperatorPin } = useSalon();
+  const { operators, activeOperatorId, setActiveOperatorId, checkPinMode, setPrivateMode } = useSalon();
   const { isDark, toggleTheme } = useTheme();
   const { notifications, unreadCount } = useNotifications();
   const newBookingCount = notifications.filter(n => !n.read && n.type === 'new_booking').length;
@@ -93,13 +93,15 @@ export default function Sidebar({ activeView, onNavigate, onLock, permissions, p
   function handleOpSelect(id: string) {
     const op = operators.find(o => o.id === id);
     if (!op) return;
-    if (!op.pin) { setActiveOperatorId(id); setShowPinModal(false); return; }
+    if (!op.pin && !op.privatePin) { setPrivateMode(false); setActiveOperatorId(id); setShowPinModal(false); return; }
     setSelectedOpId(id); setPinStep('pin'); setPinInput(''); setPinError(false);
   }
   function handlePinSubmit() {
-    const ok = verifyOperatorPin(selectedOpId, pinInput);
-    if (ok) { setActiveOperatorId(selectedOpId); setShowPinModal(false); }
-    else { setPinError(true); setPinInput(''); }
+    const mode = checkPinMode(selectedOpId, pinInput);
+    if (mode === 'invalid') { setPinError(true); setPinInput(''); return; }
+    setPrivateMode(mode === 'private');
+    setActiveOperatorId(selectedOpId);
+    setShowPinModal(false);
   }
 
   useEffect(() => {
