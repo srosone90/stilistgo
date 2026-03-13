@@ -341,7 +341,9 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
           const localOps = storageGetOperators();
           const withPins = (adminState.operators as Operator[]).map(op => {
             const local = localOps.find(l => l.id === op.id);
-            return local ? { ...op, pin: local.pin, privatePin: local.privatePin } : op;
+            if (!local) return op;
+            // Preserve user-customizable fields from local copy; admin_state only sets identity/role
+            return { ...op, pin: local.pin, privatePin: local.privatePin, color: local.color || op.color, commissionRate: local.commissionRate ?? op.commissionRate, schedule: local.schedule?.length ? local.schedule : op.schedule };
           });
           setOperators(withPins); storageSaveOperators(withPins);
         }
@@ -363,11 +365,12 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
         if (cloudIsNewer && Array.isArray(cloudState.services))                 { setServices(cloudState.services as Service[]); storageSaveServices(cloudState.services as Service[]); }
         if (cloudIsNewer && Array.isArray(cloudState.operators)) {
           // Cloud operators may have had PINs stripped by dbSaveSalonState if admin_state was present.
-          // Always re-apply locally stored pins so they are never lost.
+          // Always re-apply locally stored pins and user-customized fields so they are never lost.
           const localOps = storageGetOperators();
           const withPins = (cloudState.operators as Operator[]).map(op => {
             const local = localOps.find(l => l.id === op.id);
-            return local ? { ...op, pin: local.pin || op.pin, privatePin: local.privatePin || op.privatePin } : op;
+            if (!local) return op;
+            return { ...op, pin: local.pin || op.pin, privatePin: local.privatePin || op.privatePin, color: local.color || op.color, commissionRate: local.commissionRate ?? op.commissionRate, schedule: local.schedule?.length ? local.schedule : op.schedule };
           });
           setOperators(withPins); storageSaveOperators(withPins);
         }

@@ -307,9 +307,9 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
       if (serviceDragRef.current) {
         const totalDelta = Math.hypot(e.clientX - serviceDragRef.current.startX, e.clientY - serviceDragRef.current.startY);
         if (totalDelta > 5) wasDraggedRef.current = true;
-        // Soft 5-min snap
+        // Soft 15-min snap: raw float delta, snapped gently at 15-min boundaries
         const rawDelta = (e.clientY - serviceDragRef.current.startY) / hourPxRef.current * 60;
-        const deltaMin = Math.round(rawDelta / 5) * 5;
+        const deltaMin = Math.round(rawDelta / 15) * 15;
         const newStartMin = Math.max(openHour * 60, serviceDragRef.current.origStartMin + deltaMin);
         setServiceDraggingStart(minutesToTime(newStartMin));
         // Detect target operator column from X
@@ -675,11 +675,14 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                     : computeServiceStartMin(a, sid, services);
                   const top = ((startAbsMin - START_MIN) / 60) * HOUR_PX;
                   const headerH = 28;
-                  const minH = headerH + (procDur > 0 ? 18 : 4);
+                  // Posa always gets at least 14px of dedicated space
+                  const PROC_MIN_PX = 14;
+                  const minH = headerH + (procDur > 0 ? PROC_MIN_PX + 8 : 4);
                   const height = Math.max((totalDur / 60) * HOUR_PX, minH);
                   const bodyH = height - headerH;
-                  // Ensure posa always gets at least 12px when it exists
-                  const procH = procDur > 0 ? Math.max(Math.round((procDur / totalDur) * bodyH), 12) : 0;
+                  const procH = procDur > 0 && totalDur > 0
+                    ? Math.max(Math.round((procDur / totalDur) * bodyH), PROC_MIN_PX)
+                    : 0;
                   const activeH = Math.max(bodyH - procH, 0);
                   const client = clients.find(c => c.id === a.clientId);
                   return (
