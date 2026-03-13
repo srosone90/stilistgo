@@ -307,9 +307,9 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
       if (serviceDragRef.current) {
         const totalDelta = Math.hypot(e.clientX - serviceDragRef.current.startX, e.clientY - serviceDragRef.current.startY);
         if (totalDelta > 5) wasDraggedRef.current = true;
-        // Soft 15-min snap: raw float delta, snapped gently at 15-min boundaries
+        // Free movement — round to 1 min, no snap
         const rawDelta = (e.clientY - serviceDragRef.current.startY) / hourPxRef.current * 60;
-        const deltaMin = Math.round(rawDelta / 15) * 15;
+        const deltaMin = Math.round(rawDelta);
         const newStartMin = Math.max(openHour * 60, serviceDragRef.current.origStartMin + deltaMin);
         setServiceDraggingStart(minutesToTime(newStartMin));
         // Detect target operator column from X
@@ -669,68 +669,81 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                   const svColor = op.color || '#6366f1';
                   const opDur = isResizing ? serviceResizingOpDur : getServiceOpDurForAppt(a, sid, services);
                   const procDur = svc.processingDuration ?? 0;
-                  const totalDur = opDur + procDur;
                   const startAbsMin = isDragging && serviceDraggingStart
                     ? timeToMinutes(serviceDraggingStart)
                     : computeServiceStartMin(a, sid, services);
-                  const top = ((startAbsMin - START_MIN) / 60) * HOUR_PX;
-                  const headerH = 28;
-                  // Posa always gets at least 14px of dedicated space
-                  const PROC_MIN_PX = 14;
-                  const minH = headerH + (procDur > 0 ? PROC_MIN_PX + 8 : 4);
-                  const height = Math.max((totalDur / 60) * HOUR_PX, minH);
-                  const bodyH = height - headerH;
-                  const procH = procDur > 0 && totalDur > 0
-                    ? Math.max(Math.round((procDur / totalDur) * bodyH), PROC_MIN_PX)
-                    : 0;
-                  const activeH = Math.max(bodyH - procH, 0);
+                  // Active block sizing (only operator phase)
+                  const activeBlockH = Math.max((opDur / 60) * HOUR_PX, 28);
+                  const activeTop = ((startAbsMin - START_MIN) / 60) * HOUR_PX;
+                  // Posa block sits immediately below the active block
+                  const procBlockH = procDur > 0 ? Math.max((procDur / 60) * HOUR_PX, 16) : 0;
+                  const procTop = activeTop + activeBlockH;
                   const client = clients.find(c => c.id === a.clientId);
+                  const removeService = (e: React.MouseEvent) => {
+                    e.stopPropagation();
+                    const appt = appointments.find(ap => ap.id === a.id);
+                    if (!appt) return;
+                    const newSvcIds = appt.serviceIds.filter(s => s !== sid);
+                    const newSvcOps = { ...(appt.serviceOperators ?? {}) };
+                    const newSvcStarts = { ...(appt.serviceStartTimes ?? {}) };
+                    const newSvcOpDurs = { ...(appt.serviceOperatorDurations ?? {}) };
+                    delete newSvcOps[sid]; delete newSvcStarts[sid]; delete newSvcOpDurs[sid];
+                    updateAppointment({ ...appt, serviceIds: newSvcIds, serviceOperators: newSvcOps, serviceStartTimes: newSvcStarts, serviceOperatorDurations: newSvcOpDurs }, 'Servizio rimosso');
+                  };
                   return (
-                    <div key={dragKey}
-                      onMouseDown={e => handleServiceDragStart(e, a.id, sid, startAbsMin, op.id)}
-                      onClick={e => { if (wasDraggedRef.current) { e.stopPropagation(); return; } e.stopPropagation(); openEdit(a); }}
-                      className="absolute left-1 right-1 rounded-lg overflow-hidden hover:brightness-110 transition-all"
-                      style={{ top, height, background: `${svColor}22`, border: `1px solid ${svColor}55`, zIndex: isDragging ? 10 : 2, opacity: isDragging ? 0.7 : 1, cursor: isDragging ? 'grabbing' : 'grab', userSelect: 'none' }}>
-                      {/* × rimuovi servizio */}
-                      <button
-                        onMouseDown={e => e.stopPropagation()}
-                        onClick={e => {
-                          e.stopPropagation();
-                          const appt = appointments.find(ap => ap.id === a.id);
-                          if (!appt) return;
-                          const newSvcIds = appt.serviceIds.filter(s => s !== sid);
-                          const newSvcOps = { ...(appt.serviceOperators ?? {}) };
-                          const newSvcStarts = { ...(appt.serviceStartTimes ?? {}) };
-                          const newSvcOpDurs = { ...(appt.serviceOperatorDurations ?? {}) };
-                          delete newSvcOps[sid]; delete newSvcStarts[sid]; delete newSvcOpDurs[sid];
-                          updateAppointment({ ...appt, serviceIds: newSvcIds, serviceOperators: newSvcOps, serviceStartTimes: newSvcStarts, serviceOperatorDurations: newSvcOpDurs }, 'Servizio rimosso');
-                        }}
-                        style={{ position: 'absolute', top: 2, right: 2, zIndex: 4, background: 'rgba(0,0,0,0.35)', border: 'none', color: 'rgba(255,255,255,0.65)', borderRadius: '3px', padding: '0 4px', fontSize: '11px', lineHeight: '15px', cursor: 'pointer' }}
-                        title="Rimuovi servizio dall'appuntamento">×</button>
-                      <div style={{ height: headerH, padding: '2px 24px 0 8px', background: `${svColor}28`, overflow: 'hidden' }}>
-                        <p className="text-xs font-semibold truncate" style={{ color: svColor }}>
-                          {client ? `${client.firstName} ${client.lastName}` : '—'}
-                        </p>
-                        <p style={{ color: 'var(--text-3)', fontSize: 9 }} className="truncate">
-                          {minutesToTime(startAbsMin)}–{minutesToTime(startAbsMin + totalDur)} · {svc.name}
-                        </p>
-                      </div>
-                      {activeH > 0 && (
-                        <div style={{ height: activeH, padding: '1px 8px', overflow: 'hidden' }}>
-                          <span style={{ fontSize: 9, color: svColor, opacity: 0.8 }}>{opDur}&apos;</span>
+                    <React.Fragment key={dragKey}>
+                      {/* ── Active phase block ── */}
+                      <div
+                        onMouseDown={e => handleServiceDragStart(e, a.id, sid, startAbsMin, op.id)}
+                        onClick={e => { if (wasDraggedRef.current) { e.stopPropagation(); return; } e.stopPropagation(); openEdit(a); }}
+                        className="absolute left-1 right-1 rounded-lg overflow-hidden hover:brightness-110 transition-all"
+                        style={{ top: activeTop, height: activeBlockH, background: `${svColor}22`, border: `1px solid ${svColor}55`, zIndex: isDragging ? 10 : 2, opacity: isDragging ? 0.7 : 1, cursor: isDragging ? 'grabbing' : 'grab', userSelect: 'none' }}>
+                        {/* × rimuovi servizio */}
+                        <button
+                          onMouseDown={e => e.stopPropagation()}
+                          onClick={removeService}
+                          style={{ position: 'absolute', top: 2, right: 2, zIndex: 4, background: 'rgba(0,0,0,0.35)', border: 'none', color: 'rgba(255,255,255,0.65)', borderRadius: '3px', padding: '0 4px', fontSize: '11px', lineHeight: '15px', cursor: 'pointer' }}
+                          title="Rimuovi servizio dall'appuntamento">×</button>
+                        <div style={{ padding: '2px 24px 0 8px', overflow: 'hidden' }}>
+                          <p className="text-xs font-semibold truncate" style={{ color: svColor }}>
+                            {client ? `${client.firstName} ${client.lastName}` : '—'}
+                          </p>
+                          <p style={{ color: 'var(--text-3)', fontSize: 9 }} className="truncate">
+                            {minutesToTime(startAbsMin)}–{minutesToTime(startAbsMin + opDur + procDur)} · {svc.name}
+                          </p>
+                          <p style={{ color: svColor, fontSize: 9, opacity: 0.7 }}>{opDur}&apos; operatore</p>
                         </div>
-                      )}
+                        <div onMouseDown={e => handleServiceResizeStart(e, a.id, sid, opDur)}
+                          className="absolute bottom-0 left-0 right-0 flex items-center justify-center"
+                          style={{ height: 10, cursor: 'ns-resize', background: `${svColor}30` }}>
+                          <div style={{ width: 20, height: 2, borderRadius: 2, background: svColor, opacity: 0.8 }} />
+                        </div>
+                      </div>
+                      {/* ── Posa block (separate, linked visually) ── */}
                       {procDur > 0 && (
-                        <div style={{ height: procH, background: `repeating-linear-gradient(-45deg, transparent, transparent 3px, ${svColor}20 3px, ${svColor}20 6px)`, borderTop: `1px dashed ${svColor}40`, padding: '1px 8px', overflow: 'hidden' }}>
-                          <span style={{ fontSize: 9, color: svColor, opacity: 0.6 }}>⏳ {procDur}&apos;</span>
+                        <div
+                          onMouseDown={e => handleServiceDragStart(e, a.id, sid, startAbsMin, op.id)}
+                          onClick={e => { if (wasDraggedRef.current) { e.stopPropagation(); return; } e.stopPropagation(); openEdit(a); }}
+                          className="absolute left-1 right-1 rounded-lg overflow-hidden"
+                          style={{
+                            top: procTop,
+                            height: procBlockH,
+                            borderLeft: `3px solid ${svColor}80`,
+                            borderRight: `1px solid ${svColor}40`,
+                            borderTop: `1px dashed ${svColor}60`,
+                            borderBottom: `1px solid ${svColor}40`,
+                            background: `repeating-linear-gradient(-45deg, transparent, transparent 4px, ${svColor}18 4px, ${svColor}18 8px)`,
+                            zIndex: isDragging ? 9 : 1,
+                            opacity: isDragging ? 0.7 : 1,
+                            cursor: isDragging ? 'grabbing' : 'grab',
+                            userSelect: 'none',
+                          }}>
+                          <div style={{ padding: '2px 8px', overflow: 'hidden' }}>
+                            <span style={{ fontSize: 9, color: svColor, opacity: 0.8, fontStyle: 'italic' }}>⏳ posa {procDur}&apos;</span>
+                          </div>
                         </div>
                       )}
-                      <div onMouseDown={e => handleServiceResizeStart(e, a.id, sid, opDur)}
-                        className="absolute bottom-0 left-0 right-0 flex items-center justify-center"
-                        style={{ height: 10, cursor: 'ns-resize', background: `${svColor}30` }}>
-                        <div style={{ width: 20, height: 2, borderRadius: 2, background: svColor, opacity: 0.8 }} />
-                      </div>
-                    </div>
+                    </React.Fragment>
                   );
                 })}
               </div>
