@@ -781,6 +781,9 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
 
   const deletePayment = useCallback((id: string) => {
     setPayments(prev => { const n = prev.filter(x => x.id !== id); storageSavePayments(n); return n; });
+    // Update localSavedAt immediately so a rapid page-refresh doesn't let the cloud (which still
+    // has the deleted payment) win the cloudIsNewer comparison and restore the deleted entry.
+    setLocalSavedAt(Date.now());
   }, []);
 
   const addCashSession = useCallback((openingBalance: number) => {

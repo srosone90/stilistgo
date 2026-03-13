@@ -37,7 +37,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 export default function Dashboard({ showAccounting = true }: { showAccounting?: boolean }) {
   const { settings } = useApp();
   const transactions = useCombinedTransactions();
-  const { clients, appointments, products, payments, operators, activeOperatorId, cashSessions } = useSalon();
+  const { clients, appointments, products, payments, operators, activeOperatorId, cashSessions, isPrivateMode, salonConfig } = useSalon();
   const thisMonth = format(new Date(), 'yyyy-MM');
   const monthTx = useMemo(() => filterByMonth(transactions, thisMonth), [transactions, thisMonth]);
 
@@ -75,12 +75,22 @@ export default function Dashboard({ showAccounting = true }: { showAccounting?: 
     cashSessions.find(s => !s.closedAt),
     [cashSessions]);
 
-  const todayRevenue = useMemo(() =>
-    payments.filter(p => p.date === today).reduce((sum, p) => sum + p.total, 0),
-    [payments, today]);
-
   const activeOp = operators.find(o => o.id === activeOperatorId);
   const isOwner = !activeOperatorId || !activeOp || activeOp.role === 'owner';
+
+  // Apply same hidden-payment visibility rules as CashView so todayRevenue is consistent
+  const todayRevenue = useMemo(() => {
+    const ownerHasPrivatePin = !!(operators.find(o => o.role === 'owner')?.privatePin || salonConfig.ownerPrivatePin);
+    return payments
+      .filter(p => {
+        if (p.date !== today) return false;
+        if (!p.isHidden) return true;
+        if (!isOwner) return false;
+        if (!ownerHasPrivatePin) return true;
+        return isPrivateMode;
+      })
+      .reduce((sum, p) => sum + p.total, 0);
+  }, [payments, today, isOwner, operators, salonConfig, isPrivateMode]);
 
   return (
     <div className="space-y-6">
