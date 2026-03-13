@@ -6,7 +6,7 @@ import { Operator, OperatorRole, WorkShift, DayOfWeek, DAY_NAMES, DAY_NAMES_FULL
 import { format, parseISO } from 'date-fns';
 import { salonGenerateId } from '@/lib/salonStorage';
 import { formatCurrency } from '@/lib/calculations';
-import { Plus, X, Pencil, Trash2, User } from 'lucide-react';
+import { Plus, X, Pencil, Trash2, User, Eye, EyeOff } from 'lucide-react';
 
 const card: React.CSSProperties = { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '16px', padding: '20px' };
 const inputStyle: React.CSSProperties = { background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '10px', padding: '9px 13px', color: 'var(--text)', fontSize: '13px', outline: 'none', width: '100%' };
@@ -18,7 +18,7 @@ const ROLE_LABELS: Record<OperatorRole, string> = { owner: 'Titolare', operator:
 const EMPTY_OPERATOR: Omit<Operator, 'id' | 'createdAt'> = {
   name: '', email: '', role: 'operator', serviceIds: [],
   color: OPERATOR_COLORS[0], commissionRate: 0,
-  schedule: defaultSchedule(), active: true, pin: '',
+  schedule: defaultSchedule(), active: true, pin: '', privatePin: '',
   permissions: { ...DEFAULT_OPERATOR_PERMISSIONS },
 };
 
@@ -36,6 +36,7 @@ export default function StaffView({ newTrigger }: { newTrigger?: number }) {
   useEffect(() => { if (newTrigger && newTrigger > 0) { setShowForm(true); setEditOp(null); setForm(EMPTY_OPERATOR); } }, [newTrigger]);
   const [editOp, setEditOp] = useState<Operator | null>(null);
   const [form, setForm] = useState<Omit<Operator, 'id' | 'createdAt'>>(EMPTY_OPERATOR);
+  const [showPinPriv, setShowPinPriv] = useState(false);
   const [showAbsForm, setShowAbsForm] = useState(false);
   const [absForm, setAbsForm] = useState<Omit<Absence, 'id' | 'createdAt'>>(EMPTY_ABSENCE);
   const [activeTab, setActiveTab] = useState<'info' | 'schedule' | 'absences' | 'stats'>('info');
@@ -61,7 +62,7 @@ export default function StaffView({ newTrigger }: { newTrigger?: number }) {
 
   function openEdit(o: Operator) {
     setEditOp(o);
-    setForm({ name: o.name, email: o.email, role: o.role, serviceIds: [...o.serviceIds], color: o.color, commissionRate: o.commissionRate, schedule: o.schedule.map(s => ({ ...s })), active: o.active, pin: o.pin || '', permissions: o.permissions ? { ...o.permissions } : { ...DEFAULT_OPERATOR_PERMISSIONS } });
+    setForm({ name: o.name, email: o.email, role: o.role, serviceIds: [...o.serviceIds], color: o.color, commissionRate: o.commissionRate, schedule: o.schedule.map(s => ({ ...s })), active: o.active, pin: o.pin || '', privatePin: o.privatePin || '', permissions: o.permissions ? { ...o.permissions } : { ...DEFAULT_OPERATOR_PERMISSIONS } });
     setShowForm(true);
   }
 
@@ -253,10 +254,36 @@ export default function StaffView({ newTrigger }: { newTrigger?: number }) {
               <div className="col-span-2"><label style={labelStyle}>Nome *</label><input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} style={inputStyle} /></div>
               <div><label style={labelStyle}>Email</label><input type="email" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} style={inputStyle} /></div>
               <div>
-                <label style={labelStyle}>PIN accesso (4 cifre)</label>
+                <label style={labelStyle}>{form.role === 'owner' ? 'PIN Pubblico (accesso normale)' : 'PIN accesso (4 cifre)'}</label>
                 <input type="password" maxLength={8} value={form.pin || ''} onChange={e => setForm(p => ({ ...p, pin: e.target.value.replace(/\D/g, '') }))} placeholder="Lascia vuoto per nessun PIN" style={inputStyle} />
-                <p style={{ fontSize: '11px', color: 'var(--border-light)', marginTop: 4 }}>L'operatore usa questo PIN per accedere al gestionale dalla sidebar.</p>
+                <p style={{ fontSize: '11px', color: 'var(--border-light)', marginTop: 4 }}>L&apos;operatore usa questo PIN per accedere al gestionale dalla sidebar.</p>
               </div>
+              {/* PIN Privato — solo per titolare */}
+              {form.role === 'owner' && (
+                <div>
+                  <label style={labelStyle}>PIN Privato (mostra transazioni nascoste)</label>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <input
+                      type={showPinPriv ? 'text' : 'password'}
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={8}
+                      value={form.privatePin || ''}
+                      onChange={e => setForm(p => ({ ...p, privatePin: e.target.value.replace(/\D/g, '') }))}
+                      placeholder="Lascia vuoto = nessun PIN privato"
+                      style={{ ...inputStyle, flex: 1, letterSpacing: form.privatePin && !showPinPriv ? '0.4em' : undefined }}
+                    />
+                    <button type="button" onClick={() => setShowPinPriv(v => !v)}
+                      style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '10px', padding: '9px 12px', color: 'var(--muted)', cursor: 'pointer', flexShrink: 0 }}>
+                      {showPinPriv ? <EyeOff size={14} /> : <Eye size={14} />}
+                    </button>
+                  </div>
+                  {form.pin && form.privatePin && form.pin === form.privatePin && (
+                    <p style={{ fontSize: '11px', color: '#f59e0b', marginTop: 4 }}>⚠️ PIN pubblico e privato non possono essere uguali.</p>
+                  )}
+                  <p style={{ fontSize: '11px', color: 'var(--border-light)', marginTop: 4 }}>Il PIN privato sblocca la visualizzazione delle transazioni nascoste in cassa.</p>
+                </div>
+              )}
               <div>
                 <label style={labelStyle}>Ruolo</label>
                 <select value={form.role} onChange={e => setForm(p => ({ ...p, role: e.target.value as OperatorRole }))} style={inputStyle}>

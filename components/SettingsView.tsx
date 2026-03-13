@@ -6,7 +6,7 @@ import { useSalon } from '@/context/SalonContext';
 import { Transaction, CashIn, CashOut } from '@/types';
 import { GiftCard, SalonConfig, DayOfWeek } from '@/types/salon';
 import Papa from 'papaparse';
-import { Upload, Download, AlertTriangle, CheckCircle2, RefreshCw, Wifi, WifiOff, FileDown, Plus, Trash2, Check, Eye, EyeOff } from 'lucide-react';
+import { Upload, Download, AlertTriangle, CheckCircle2, RefreshCw, Wifi, WifiOff, FileDown, Plus, Trash2, Check } from 'lucide-react';
 import { generateId } from '@/lib/storage';
 import { resetSupabaseAvailability } from '@/lib/db';
 import { exportTransactionsPDF } from '@/lib/pdf';
@@ -63,33 +63,10 @@ export default function SettingsView() {
     salonConfig, updateSalonConfig,
     giftCards, addGiftCard, updateGiftCard,
     operators, clients, services, appointments, payments, products,
-    activeOperatorId, updateOperator,
   } = useSalon();
-
-  // ── Owner identity for PIN section ────────────────────────
-  const ownerOp = operators.find(o => o.id === activeOperatorId && o.role === 'owner');
-  // Show PIN section if logged in as a named owner operator OR as the default titolare (no operator)
-  const showPinSection = ownerOp !== undefined || activeOperatorId === null;
 
   // ── Tax rate ───────────────────────────────────────────────
   const [taxInput, setTaxInput] = useState(String(settings.taxRate));
-
-  // ── PIN titolare ───────────────────────────────────────────
-  const [pinPublico, setPinPublico] = useState(() =>
-    ownerOp ? (ownerOp.pin || '') : (salonConfig.ownerPublicPin || ''));
-  const [pinPrivato, setPinPrivato] = useState(() =>
-    ownerOp ? (ownerOp.privatePin || '') : (salonConfig.ownerPrivatePin || ''));
-  const [showPub, setShowPub] = useState(false);
-  const [showPriv, setShowPriv] = useState(false);
-
-  const savePins = () => {
-    if (ownerOp) {
-      updateOperator({ ...ownerOp, pin: pinPublico || undefined, privatePin: pinPrivato || undefined });
-    } else {
-      updateSalonConfig({ ownerPublicPin: pinPublico || undefined, ownerPrivatePin: pinPrivato || undefined });
-    }
-    flash('pin');
-  };
 
   // ── Salon info ─────────────────────────────────────────────
   const [info, setInfo] = useState({
@@ -570,71 +547,7 @@ export default function SettingsView() {
         </div>
       </Section>
 
-      {/* ─── 8. PIN di accesso (solo titolare) ─────────────── */}
-      {showPinSection && (
-        <Section title="🔐 PIN di accesso">
-          <p className="text-xs mb-4" style={{ color: 'var(--muted)' }}>
-            Imposta due PIN separati: il <strong style={{ color: 'var(--text-2)' }}>PIN Pubblico</strong> permette l&apos;accesso
-            normale, mentre il <strong style={{ color: '#a855f7' }}>PIN Privato</strong> mostra anche le transazioni nascoste
-            registrate senza metodo di pagamento.
-          </p>
-          <div className="grid grid-cols-1 gap-3">
-            <Field label="PIN Pubblico (accesso normale)">
-              <div className="flex gap-2 items-center">
-                <input
-                  type={showPub ? 'text' : 'password'}
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  maxLength={8}
-                  placeholder="Lascia vuoto = accesso libero"
-                  value={pinPublico}
-                  onChange={e => setPinPublico(e.target.value.replace(/\D/g, ''))}
-                  style={{ ...inputStyle, flex: 1, letterSpacing: pinPublico && !showPub ? '0.4em' : undefined }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPub(v => !v)}
-                  style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '10px', padding: '10px 12px', color: 'var(--muted)', cursor: 'pointer' }}
-                >
-                  {showPub ? <EyeOff size={15} /> : <Eye size={15} />}
-                </button>
-              </div>
-            </Field>
-            <Field label="PIN Privato (mostra transazioni nascoste)">
-              <div className="flex gap-2 items-center">
-                <input
-                  type={showPriv ? 'text' : 'password'}
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  maxLength={8}
-                  placeholder="Lascia vuoto = nessun PIN privato"
-                  value={pinPrivato}
-                  onChange={e => setPinPrivato(e.target.value.replace(/\D/g, ''))}
-                  style={{ ...inputStyle, flex: 1, letterSpacing: pinPrivato && !showPriv ? '0.4em' : undefined }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPriv(v => !v)}
-                  style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '10px', padding: '10px 12px', color: 'var(--muted)', cursor: 'pointer' }}
-                >
-                  {showPriv ? <EyeOff size={15} /> : <Eye size={15} />}
-                </button>
-              </div>
-            </Field>
-          </div>
-          {pinPublico && pinPrivato && pinPublico === pinPrivato && (
-            <p className="text-xs mt-2" style={{ color: '#f59e0b' }}>
-              ⚠️ Il PIN pubblico e il PIN privato non possono essere uguali.
-            </p>
-          )}
-          <SaveBtn
-            onClick={savePins}
-            saved={savedSection === 'pin'}
-          />
-        </Section>
-      )}
-
-      {/* ─── 9. Connessione ─────────────────────────────────── */}
+      {/* ─── 8. Connessione ─────────────────────────────────── */}
       <Section title="🌐 Connessione Dati">
         <div className="flex items-center justify-between mb-4 p-3 rounded-xl"
           style={dataSource === 'supabase'

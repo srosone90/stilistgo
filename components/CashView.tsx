@@ -60,8 +60,18 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
     clients, operators, services, appointments,
     giftCards, redeemGiftCard, salonConfig, changeAppointmentStatus,
     products, addStockMovement,
-    isPrivateMode,
+    isPrivateMode, activeOperatorId,
   } = useSalon();
+
+  // Determine if current session is an owner session
+  const activeOp = operators.find(o => o.id === activeOperatorId);
+  const isOwnerSession = !activeOperatorId || activeOp?.role === 'owner';
+
+  // Is a private PIN configured for any owner? (gates whether hidden payments need private mode)
+  const ownerHasPrivatePin = !!(
+    operators.find(o => o.role === 'owner')?.privatePin ||
+    salonConfig.ownerPrivatePin
+  );
 
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
@@ -109,15 +119,24 @@ export default function CashView({ newTrigger, cashPreset, onPresetConsumed }: {
     cashSessions.find(s => s.date === selectedDate && !s.closedAt) ?? null,
     [cashSessions, selectedDate]);
 
-  // Payments for selected date (hidden only visible in private mode)
+  // Payments for selected date.
+  // Visibility rules for hidden payments (isHidden=true):
+  //  - Non-owner operators: NEVER see hidden payments
+  //  - Owner with no private PIN configured: always see (otherwise they'd be permanently invisible)
+  //  - Owner with private PIN configured: only visible in private mode
   const dayPayments = useMemo(() =>
     payments
       .filter(p => p.date === selectedDate)
-      .filter(p => isPrivateMode || !p.isHidden)
+      .filter(p => {
+        if (!p.isHidden) return true;                          // normal payment → always show
+        if (!isOwnerSession) return false;                     // non-owner → never see hidden
+        if (!ownerHasPrivatePin) return true;                  // owner, no private PIN → always show
+        return isPrivateMode;                                  // owner with private PIN → only in private mode
+      })
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
-    [payments, selectedDate, isPrivateMode]);
+    [payments, selectedDate, isPrivateMode, isOwnerSession, ownerHasPrivatePin]);
 
-  // Totals
+  // Totals (same visibility rules as dayPayments)
   const totals = useMemo(() => {
     const total = dayPayments.reduce((s, p) => s + p.total, 0);
     const cash = dayPayments.reduce((s, p) => s + p.cashAmount, 0);
