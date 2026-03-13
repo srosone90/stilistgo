@@ -7,6 +7,7 @@ import { salonGenerateId } from '@/lib/salonStorage';
 import { getCurrentUser } from '@/lib/supabase';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { UserPlus, Search, Trash2, ChevronDown, ChevronUp, X, Star, AlertTriangle, FlaskConical, Clock, Camera, ImagePlus, Download, ShieldOff, Upload, CheckSquare, Square, CheckCheck, Trash } from 'lucide-react';
+import ImportWizard from '@/components/ImportWizard';
 
 const card: React.CSSProperties = { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '16px', padding: '20px' };
 const inputStyle: React.CSSProperties = { background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '10px', padding: '9px 13px', color: 'var(--text)', fontSize: '13px', outline: 'none', width: '100%' };
@@ -53,9 +54,6 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
   const [gdprDeleting, setGdprDeleting] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [showImport, setShowImport] = useState(false);
-  const [importData, setImportData] = useState<Omit<Client, 'id' | 'createdAt'>[] | null>(null);
-  const [importError, setImportError] = useState('');
-  const [importDupCount, setImportDupCount] = useState(0);
 
   // ── Multi-select ──────────────────────────────────────────────────────────────
   const [selectMode, setSelectMode] = useState(false);
@@ -360,165 +358,7 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
     setShowExport(false);
   }
 
-  // ── Import ──────────────────────────────────────────────────────────────────
-  async function handleImportFile(file: File) {
-    setImportError('');
-    setImportData(null);
-    try {
-      const text = await file.text();
-      const name = file.name.toLowerCase();
-      let parsed: Omit<Client, 'id' | 'createdAt'>[] = [];
-
-      if (name.endsWith('.json')) {
-        const raw: unknown = JSON.parse(text);
-        const arr = Array.isArray(raw) ? (raw as Record<string, unknown>[]) : [];
-        parsed = arr.map(r => ({
-          firstName: String(r.nome ?? r.firstName ?? r.first_name ?? '').trim(),
-          lastName: String(r.cognome ?? r.lastName ?? r.last_name ?? '').trim(),
-          phone: String(r.telefono ?? r.phone ?? '').trim(),
-          email: String(r.email ?? '').trim().toLowerCase(),
-          birthDate: String(r.dataNascita ?? r.birthDate ?? '').trim(),
-          gender: (['M','F'].includes(String(r.sesso ?? r.gender ?? '').toUpperCase()) ? String(r.sesso ?? r.gender ?? '').toUpperCase() : '') as ClientGender,
-          address: String(r.indirizzo ?? r.address ?? '').trim(),
-          city: String(r.citta ?? r.city ?? '').trim(),
-          province: String(r.provincia ?? r.province ?? '').trim(),
-          postalCode: String(r.cap ?? r.postalCode ?? '').trim(),
-          acquisitionSource: (String(r.fonteAcquisizione ?? r.acquisitionSource ?? '').trim() || '') as AcquisitionSource,
-          acquisitionDate: String(r.dataAcquisizione ?? r.acquisitionDate ?? '').trim(),
-          notes: String(r.note ?? r.notes ?? '').trim(),
-          allergies: String(r.allergie ?? r.allergies ?? '').trim(),
-          tags: Array.isArray(r.tag) ? (r.tag as string[]) : Array.isArray(r.tags) ? (r.tags as string[]) : [],
-          loyaltyPoints: Number(r.puntiFedelta ?? r.loyaltyPoints ?? 0) || 0,
-          gdprConsent: Boolean(r.gdprConsent ?? false),
-          gdprDate: String(r.gdprDate ?? '').trim(),
-        })).filter(c => c.firstName || c.lastName);
-
-      } else if (name.endsWith('.vcf')) {
-        const blocks = text.split(/BEGIN:VCARD/i).slice(1);
-        parsed = blocks.map(block => {
-          const get = (prop: string) => { const m = block.match(new RegExp(`^${prop}[^:\r\n]*:(.+)$`, 'im')); return m ? m[1].trim() : ''; };
-          const nParts = get('N').split(';');
-          const lastName = nParts[0] ?? '';
-          const firstName = nParts[1] ?? '';
-          const fn = get('FN');
-          const finalFirst = firstName || (fn.includes(' ') ? fn.split(' ')[0] : fn);
-          const finalLast = lastName || (fn.includes(' ') ? fn.split(' ').slice(1).join(' ') : '');
-          const bday = get('BDAY');
-          const bdayFmt = bday.length === 8 ? `${bday.slice(0,4)}-${bday.slice(4,6)}-${bday.slice(6,8)}` : bday;
-          const cats = get('CATEGORIES');
-          const lm = block.match(/^X-LOYALTY-POINTS[^:]*:(\d+)$/im);
-          const genderRaw = get('X-GENDER').toLowerCase();
-          const adrParts = get('ADR').split(';');
-          return {
-            firstName: finalFirst, lastName: finalLast,
-            phone: get('TEL'), email: get('EMAIL'),
-            birthDate: bdayFmt, notes: get('NOTE'),
-            gender: (genderRaw === 'male' ? 'M' : genderRaw === 'female' ? 'F' : '') as ClientGender,
-            address: adrParts[2]?.trim() ?? '', city: adrParts[3]?.trim() ?? '',
-            province: adrParts[4]?.trim() ?? '', postalCode: adrParts[5]?.trim() ?? '',
-            acquisitionSource: (get('X-ACQUISITION-SOURCE') || '') as AcquisitionSource,
-            acquisitionDate: '',
-            allergies: '', tags: cats ? cats.split(',').map(t => t.trim()).filter(Boolean) : [],
-            loyaltyPoints: lm ? Number(lm[1]) : 0, gdprConsent: false, gdprDate: '',
-          };
-        }).filter(c => c.firstName || c.lastName);
-
-      } else if (name.endsWith('.xml')) {
-        const doc = new DOMParser().parseFromString(text, 'application/xml');
-        const items = Array.from(doc.querySelectorAll('cliente'));
-        const txt = (el: Element, tag: string) => el.querySelector(tag)?.textContent?.trim() ?? '';
-        parsed = items.map(el => ({
-          firstName: txt(el, 'nome'), lastName: txt(el, 'cognome'),
-          gender: (['M','F'].includes(txt(el,'sesso').toUpperCase()) ? txt(el,'sesso').toUpperCase() : '') as ClientGender,
-          phone: txt(el, 'telefono'), email: txt(el, 'email'),
-          birthDate: txt(el, 'dataNascita'),
-          address: txt(el, 'indirizzo'), city: txt(el, 'citta'), province: txt(el, 'provincia'), postalCode: txt(el, 'cap'),
-          acquisitionSource: (txt(el, 'fonteAcquisizione') || '') as AcquisitionSource,
-          acquisitionDate: txt(el, 'dataAcquisizione'),
-          notes: txt(el, 'note'),
-          allergies: txt(el, 'allergie'),
-          tags: Array.from(el.querySelectorAll('tag item')).map(i => i.textContent?.trim() ?? '').filter(Boolean),
-          loyaltyPoints: Number(txt(el, 'puntiFedelta')) || 0,
-          gdprConsent: txt(el, 'gdprConsent') === 'true',
-          gdprDate: txt(el, 'gdprDate'),
-        })).filter(c => c.firstName || c.lastName);
-
-      } else {
-        // CSV — auto-detect separator (semicolon wins for Italian locale)
-        const rawText = text.replace(/^\uFEFF/, '');
-        const firstLine = rawText.split(/\r?\n/)[0] || '';
-        const sep = firstLine.split(';').length > firstLine.split(',').length ? ';' : ',';
-        const lines = rawText.split(/\r?\n/).filter(l => l.trim());
-        if (lines.length < 2) { setImportError('File CSV vuoto o formato non riconosciuto.'); return; }
-        const parseRow = (row: string): string[] => {
-          const res: string[] = []; let cur = ''; let inQ = false;
-          for (let i = 0; i < row.length; i++) {
-            const ch = row[i];
-            if (ch === '"') { if (inQ && row[i + 1] === '"') { cur += '"'; i++; } else { inQ = !inQ; } }
-            else if (ch === sep && !inQ) { res.push(cur); cur = ''; }
-            else { cur += ch; }
-          }
-          res.push(cur); return res;
-        };
-        const headers = parseRow(lines[0]).map(h => h.toLowerCase().replace(/[\s_\-]/g, ''));
-        const col = (...ns: string[]) => { for (const n of ns) { const i = headers.indexOf(n); if (i >= 0) return i; } return -1; };
-        const iFirst = col('nome', 'firstname'); const iLast = col('cognome', 'lastname');
-        const iPhone = col('telefono', 'phone', 'tel'); const iEmail = col('email');
-        const iBday = col('datanascita', 'birthdate'); const iGender = col('sesso', 'gender');
-        const iAddr = col('indirizzo', 'address'); const iCity = col('citta', 'city');
-        const iProv = col('provincia', 'province'); const iCap = col('cap', 'postalcode');
-        const iAcqSrc = col('fonteacquisizione', 'acquisitionsource'); const iAcqDate = col('dataacquisizione', 'acquisitiondate');
-        const iNotes = col('note', 'notes');
-        const iAller = col('allergie', 'allergies'); const iTags = col('tag', 'tags');
-        const iLoy = col('puntifedelta', 'loyaltypoints', 'punti'); const iGdpr = col('consensogdpr', 'gdprconsent', 'gdpr');
-        parsed = lines.slice(1).map(line => {
-          const cols = parseRow(line);
-          const get = (i: number) => (i >= 0 ? (cols[i] ?? '').trim() : '');
-          const rawG = get(iGender).toUpperCase();
-          return {
-            firstName: get(iFirst), lastName: get(iLast), phone: get(iPhone),
-            email: get(iEmail).toLowerCase(), birthDate: get(iBday),
-            gender: (['M','F'].includes(rawG) ? rawG : '') as ClientGender,
-            address: get(iAddr), city: get(iCity), province: get(iProv), postalCode: get(iCap),
-            acquisitionSource: (get(iAcqSrc) || '') as AcquisitionSource, acquisitionDate: get(iAcqDate),
-            notes: get(iNotes), allergies: get(iAller),
-            tags: get(iTags).split('|').map(t => t.trim()).filter(Boolean),
-            loyaltyPoints: Number(get(iLoy)) || 0,
-            gdprConsent: ['sì', 'si', 'yes', 'true', '1'].includes(get(iGdpr).toLowerCase()),
-            gdprDate: '',
-          };
-        }).filter(c => c.firstName || c.lastName);
-      }
-
-      const existingPhones = new Set(clients.map(c => c.phone.trim()).filter(Boolean));
-      const existingEmails = new Set(clients.map(c => c.email.trim().toLowerCase()).filter(Boolean));
-      const dups = parsed.filter(c =>
-        (c.phone && existingPhones.has(c.phone.trim())) ||
-        (c.email && existingEmails.has(c.email.toLowerCase()))
-      ).length;
-      setImportDupCount(dups);
-      setImportData(parsed);
-    } catch (_e) {
-      setImportError('Errore nella lettura del file. Verifica il formato e riprova.');
-    }
-  }
-
-  function executeImport() {
-    if (!importData) return;
-    const existingPhones = new Set(clients.map(c => c.phone.trim()).filter(Boolean));
-    const existingEmails = new Set(clients.map(c => c.email.trim().toLowerCase()).filter(Boolean));
-    let added = 0;
-    for (const c of importData) {
-      if ((c.phone && existingPhones.has(c.phone.trim())) ||
-          (c.email && existingEmails.has(c.email.toLowerCase()))) continue;
-      addClient({ ...c, gdprDate: c.gdprConsent ? (c.gdprDate || new Date().toISOString()) : '' });
-      added++;
-    }
-    setShowImport(false);
-    setImportData(null);
-    setImportError('');
-    alert(`Importazione completata: ${added} nuovi clienti aggiunti${importData.length - added > 0 ? `, ${importData.length - added} duplicati ignorati` : '.'}.`);
-  }
+  // ── Import — handled by ImportWizard component ──────────────────────────────
 
   return (
     <div className="flex flex-col md:flex-row gap-4 md:gap-5 h-full" style={{ minHeight: 0 }}>
@@ -552,7 +392,7 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
             <CheckSquare size={13} />
           </button>
           <button onClick={() => setShowExport(true)} style={{ ...btnPrimary, fontSize: '12px', padding: '6px 10px' }}><Download size={13} /></button>
-          <button onClick={() => { setImportData(null); setImportError(''); setShowImport(true); }} style={{ ...btnPrimary, fontSize: '12px', padding: '6px 10px' }}><Upload size={13} /></button>
+          <button onClick={() => setShowImport(true)} style={{ ...btnPrimary, fontSize: '12px', padding: '6px 10px' }}><Upload size={13} /></button>
         </div>
 
         {/* Bulk action bar */}
@@ -1103,72 +943,9 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
         </Modal>
       )}
 
-      {/* ── Modal: Importa Clienti ── */}
+      {/* ── Wizard: Importa Clienti ── */}
       {showImport && (
-        <Modal title="Importa Clienti" onClose={() => { setShowImport(false); setImportData(null); setImportError(''); }}>
-          <div className="space-y-4">
-            <div className="rounded-xl p-3" style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)' }}>
-              <p className="text-xs" style={{ color: 'var(--muted)' }}>
-                <strong style={{ color: 'var(--accent-light)' }}>Formati supportati:</strong>{' '}
-                CSV (Excel/LibreOffice), JSON, vCard (.vcf), XML<br />
-                I duplicati per telefono o email vengono automaticamente ignorati.
-              </p>
-            </div>
-            <label className="flex flex-col items-center justify-center gap-2 rounded-xl cursor-pointer transition-opacity hover:opacity-70"
-              style={{ border: '2px dashed var(--border)', padding: '32px', color: 'var(--muted)' }}>
-              <Upload size={24} />
-              <span className="text-sm font-medium text-white">Clicca per selezionare il file</span>
-              <span className="text-xs">.csv · .json · .vcf · .xml</span>
-              <input type="file" accept=".csv,.json,.vcf,.xml" className="hidden"
-                onChange={e => { const f = e.target.files?.[0]; if (f) handleImportFile(f); e.target.value = ''; }} />
-            </label>
-            {importError && (
-              <div className="rounded-xl p-3" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)' }}>
-                <p className="text-sm" style={{ color: '#f87171' }}>{importError}</p>
-              </div>
-            )}
-            {importData && (
-              <div className="space-y-3">
-                <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--border)' }}>
-                  <div className="px-4 py-2 flex justify-between text-sm" style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-input)' }}>
-                    <span style={{ color: 'var(--text-2)' }}>Clienti trovati nel file</span>
-                    <span className="font-semibold text-white">{importData.length}</span>
-                  </div>
-                  <div className="px-4 py-2 flex justify-between text-sm" style={{ borderBottom: '1px solid var(--border)' }}>
-                    <span style={{ color: 'var(--muted)' }}>Già presenti (ignorati)</span>
-                    <span style={{ color: '#f59e0b' }}>{importDupCount}</span>
-                  </div>
-                  <div className="px-4 py-2 flex justify-between text-sm font-semibold" style={{ background: 'rgba(34,197,94,0.05)' }}>
-                    <span style={{ color: '#22c55e' }}>Nuovi da importare</span>
-                    <span style={{ color: '#22c55e' }}>{importData.length - importDupCount}</span>
-                  </div>
-                </div>
-                {importData.slice(0, 5).length > 0 && (
-                  <div className="rounded-xl overflow-hidden text-xs" style={{ border: '1px solid var(--border)' }}>
-                    {importData.slice(0, 5).map((c, i) => (
-                      <div key={i} className="px-3 py-2" style={{ borderBottom: i < Math.min(importData.length, 5) - 1 ? '1px solid var(--border)' : undefined, color: 'var(--text-2)' }}>
-                        {c.firstName} {c.lastName}{c.phone ? ` · ${c.phone}` : ''}{c.email ? ` · ${c.email}` : ''}
-                      </div>
-                    ))}
-                    {importData.length > 5 && (
-                      <div className="px-3 py-2 text-center" style={{ color: 'var(--muted)', background: 'var(--bg-input)' }}>…e altri {importData.length - 5} clienti</div>
-                    )}
-                  </div>
-                )}
-                {importData.length - importDupCount > 0 ? (
-                  <div className="flex gap-2 justify-end">
-                    <button onClick={() => { setImportData(null); setImportError(''); }} style={btnDanger}>Annulla</button>
-                    <button onClick={executeImport} style={btnPrimary}>
-                      <Upload size={13} /> Importa {importData.length - importDupCount} clienti
-                    </button>
-                  </div>
-                ) : (
-                  <p className="text-sm text-center py-2" style={{ color: 'var(--muted)' }}>Nessun nuovo cliente da aggiungere (tutti già presenti).</p>
-                )}
-              </div>
-            )}
-          </div>
-        </Modal>
+        <ImportWizard onClose={() => setShowImport(false)} />
       )}
     </div>
   );
