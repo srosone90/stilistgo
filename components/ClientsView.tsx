@@ -31,6 +31,7 @@ const EMPTY_CLIENT: Omit<Client, 'id' | 'createdAt'> = {
   gender: '', address: '', city: '', province: '', postalCode: '',
   acquisitionSource: '', acquisitionDate: '',
   notes: '', allergies: '', tags: [], gdprConsent: false, gdprDate: '', loyaltyPoints: 0,
+  visitFrequency: '', lastVisitDate: '', totalVisits: 0, totalRevenue: 0,
 };
 
 const EMPTY_CARD: Omit<TechnicalCard, 'id' | 'createdAt'> = {
@@ -42,7 +43,41 @@ const EMPTY_CARD: Omit<TechnicalCard, 'id' | 'createdAt'> = {
 };
 
 export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
-  const { clients, addClient, updateClient, deleteClient, technicalCards, addTechnicalCard, deleteTechnicalCard, operators, salonConfig } = useSalon();
+  const { clients, payments, appointments, addClient, updateClient, deleteClient, technicalCards, addTechnicalCard, deleteTechnicalCard, operators, salonConfig } = useSalon();
+
+  /** Calcola stats live da pagamenti e appuntamenti per un cliente. */
+  const getClientStats = useMemo(() => (clientId: string) => {
+    const clientPayments = payments.filter(p => p.clientId === clientId);
+    const clientAppts = appointments.filter(a => a.clientId === clientId && a.status !== 'cancelled');
+    const liveRevenue = clientPayments.reduce((sum, p) => sum + (p.total ?? 0), 0);
+    const allDates = [
+      ...clientPayments.map(p => p.date),
+      ...clientAppts.map(a => a.date),
+    ].filter(Boolean).sort((a, b) => b.localeCompare(a));
+    return {
+      liveRevenue,
+      liveVisits: clientAppts.length,
+      liveLastVisit: allDates[0] ?? null,
+    };
+  }, [payments, appointments]);
+
+  /** Restituisce la data ultima visita: prima usa i dati live, poi il campo importato. */
+  const getEffectiveLastVisit = (c: Client): string | null => {
+    const { liveLastVisit } = getClientStats(c.id);
+    return liveLastVisit ?? c.lastVisitDate ?? null;
+  };
+
+  /** Restituisce il fatturato effettivo: live se disponibile, altrimenti importato. */
+  const getEffectiveRevenue = (c: Client): number => {
+    const { liveRevenue } = getClientStats(c.id);
+    return liveRevenue > 0 ? liveRevenue : (c.totalRevenue ?? 0);
+  };
+
+  /** Restituisce il numero passaggi effettivo: live se disponibile, altrimenti importato. */
+  const getEffectiveVisits = (c: Client): number => {
+    const { liveVisits } = getClientStats(c.id);
+    return liveVisits > 0 ? liveVisits : (c.totalVisits ?? 0);
+  };
 
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -192,23 +227,42 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
       if (fAcqTo && c.acquisitionDate && c.acquisitionDate > fAcqTo) return false;
       if (fBdayFrom && c.birthDate && c.birthDate.slice(5) < fBdayFrom.slice(5)) return false;
       if (fBdayTo && c.birthDate && c.birthDate.slice(5) > fBdayTo.slice(5)) return false;
+      // Nuovi filtri statistiche
+      if (fFrequency && (c.visitFrequency ?? '').toLowerCase() !== fFrequency.toLowerCase()) return false;
+      const effLast = getEffectiveLastVisit(c);
+      if (fLastVisitFrom && (!effLast || effLast < fLastVisitFrom)) return false;
+      if (fLastVisitTo && (!effLast || effLast > fLastVisitTo)) return false;
+      const effVisits = getEffectiveVisits(c);
+      if (fMinVisits && effVisits < Number(fMinVisits)) return false;
+      if (fMaxVisits && effVisits > Number(fMaxVisits)) return false;
+      const effRevenue = getEffectiveRevenue(c);
+      if (fMinRevenue && effRevenue < Number(fMinRevenue)) return false;
+      if (fMaxRevenue && effRevenue > Number(fMaxRevenue)) return false;
       return true;
     });
     list = list.sort((a, b) => {
       if (fSortOrder === 'za') return `${b.firstName}${b.lastName}`.localeCompare(`${a.firstName}${a.lastName}`);
       if (fSortOrder === 'newest') return b.createdAt.localeCompare(a.createdAt);
       if (fSortOrder === 'oldest') return a.createdAt.localeCompare(b.createdAt);
+      if (fSortOrder === 'revenue-desc') return getEffectiveRevenue(b) - getEffectiveRevenue(a);
+      if (fSortOrder === 'revenue-asc') return getEffectiveRevenue(a) - getEffectiveRevenue(b);
+      if (fSortOrder === 'visits-desc') return getEffectiveVisits(b) - getEffectiveVisits(a);
+      if (fSortOrder === 'visits-asc') return getEffectiveVisits(a) - getEffectiveVisits(b);
+      if (fSortOrder === 'lastvisit-desc') return (getEffectiveLastVisit(b) ?? '').localeCompare(getEffectiveLastVisit(a) ?? '');
+      if (fSortOrder === 'lastvisit-asc') return (getEffectiveLastVisit(a) ?? '').localeCompare(getEffectiveLastVisit(b) ?? '');
       return `${a.firstName}${a.lastName}`.localeCompare(`${b.firstName}${b.lastName}`);
     });
     return list;
-  }, [clients, search, fGender, fAcqSource, fHasPhone, fHasEmail, fHasGdpr, fCity, fProvince, fTagSearch, fAcqFrom, fAcqTo, fBdayFrom, fBdayTo, fSortOrder]);
+  }, [clients, payments, appointments, search, fGender, fAcqSource, fHasPhone, fHasEmail, fHasGdpr, fCity, fProvince, fTagSearch, fAcqFrom, fAcqTo, fBdayFrom, fBdayTo, fSortOrder, fFrequency, fLastVisitFrom, fLastVisitTo, fMinVisits, fMaxVisits, fMinRevenue, fMaxRevenue, getClientStats]);
 
   const selected = selectedId ? clients.find(c => c.id === selectedId) ?? null : null;
   const clientCards = useMemo(() => technicalCards.filter(c => c.clientId === selectedId).sort((a, b) => b.date.localeCompare(a.date)), [technicalCards, selectedId]);
 
   const isDormant = (c: Client) => {
     const days = salonConfig.dormientiDays || 60;
-    return differenceInDays(new Date(), parseISO(c.createdAt)) > days;
+    const lastVisit = getEffectiveLastVisit(c);
+    const refDate = lastVisit ? parseISO(lastVisit) : parseISO(c.createdAt);
+    return differenceInDays(new Date(), refDate) > days;
   };
 
   function openNew() {
@@ -227,6 +281,8 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
       acquisitionSource: c.acquisitionSource ?? '', acquisitionDate: c.acquisitionDate ?? '',
       notes: c.notes, allergies: c.allergies, tags: [...c.tags],
       gdprConsent: c.gdprConsent, gdprDate: c.gdprDate, loyaltyPoints: c.loyaltyPoints,
+      visitFrequency: c.visitFrequency ?? '', lastVisitDate: c.lastVisitDate ?? '',
+      totalVisits: c.totalVisits ?? 0, totalRevenue: c.totalRevenue ?? 0,
     });
     setTagInput('');
     setShowForm(true);
@@ -300,15 +356,20 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
     let content = ''; let mimeType = 'text/plain;charset=utf-8'; let ext = 'txt';
     if (fmt === 'csv') {
       const BOM = '\uFEFF';
-      const header = 'Nome;Cognome;Sesso;Telefono;Email;DataNascita;Indirizzo;Citta;Provincia;CAP;FonteAcquisizione;DataAcquisizione;Note;Allergie;Tag;PuntiFedelta;ConsensoGDPR;DataGDPR;DataCreazione';
-      const rows = list.map(c =>
-        [c.firstName, c.lastName, c.gender ?? '', c.phone, c.email, c.birthDate,
+      const header = 'Nome;Cognome;Sesso;Telefono;Email;DataNascita;Indirizzo;Citta;Provincia;CAP;FonteAcquisizione;DataAcquisizione;Note;Allergie;Tag;PuntiFedelta;ConsensoGDPR;DataGDPR;FrequenzaVisite;UltimoPassaggio;Passaggi;Fatturato;DataCreazione';
+      const rows = list.map(c => {
+        const effLast = getEffectiveLastVisit(c);
+        const effVisits = getEffectiveVisits(c);
+        const effRevenue = getEffectiveRevenue(c);
+        return [c.firstName, c.lastName, c.gender ?? '', c.phone, c.email, c.birthDate,
           c.address ?? '', c.city ?? '', c.province ?? '', c.postalCode ?? '',
           c.acquisitionSource ?? '', c.acquisitionDate ?? '',
           c.notes, c.allergies, c.tags.join('|'), String(c.loyaltyPoints),
-          c.gdprConsent ? 'S\u00ec' : 'No', c.gdprDate, c.createdAt]
-          .map(v => `"${(v ?? '').replace(/"/g, '""')}"`).join(';')
-      );
+          c.gdprConsent ? 'Sì' : 'No', c.gdprDate,
+          c.visitFrequency ?? '', effLast ?? '', effVisits > 0 ? String(effVisits) : '', effRevenue > 0 ? effRevenue.toFixed(2) : '',
+          c.createdAt]
+          .map(v => `"${(v ?? '').replace(/"/g, '""')}"`).join(';');
+      });
       content = BOM + [header, ...rows].join('\n'); mimeType = 'text/csv;charset=utf-8'; ext = 'csv';
     } else if (fmt === 'json') {
       content = JSON.stringify(list.map(c => ({
@@ -317,7 +378,12 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
         indirizzo: c.address ?? '', citta: c.city ?? '', provincia: c.province ?? '', cap: c.postalCode ?? '',
         fonteAcquisizione: c.acquisitionSource ?? '', dataAcquisizione: c.acquisitionDate ?? '',
         note: c.notes, allergie: c.allergies, tag: c.tags,
-        puntiFedelta: c.loyaltyPoints, gdprConsent: c.gdprConsent, gdprDate: c.gdprDate, dataCreazione: c.createdAt,
+        puntiFedelta: c.loyaltyPoints, gdprConsent: c.gdprConsent, gdprDate: c.gdprDate,
+        frequenzaVisite: c.visitFrequency ?? '',
+        ultimoPassaggio: getEffectiveLastVisit(c) ?? '',
+        passaggiTotali: getEffectiveVisits(c),
+        fatturatoTotale: getEffectiveRevenue(c),
+        dataCreazione: c.createdAt,
       })), null, 2); mimeType = 'application/json;charset=utf-8'; ext = 'json';
     } else if (fmt === 'vcf') {
       content = list.map(c => {
@@ -333,19 +399,32 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
         if (c.tags.length) lines.push(`CATEGORIES:${c.tags.join(',')}`);
         if (c.loyaltyPoints) lines.push(`X-LOYALTY-POINTS:${c.loyaltyPoints}`);
         if (c.acquisitionSource) lines.push(`X-ACQUISITION-SOURCE:${c.acquisitionSource}`);
+        const effVisits = getEffectiveVisits(c);
+        const effRevenue = getEffectiveRevenue(c);
+        const effLast = getEffectiveLastVisit(c);
+        if (effVisits) lines.push(`X-TOTAL-VISITS:${effVisits}`);
+        if (effRevenue) lines.push(`X-TOTAL-REVENUE:${effRevenue.toFixed(2)}`);
+        if (effLast) lines.push(`X-LAST-VISIT:${effLast}`);
+        if (c.visitFrequency) lines.push(`X-VISIT-FREQUENCY:${c.visitFrequency}`);
         lines.push('END:VCARD'); return lines.join('\r\n');
       }).join('\r\n'); mimeType = 'text/vcard;charset=utf-8'; ext = 'vcf';
     } else {
       const esc = (s: string) => (s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
       content = `<?xml version="1.0" encoding="UTF-8"?>\n<clienti>\n` +
-        list.map(c =>
-          `  <cliente>\n    <nome>${esc(c.firstName)}</nome>\n    <cognome>${esc(c.lastName)}</cognome>\n    <sesso>${esc(c.gender ?? '')}</sesso>\n` +
+        list.map(c => {
+          const effLast = getEffectiveLastVisit(c);
+          const effVisits = getEffectiveVisits(c);
+          const effRevenue = getEffectiveRevenue(c);
+          return `  <cliente>\n    <nome>${esc(c.firstName)}</nome>\n    <cognome>${esc(c.lastName)}</cognome>\n    <sesso>${esc(c.gender ?? '')}</sesso>\n` +
           `    <telefono>${esc(c.phone)}</telefono>\n    <email>${esc(c.email)}</email>\n    <dataNascita>${esc(c.birthDate)}</dataNascita>\n` +
           `    <indirizzo>${esc(c.address ?? '')}</indirizzo>\n    <citta>${esc(c.city ?? '')}</citta>\n    <provincia>${esc(c.province ?? '')}</provincia>\n    <cap>${esc(c.postalCode ?? '')}</cap>\n` +
           `    <fonteAcquisizione>${esc(c.acquisitionSource ?? '')}</fonteAcquisizione>\n    <dataAcquisizione>${esc(c.acquisitionDate ?? '')}</dataAcquisizione>\n` +
           `    <note>${esc(c.notes)}</note>\n    <allergie>${esc(c.allergies)}</allergie>\n    <tag>${c.tags.map(t => `<item>${esc(t)}</item>`).join('')}</tag>\n` +
-          `    <puntiFedelta>${c.loyaltyPoints}</puntiFedelta>\n    <gdprConsent>${c.gdprConsent}</gdprConsent>\n    <gdprDate>${esc(c.gdprDate)}</gdprDate>\n    <dataCreazione>${esc(c.createdAt)}</dataCreazione>\n  </cliente>`
-        ).join('\n') + '\n</clienti>'; mimeType = 'application/xml;charset=utf-8'; ext = 'xml';
+          `    <puntiFedelta>${c.loyaltyPoints}</puntiFedelta>\n    <gdprConsent>${c.gdprConsent}</gdprConsent>\n    <gdprDate>${esc(c.gdprDate)}</gdprDate>\n` +
+          `    <frequenzaVisite>${esc(c.visitFrequency ?? '')}</frequenzaVisite>\n    <ultimoPassaggio>${esc(effLast ?? '')}</ultimoPassaggio>\n` +
+          `    <passaggiTotali>${effVisits}</passaggiTotali>\n    <fatturatoTotale>${effRevenue.toFixed(2)}</fatturatoTotale>\n` +
+          `    <dataCreazione>${esc(c.createdAt)}</dataCreazione>\n  </cliente>`;
+        }).join('\n') + '\n</clienti>'; mimeType = 'application/xml;charset=utf-8'; ext = 'xml';
     }
     const blob = new Blob([content], { type: mimeType });
     const url = URL.createObjectURL(blob);
@@ -504,14 +583,54 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
                 <input type="date" value={fBdayTo} onChange={e => setFBdayTo(e.target.value)} placeholder="a" style={{ ...inputStyle, fontSize: '12px' }} />
               </div>
             </div>
+            {/* Frequenza visita */}
+            <div>
+              <p style={labelStyle}>Frequenza visita</p>
+              <select value={fFrequency} onChange={e => setFFrequency(e.target.value)} style={{ ...inputStyle, fontSize: '12px' }}>
+                <option value="">Tutte</option>
+                {['occasionale', 'regolare', 'frequente', 'mensile', 'settimanale'].map(f => (
+                  <option key={f} value={f}>{f.charAt(0).toUpperCase() + f.slice(1)}</option>
+                ))}
+              </select>
+            </div>
+            {/* Ultimo passaggio */}
+            <div>
+              <p style={labelStyle}>Ultimo passaggio</p>
+              <div className="grid grid-cols-2 gap-2">
+                <input type="date" value={fLastVisitFrom} onChange={e => setFLastVisitFrom(e.target.value)} style={{ ...inputStyle, fontSize: '12px' }} />
+                <input type="date" value={fLastVisitTo} onChange={e => setFLastVisitTo(e.target.value)} style={{ ...inputStyle, fontSize: '12px' }} />
+              </div>
+            </div>
+            {/* Passaggi totali */}
+            <div>
+              <p style={labelStyle}>N° passaggi (min — max)</p>
+              <div className="grid grid-cols-2 gap-2">
+                <input type="number" min={0} value={fMinVisits} onChange={e => setFMinVisits(e.target.value)} placeholder="da" style={{ ...inputStyle, fontSize: '12px' }} />
+                <input type="number" min={0} value={fMaxVisits} onChange={e => setFMaxVisits(e.target.value)} placeholder="a" style={{ ...inputStyle, fontSize: '12px' }} />
+              </div>
+            </div>
+            {/* Fatturato */}
+            <div>
+              <p style={labelStyle}>Fatturato € (min — max)</p>
+              <div className="grid grid-cols-2 gap-2">
+                <input type="number" min={0} value={fMinRevenue} onChange={e => setFMinRevenue(e.target.value)} placeholder="da" style={{ ...inputStyle, fontSize: '12px' }} />
+                <input type="number" min={0} value={fMaxRevenue} onChange={e => setFMaxRevenue(e.target.value)} placeholder="a" style={{ ...inputStyle, fontSize: '12px' }} />
+              </div>
+            </div>
             {/* Ordinamento */}
             <div>
               <p style={labelStyle}>Ordine</p>
-              <select value={fSortOrder} onChange={e => setFSortOrder(e.target.value as 'az' | 'za' | 'newest' | 'oldest')} style={{ ...inputStyle, fontSize: '12px' }}>
+              <select value={fSortOrder} onChange={e => setFSortOrder(e.target.value as typeof fSortOrder)} style={{ ...inputStyle, fontSize: '12px' }}>
                 <option value="az">Alfabetico A→Z</option>
                 <option value="za">Alfabetico Z→A</option>
                 <option value="newest">Prima i più recenti</option>
                 <option value="oldest">Prima i più vecchi</option>
+                <option value="revenue-desc">Fatturato ↓ decrescente</option>
+                <option value="revenue-asc">Fatturato ↑ crescente</option>
+                <option value="visits-desc">Più passaggi prima</option>
+                <option value="visits-asc">Meno passaggi prima</option>
+                <option value="lastvisit-desc">Ultima visita recente</option>
+                <option value="lastvisit-asc">Ultima visita più vecchia</option>
               </select>
             </div>
             {activeFilterCount > 0 && (
@@ -633,6 +752,33 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
                     {selected.acquisitionDate && <Row label="Acquisito il" value={format(parseISO(selected.acquisitionDate), 'dd/MM/yyyy')} />}
                   </div>
                 </div>
+
+                {/* Statistiche visita */}
+                {(() => {
+                  const { liveRevenue, liveVisits, liveLastVisit } = getClientStats(selected.id);
+                  const hasLive = liveRevenue > 0 || liveVisits > 0 || !!liveLastVisit;
+                  const effRevenue = getEffectiveRevenue(selected);
+                  const effVisits = getEffectiveVisits(selected);
+                  const effLast = getEffectiveLastVisit(selected);
+                  if (!hasLive && !selected.totalVisits && !selected.totalRevenue && !selected.lastVisitDate && !selected.visitFrequency) return null;
+                  return (
+                    <div style={card}>
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-sm font-semibold text-white">Statistiche visita</h3>
+                        {hasLive
+                          ? <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.3)' }}>Live</span>
+                          : <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(99,102,241,0.1)', color: 'var(--accent-light)', border: '1px solid rgba(99,102,241,0.25)' }}>Importato</span>
+                        }
+                      </div>
+                      <div className="space-y-2 text-sm">
+                        {effVisits > 0 && <Row label="Passaggi totali" value={String(effVisits)} />}
+                        {effRevenue > 0 && <Row label="Fatturato" value={`€ ${effRevenue.toFixed(2)}`} highlight="#f59e0b" />}
+                        {effLast && <Row label="Ultimo passaggio" value={format(parseISO(effLast), 'dd/MM/yyyy')} />}
+                        {selected.visitFrequency && <Row label="Frequenza" value={selected.visitFrequency} />}
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {(selected.address || selected.city || selected.province || selected.postalCode) && (
                   <div style={card}>
@@ -771,6 +917,18 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
               </select>
             </Field>
             <Field label="Data di acquisizione"><input type="date" value={form.acquisitionDate} onChange={e => setForm(p => ({ ...p, acquisitionDate: e.target.value }))} style={inputStyle} /></Field>
+            {/* Statistiche (campi manuali / importati) */}
+            <Field label="Frequenza visite">
+              <select value={form.visitFrequency ?? ''} onChange={e => setForm(p => ({ ...p, visitFrequency: e.target.value }))} style={inputStyle}>
+                <option value="">—</option>
+                {['occasionale', 'regolare', 'frequente', 'mensile', 'settimanale'].map(f => (
+                  <option key={f} value={f}>{f.charAt(0).toUpperCase() + f.slice(1)}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Ultimo passaggio (da import)"><input type="date" value={form.lastVisitDate ?? ''} onChange={e => setForm(p => ({ ...p, lastVisitDate: e.target.value }))} style={inputStyle} /></Field>
+            <Field label="N° passaggi (da import)"><input type="number" min={0} value={form.totalVisits ?? 0} onChange={e => setForm(p => ({ ...p, totalVisits: Number(e.target.value) }))} style={inputStyle} /></Field>
+            <Field label="Fatturato € (da import)"><input type="number" min={0} step="0.01" value={form.totalRevenue ?? 0} onChange={e => setForm(p => ({ ...p, totalRevenue: parseFloat(e.target.value) || 0 }))} style={inputStyle} /></Field>
             {/* Altri campi */}
             <Field label="Punti fedeltà"><input type="number" min={0} value={form.loyaltyPoints} onChange={e => setForm(p => ({ ...p, loyaltyPoints: Number(e.target.value) }))} style={inputStyle} /></Field>
             <div className="col-span-2"><Field label="Allergie / Controindicazioni"><textarea rows={2} value={form.allergies} onChange={e => setForm(p => ({ ...p, allergies: e.target.value }))} style={{ ...inputStyle, resize: 'vertical' }} /></Field></div>

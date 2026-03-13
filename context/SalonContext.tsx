@@ -265,6 +265,7 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
             allergies: '', tags: [], gdprConsent: false, gdprDate: '', loyaltyPoints: 0,
             gender: '', address: '', city: '', province: '', postalCode: '',
             acquisitionSource: 'sito_web', acquisitionDate: b.created_at?.slice(0, 10) ?? '',
+            visitFrequency: '', lastVisitDate: '', totalVisits: 0, totalRevenue: 0,
             createdAt: new Date().toISOString(),
           };
           mergedClients.push(nc);

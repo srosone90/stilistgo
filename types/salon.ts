@@ -31,6 +31,11 @@ export interface Client {
   gdprConsent: boolean;
   gdprDate: string;
   loyaltyPoints: number;
+  // ── Statistiche visita (importate o calcolate live) ──
+  visitFrequency?: string;  // es. 'occasionale', 'regolare', 'frequente'
+  lastVisitDate?: string;   // YYYY-MM-DD — data ultima visita (da import)
+  totalVisits?: number;     // numero totale passaggi (da import)
+  totalRevenue?: number;    // fatturato totale (da import)
   createdAt: string;
 }
 

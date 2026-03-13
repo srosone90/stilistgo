@@ -176,6 +176,25 @@ export const TARGET_FIELDS: TargetField[] = [
     key: 'tags', label: 'Tag / Etichette',
     aliases: ['tag', 'tags', 'etichette', 'label', 'labels', 'categoria', 'categorie', 'gruppi', 'gruppo'],
   },
+  {
+    key: 'visitFrequency', label: 'Frequenza visite',
+    aliases: ['frequenza', 'visitfrequency', 'frequenzavisita', 'frequenzapassaggi', 'tipofrequenza'],
+  },
+  {
+    key: 'lastVisitDate', label: 'Ultimo passaggio',
+    aliases: ['ultimopassaggio', 'lastvisitdate', 'ultimavisita', 'dataultimopalmento',
+              'datapassaggio', 'ultimadata', 'datasaloon', 'lastvisit', 'ultimoaccesso'],
+  },
+  {
+    key: 'totalVisits', label: 'N° passaggi totali',
+    aliases: ['passaggi', 'totalvisits', 'npassaggi', 'numeropassaggi', 'visitazioni',
+              'numeraccessi', 'numerovisite', 'totalvisite', 'nropassaggi'],
+  },
+  {
+    key: 'totalRevenue', label: 'Fatturato totale',
+    aliases: ['fatturato', 'totalrevenue', 'fatturatocomplessivo', 'fatturatopieno',
+              'totaleacquisti', 'spesatotale', 'spesa', 'revenue', 'turnover', 'importototale'],
+  },
 ];
 
 /** Auto-match a CSV column header to a TargetField key. Returns `__ignore__` if no match. */
@@ -303,6 +322,12 @@ export function processRow(
   const acqSrcRaw = get('acquisitionSource');
   const tagsRaw = get('tags');
 
+  // Nuovi campi statistiche
+  const lastVisitDateRaw = normalizeDate(get('lastVisitDate'));
+  const totalVisitsRaw = get('totalVisits');
+  const totalRevenueRaw = get('totalRevenue').replace(/[€$,\s]/g, '').replace(',', '.');
+  const visitFrequencyRaw = get('visitFrequency').trim();
+
   if (emailRaw && !isValidEmail(emailRaw)) {
     warnings.push(`Riga ${rowIndex}: email "${emailRaw}" non valida — verrà importata comunque`);
   }
@@ -329,6 +354,10 @@ export function processRow(
       notes: get('notes'),
       allergies: get('allergies'),
       tags: tagsRaw ? tagsRaw.split(/[|,;]/).map(t => t.trim()).filter(Boolean) : [],
+      ...(visitFrequencyRaw ? { visitFrequency: visitFrequencyRaw } : {}),
+      ...(lastVisitDateRaw ? { lastVisitDate: lastVisitDateRaw } : {}),
+      ...(totalVisitsRaw ? { totalVisits: Math.round(Math.abs(Number(totalVisitsRaw))) || undefined } : {}),
+      ...(totalRevenueRaw ? { totalRevenue: parseFloat(totalRevenueRaw) || undefined } : {}),
     },
   };
 }

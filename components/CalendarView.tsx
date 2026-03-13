@@ -243,6 +243,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
       allergies: '', tags: [], gdprConsent: false, gdprDate: '', loyaltyPoints: 0,
       gender: '', address: '', city: '', province: '', postalCode: '',
       acquisitionSource: '', acquisitionDate: '',
+      visitFrequency: '', lastVisitDate: '', totalVisits: 0, totalRevenue: 0,
     });
     setForm(p => ({ ...p, clientId: newId }));
     setShowQuickClient(false);

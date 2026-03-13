@@ -100,6 +100,7 @@ export default function OnlineBookingsView() {
         allergies: '', tags: [], gdprConsent: false, gdprDate: '', loyaltyPoints: 0,
         gender: '', address: '', city: '', province: '', postalCode: '',
         acquisitionSource: 'sito_web', acquisitionDate: format(parseISO(b.created_at), 'yyyy-MM-dd'),
+        visitFrequency: '', lastVisitDate: '', totalVisits: 0, totalRevenue: 0,
       });
     }
     // Find matching service
