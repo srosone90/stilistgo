@@ -289,6 +289,8 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
     setServiceResizingKey(`${apptId}:${serviceId}`);
     setServiceResizingOpDur(currentOpDur);
   }, []);
+
+  useEffect(() => {
     function onMove(e: MouseEvent) {
       // SERVICE RESIZE
       if (serviceResizeRef.current) {
