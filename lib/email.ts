@@ -15,11 +15,10 @@ import { Resend } from 'resend';
 import { createClient } from '@supabase/supabase-js';
 
 // ─── Costanti ────────────────────────────────────────────────────────────────
-// IMPORTANTE: sostituisci con il tuo dominio verificato su resend.com
-const FROM = 'StylistGo <noreply@stylistgo.it>';
+const FROM = 'StylistGo <noreply@stylistgo.app>';
 
 const SITE_URL = (
-  process.env.NEXT_PUBLIC_SITE_URL || 'https://app.stylistgo.it'
+  process.env.NEXT_PUBLIC_SITE_URL || 'https://app.stylistgo.app'
 ).replace(/\/$/, '');
 
 // ─── Client factory (lazy, server-side only) ─────────────────────────────────
@@ -194,7 +193,7 @@ function baseTemplate(salonName: string, content: string): string {
             <td style="background:#faf5ff;padding:24px 48px;text-align:center;border-top:1px solid #ede9fe">
               <p style="margin:0;color:#9ca3af;font-size:12px">
                 &copy; 2025 StylistGo &middot;
-                <a href="https://stylistgo.it" style="color:#7c3aed;text-decoration:none">stylistgo.it</a>
+                <a href="https://stylistgo.app" style="color:#7c3aed;text-decoration:none">stylistgo.app</a>
               </p>
               <p style="margin:6px 0 0;color:#9ca3af;font-size:11px">
                 Hai ricevuto questa email perché hai un account StylistGo.
@@ -281,7 +280,7 @@ function tplWelcomeHtml(salonName: string, email: string): string {
       p('Accedi al gestionale per iniziare a gestire appuntamenti, clienti, cassa e molto altro.'),
       btn(`${SITE_URL}/login`, 'Vai al gestionale'),
       hr(),
-      small('Per qualsiasi domanda visita <a href="https://stylistgo.it" style="color:#7c3aed">stylistgo.it</a> o contatta il supporto.'),
+      small('Per qualsiasi domanda visita <a href="https://stylistgo.app" style="color:#7c3aed">stylistgo.app</a> o contatta il supporto.'),
     ].join(''),
   );
 }
