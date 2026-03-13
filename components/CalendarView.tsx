@@ -217,7 +217,7 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
       ws.push({ label: String(getISOWeek(wStart)).padStart(2, '0'), monthLabel: monthAbbr, weekStart: wStart });
     }
     return ws;
-  }, [currentDate, yearStart]);
+  }, [currentDate]);
   // Scroll week strip to active week
   useEffect(() => {
     const el = weekStripRef.current;
