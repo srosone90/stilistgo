@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -140,7 +140,7 @@ export default function AuthForm() {
       });
       const json = await res.json();
       if (res.status === 429) { setError(json.error); return; }
-      setSuccess(json.message || "Se l'indirizzo è registrato, riceverai le istruzioni a breve.");
+      setSuccess(json.message || "Se l'indirizzo Ã¨ registrato, riceverai le istruzioni a breve.");
       setMode('login');
     } catch {
       setError('Errore di rete. Riprova.');
@@ -256,7 +256,7 @@ export default function AuthForm() {
         </div>
       )}
 
-      {/* ── Modalità: nuova password dopo recovery link ── */}
+      {/* â”€â”€ ModalitÃ : nuova password dopo recovery link â”€â”€ */}
       {mode === 'reset' && (
         <div className="space-y-4">
           <div>
@@ -264,7 +264,7 @@ export default function AuthForm() {
             <input
               type="password"
               minLength={6}
-              placeholder="••••••••"
+              placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
               value={newPassword}
               onChange={e => setNewPassword(e.target.value)}
               style={inputStyle}
@@ -276,7 +276,7 @@ export default function AuthForm() {
             <input
               type="password"
               minLength={6}
-              placeholder="••••••••"
+              placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
               value={newPasswordConfirm}
               onChange={e => setNewPasswordConfirm(e.target.value)}
               style={inputStyle}
@@ -295,7 +295,7 @@ export default function AuthForm() {
         </div>
       )}
 
-      {/* ── Modalità: login / register / forgot ── */}
+      {/* â”€â”€ ModalitÃ : login / register / forgot â”€â”€ */}
       {mode !== 'reset' && (
         <form onSubmit={handleSubmit} className="space-y-4">
           {mode === 'register' && (
@@ -346,7 +346,7 @@ export default function AuthForm() {
                 type="password"
                 required
                 minLength={6}
-                placeholder="••••••••"
+                placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 style={inputStyle}
@@ -393,9 +393,9 @@ export default function AuthForm() {
             {mode === 'login' ? (
               <>Non hai un account? <span style={{ color: 'var(--accent-light)' }}>Registrati</span></>
             ) : mode === 'register' ? (
-              <>Hai già un account? <span style={{ color: 'var(--accent-light)' }}>Accedi</span></>
+              <>Hai giÃ  un account? <span style={{ color: 'var(--accent-light)' }}>Accedi</span></>
             ) : (
-              <span style={{ color: 'var(--accent-light)' }}>← Torna al login</span>
+              <span style={{ color: 'var(--accent-light)' }}>â† Torna al login</span>
             )}
           </button>
         </div>
@@ -408,7 +408,7 @@ export default function AuthForm() {
             href="/admin"
             style={{ fontSize: '10px', color: '#1e1e2a', textDecoration: 'none', letterSpacing: '0.05em' }}
           >
-            ···
+            Â·Â·Â·
           </a>
         </div>
       )}
@@ -416,377 +416,3 @@ export default function AuthForm() {
   );
 }
 
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  background: 'var(--bg-input)',
-  border: '1px solid var(--border)',
-  borderRadius: '10px',
-  padding: '11px 14px',
-  color: 'var(--text)',
-  fontSize: '14px',
-  outline: 'none',
-  transition: 'border-color 0.2s',
-};
-
-const labelStyle: React.CSSProperties = {
-  display: 'block',
-  fontSize: '12px',
-  fontWeight: 500,
-  color: 'var(--muted)',
-  marginBottom: '6px',
-};
-
-function Spinner() {
-  return (
-    <svg
-      className="animate-spin"
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-    </svg>
-  );
-}
-
-export default function AuthForm() {
-  const router = useRouter();
-  const [mode, setMode] = useState<Mode>('login');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const [showResend, setShowResend] = useState(false);
-  const [resendLoading, setResendLoading] = useState(false);
-
-  // Fields
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [newPasswordConfirm, setNewPasswordConfirm] = useState('');
-  const [fullName, setFullName] = useState('');
-
-  // Rileva il callback di recovery di Supabase nell'hash dell'URL
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const hash = window.location.hash;
-    if (hash.includes('type=recovery')) {
-      // Supabase ha già impostato la sessione — ora mostriamo il form cambio password
-      setMode('reset');
-      // Puliamo l'hash dall'URL senza ricaricare la pagina
-      window.history.replaceState(null, '', window.location.pathname + window.location.search);
-    }
-  }, []);
-
-  const reset = () => { setError(''); setSuccess(''); setShowResend(false); };
-
-  const handleForgot = async () => {
-    reset();
-    if (!email) { setError('Inserisci la tua email sopra.'); return; }
-    setLoading(true);
-    try {
-      const res = await fetch('/api/auth/reset-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      });
-      const json = await res.json();
-      if (res.status === 429) { setError(json.error); return; }
-      setSuccess(json.message || "Se l'indirizzo è registrato, riceverai le istruzioni a breve.");
-      setMode('login');
-    } catch {
-      setError('Errore di rete. Riprova.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    reset();
-
-    if (password.length < 6) {
-      setError('La password deve essere di almeno 6 caratteri.');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      if (mode === 'login') {
-        const { data, error: err } = await signIn(email, password);
-        if (err) {
-          const msg = err.message;
-          if (msg.toLowerCase().includes('email not confirmed') || msg.toLowerCase().includes('email_not_confirmed')) {
-            setError('Email non ancora confermata. Controlla la tua casella di posta e clicca il link di conferma.');
-            setShowResend(true);
-          } else {
-            setError(msg);
-          }
-          return;
-        }
-        if (data?.session) {
-          router.push('/');
-          router.refresh();
-        }
-      } else {
-        const { data, error: err } = await signUp(email, password, fullName);
-        if (err) { setError(err.message); return; }
-        if ((data as { check_email?: boolean })?.check_email) {
-          setSuccess('Account creato! Controlla la tua email e clicca il link di conferma per accedere.');
-          return;
-        }
-        if (data?.session) {
-          router.push('/');
-          router.refresh();
-        } else {
-          setSuccess('Account creato! Accesso in corso...');
-          setTimeout(() => { router.push('/'); router.refresh(); }, 1000);
-        }
-      }
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Errore imprevisto. Riprova.';
-      setError(msg);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const toggleMode = () => {
-    setMode(m => m === 'login' ? 'register' : 'login');
-    reset();
-  };
-
-  const handleResend = async () => {
-    const handleResetPassword = async () => {
-    reset();
-    if (newPassword.length < 6) { setError('La password deve essere di almeno 6 caratteri.'); return; }
-    if (newPassword !== newPasswordConfirm) { setError('Le password non coincidono.'); return; }
-    setLoading(true);
-    try {
-      const supabase = getSupabaseClient();
-      const { error: err } = await supabase.auth.updateUser({ password: newPassword });
-      if (err) { setError(err.message); return; }
-      // Notifica email (fire-and-forget)
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user?.email) {
-        fetch('/api/auth/password-changed', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: user.email }),
-        }).catch(() => {});
-      }
-      setSuccess('Password aggiornata! Accesso in corso...');
-      setTimeout(() => { router.push('/'); router.refresh(); }, 1500);
-    } catch {
-      setError('Errore durante il cambio password. Riprova.');
-    } finally {
-      setLoading(false);
-    }
-  };    if (!email) { setError('Inserisci la tua email per ricevere il nuovo link.'); return; }
-    setResendLoading(true);
-    try {
-      const res = await fetch('/api/auth/resend-confirmation', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      });
-      const json = await res.json();
-      if (!res.ok) { setError(json.error || 'Errore durante il reinvio.'); return; }
-      setError('');
-      setShowResend(false);
-      setSuccess('Email di conferma reinviata! Controlla la tua casella.');
-    } catch {
-      setError('Errore di rete. Riprova.');
-    } finally {
-      setResendLoading(false);
-    }
-  };
-
-  return (
-    <div
-      className="w-full max-w-md rounded-2xl p-8 shadow-2xl"
-      style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
-    >
-      {/* Logo */}
-      <div className="flex flex-col items-center mb-8">
-        <div
-          className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
-          style={{ background: 'linear-gradient(135deg,#6366f1,#a855f7)', boxShadow: '0 0 30px rgba(99,102,241,0.4)' }}
-        >
-          <Scissors size={26} className="text-white" />
-        </div>
-        <h1 className="text-xl font-bold text-white">Stylistgo</h1>
-        <p className="text-sm mt-1" style={{ color: 'var(--muted)' }}>
-          {mode === 'login' ? 'Accedi al gestionale' : mode === 'register' ? 'Crea il tuo account' : 'Reimposta password'}
-        </p>
-      </div>
-
-      {/* Error banner */}
-      {error && (
-        <div
-          className="mb-4 px-4 py-3 rounded-xl text-sm"
-          style={{
-            background: 'rgba(239,68,68,0.1)',
-            borderLeft: '3px solid #ef4444',
-            color: '#fca5a5',
-          }}
-        >
-          {error}
-          {showResend && (
-            <button
-              type="button"
-              onClick={handleResend}
-              disabled={resendLoading}
-              style={{
-                display: 'block',
-                marginTop: '8px',
-                background: 'rgba(239,68,68,0.2)',
-                border: '1px solid rgba(239,68,68,0.4)',
-                borderRadius: '6px',
-                color: '#fca5a5',
-                padding: '5px 12px',
-                fontSize: '12px',
-                cursor: resendLoading ? 'not-allowed' : 'pointer',
-                opacity: resendLoading ? 0.6 : 1,
-              }}
-            >
-              {resendLoading ? 'Invio...' : 'Rimanda email di conferma'}
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Success banner */}
-      {success && (
-        <div
-          className="mb-4 px-4 py-3 rounded-xl text-sm"
-          style={{
-            background: 'rgba(34,197,94,0.1)',
-            borderLeft: '3px solid #22c55e',
-            color: '#86efac',
-          }}
-        >
-          {success}
-        </div>
-      )}
-
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Full name — only register */}
-        {mode === 'register' && (
-          <div>
-            <label style={labelStyle}>Nome Completo</label>
-            <input
-              type="text"
-              required
-              placeholder="es. Mario Rossi"
-              value={fullName}
-              onChange={e => setFullName(e.target.value)}
-              style={inputStyle}
-              autoComplete="name"
-            />
-          </div>
-        )}
-
-        <div>
-          <label style={labelStyle}>Email</label>
-          <input
-            type="email"
-            required
-            placeholder="nome@esempio.com"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            style={inputStyle}
-            autoComplete="email"
-          />
-        </div>
-
-        {mode !== 'forgot' && (
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-              <label style={{ ...labelStyle, marginBottom: 0 }}>
-                Password {mode === 'register' && <span style={{ color: 'var(--border-light)' }}>(min. 6 caratteri)</span>}
-              </label>
-              {mode === 'login' && (
-                <button
-                  type="button"
-                  onClick={() => { reset(); setMode('forgot'); }}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px', color: 'var(--accent-light)', padding: 0 }}
-                >
-                  Password dimenticata?
-                </button>
-              )}
-            </div>
-            <input
-              type="password"
-              required
-              minLength={6}
-              placeholder="••••••••"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              style={inputStyle}
-              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-            />
-          </div>
-        )}
-
-        {mode === 'forgot' ? (
-          <button
-            type="button"
-            onClick={handleForgot}
-            disabled={loading}
-            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-white transition-all disabled:opacity-60 mt-2"
-            style={{ background: 'linear-gradient(135deg,#6366f1,#a855f7)', border: 'none', cursor: loading ? 'not-allowed' : 'pointer' }}
-          >
-            {loading ? <><Spinner />Invio...</> : 'Invia link di reset'}
-          </button>
-        ) : (
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-white transition-all disabled:opacity-60 mt-2"
-            style={{ background: 'linear-gradient(135deg,#6366f1,#a855f7)', border: 'none' }}
-          >
-            {loading ? (
-              <><Spinner />{mode === 'login' ? 'Accesso...' : 'Registrazione...'}</>
-            ) : (
-              mode === 'login' ? 'Accedi' : 'Crea Account'
-            )}
-          </button>
-        )}
-      </form>
-
-      {/* Toggle */}
-      <div className="mt-6 text-center">
-        <button
-          onClick={toggleMode}
-          className="text-sm transition-colors"
-          style={{ color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer' }}
-        >
-          {mode === 'login' ? (
-            <>Non hai un account? <span style={{ color: 'var(--accent-light)' }}>Registrati</span></>
-          ) : mode === 'register' ? (
-            <>Hai già un account? <span style={{ color: 'var(--accent-light)' }}>Accedi</span></>
-          ) : (
-            <><span style={{ color: 'var(--accent-light)' }}>← Torna al login</span></>
-          )}
-        </button>
-      </div>
-
-      {/* Discrete admin link — visible only on login mode */}
-      {mode === 'login' && (
-        <div className="mt-8 text-center">
-          <a
-            href="/admin"
-            style={{ fontSize: '10px', color: '#1e1e2a', textDecoration: 'none', letterSpacing: '0.05em' }}
-          >
-            ···
-          </a>
-        </div>
-      )}
-    </div>
-  );
-}
