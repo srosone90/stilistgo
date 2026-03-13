@@ -6,7 +6,7 @@ import { Client, TechnicalCard, HairType, HairCondition } from '@/types/salon';
 import { salonGenerateId } from '@/lib/salonStorage';
 import { getCurrentUser } from '@/lib/supabase';
 import { format, parseISO, differenceInDays } from 'date-fns';
-import { UserPlus, Search, Trash2, ChevronDown, ChevronUp, X, Star, AlertTriangle, FlaskConical, Clock, Camera, ImagePlus, Download, ShieldOff } from 'lucide-react';
+import { UserPlus, Search, Trash2, ChevronDown, ChevronUp, X, Star, AlertTriangle, FlaskConical, Clock, Camera, ImagePlus, Download, ShieldOff, Upload } from 'lucide-react';
 
 const card: React.CSSProperties = { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '16px', padding: '20px' };
 const inputStyle: React.CSSProperties = { background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '10px', padding: '9px 13px', color: 'var(--text)', fontSize: '13px', outline: 'none', width: '100%' };
@@ -38,6 +38,11 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
 
   const [gdprExporting, setGdprExporting] = useState(false);
   const [gdprDeleting, setGdprDeleting] = useState(false);
+  const [showExport, setShowExport] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [importData, setImportData] = useState<Omit<Client, 'id' | 'createdAt'>[] | null>(null);
+  const [importError, setImportError] = useState('');
+  const [importDupCount, setImportDupCount] = useState(0);
 
   const gdprExport = async (clientId: string) => {
     setGdprExporting(true);
@@ -183,6 +188,204 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
     setCardForm({ ...EMPTY_CARD, clientId: selectedId });
   }
 
+  // ── Export ──────────────────────────────────────────────────────────────────
+  function exportClients(fmt: 'csv' | 'json' | 'vcf' | 'xml') {
+    const list = clients;
+    const today = format(new Date(), 'yyyy-MM-dd');
+    let content = '';
+    let mimeType = 'text/plain;charset=utf-8';
+    let ext = 'txt';
+
+    if (fmt === 'csv') {
+      const BOM = '\uFEFF';
+      const header = 'Nome;Cognome;Telefono;Email;DataNascita;Note;Allergie;Tag;PuntiFedelta;ConsensoGDPR;DataGDPR;DataCreazione';
+      const rows = list.map(c =>
+        [c.firstName, c.lastName, c.phone, c.email, c.birthDate, c.notes, c.allergies,
+          c.tags.join('|'), String(c.loyaltyPoints), c.gdprConsent ? 'Sì' : 'No', c.gdprDate, c.createdAt]
+          .map(v => `"${(v ?? '').replace(/"/g, '""')}"`).join(';')
+      );
+      content = BOM + [header, ...rows].join('\n');
+      mimeType = 'text/csv;charset=utf-8'; ext = 'csv';
+    } else if (fmt === 'json') {
+      content = JSON.stringify(list.map(c => ({
+        nome: c.firstName, cognome: c.lastName, telefono: c.phone, email: c.email,
+        dataNascita: c.birthDate, note: c.notes, allergie: c.allergies, tag: c.tags,
+        puntiFedelta: c.loyaltyPoints, gdprConsent: c.gdprConsent, gdprDate: c.gdprDate, dataCreazione: c.createdAt,
+      })), null, 2);
+      mimeType = 'application/json;charset=utf-8'; ext = 'json';
+    } else if (fmt === 'vcf') {
+      content = list.map(c => {
+        const lines = ['BEGIN:VCARD', 'VERSION:3.0',
+          `N:${c.lastName};${c.firstName};;;`,
+          `FN:${[c.firstName, c.lastName].filter(Boolean).join(' ')}`,
+        ];
+        if (c.phone) lines.push(`TEL;TYPE=CELL:${c.phone}`);
+        if (c.email) lines.push(`EMAIL:${c.email}`);
+        if (c.birthDate) lines.push(`BDAY:${c.birthDate.replace(/-/g, '')}`);
+        const noteText = [c.notes, c.allergies ? `Allergie: ${c.allergies}` : ''].filter(Boolean).join(' | ');
+        if (noteText) lines.push(`NOTE:${noteText}`);
+        if (c.tags.length) lines.push(`CATEGORIES:${c.tags.join(',')}`);
+        if (c.loyaltyPoints) lines.push(`X-LOYALTY-POINTS:${c.loyaltyPoints}`);
+        lines.push('END:VCARD');
+        return lines.join('\r\n');
+      }).join('\r\n');
+      mimeType = 'text/vcard;charset=utf-8'; ext = 'vcf';
+    } else if (fmt === 'xml') {
+      const esc = (s: string) => (s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      content = `<?xml version="1.0" encoding="UTF-8"?>\n<clienti>\n` +
+        list.map(c =>
+          `  <cliente>\n    <nome>${esc(c.firstName)}</nome>\n    <cognome>${esc(c.lastName)}</cognome>\n` +
+          `    <telefono>${esc(c.phone)}</telefono>\n    <email>${esc(c.email)}</email>\n` +
+          `    <dataNascita>${esc(c.birthDate)}</dataNascita>\n    <note>${esc(c.notes)}</note>\n` +
+          `    <allergie>${esc(c.allergies)}</allergie>\n    <tag>${c.tags.map(t => `<item>${esc(t)}</item>`).join('')}</tag>\n` +
+          `    <puntiFedelta>${c.loyaltyPoints}</puntiFedelta>\n    <gdprConsent>${c.gdprConsent}</gdprConsent>\n` +
+          `    <gdprDate>${esc(c.gdprDate)}</gdprDate>\n    <dataCreazione>${esc(c.createdAt)}</dataCreazione>\n  </cliente>`
+        ).join('\n') + '\n</clienti>';
+      mimeType = 'application/xml;charset=utf-8'; ext = 'xml';
+    }
+
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `clienti_${today}.${ext}`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setShowExport(false);
+  }
+
+  // ── Import ──────────────────────────────────────────────────────────────────
+  async function handleImportFile(file: File) {
+    setImportError('');
+    setImportData(null);
+    try {
+      const text = await file.text();
+      const name = file.name.toLowerCase();
+      let parsed: Omit<Client, 'id' | 'createdAt'>[] = [];
+
+      if (name.endsWith('.json')) {
+        const raw: unknown = JSON.parse(text);
+        const arr = Array.isArray(raw) ? (raw as Record<string, unknown>[]) : [];
+        parsed = arr.map(r => ({
+          firstName: String(r.nome ?? r.firstName ?? r.first_name ?? '').trim(),
+          lastName: String(r.cognome ?? r.lastName ?? r.last_name ?? '').trim(),
+          phone: String(r.telefono ?? r.phone ?? '').trim(),
+          email: String(r.email ?? '').trim().toLowerCase(),
+          birthDate: String(r.dataNascita ?? r.birthDate ?? '').trim(),
+          notes: String(r.note ?? r.notes ?? '').trim(),
+          allergies: String(r.allergie ?? r.allergies ?? '').trim(),
+          tags: Array.isArray(r.tag) ? (r.tag as string[]) : Array.isArray(r.tags) ? (r.tags as string[]) : [],
+          loyaltyPoints: Number(r.puntiFedelta ?? r.loyaltyPoints ?? 0) || 0,
+          gdprConsent: Boolean(r.gdprConsent ?? false),
+          gdprDate: String(r.gdprDate ?? '').trim(),
+        })).filter(c => c.firstName || c.lastName);
+
+      } else if (name.endsWith('.vcf')) {
+        const blocks = text.split(/BEGIN:VCARD/i).slice(1);
+        parsed = blocks.map(block => {
+          const get = (prop: string) => { const m = block.match(new RegExp(`^${prop}[^:\r\n]*:(.+)$`, 'im')); return m ? m[1].trim() : ''; };
+          const nParts = get('N').split(';');
+          const lastName = nParts[0] ?? '';
+          const firstName = nParts[1] ?? '';
+          const fn = get('FN');
+          const finalFirst = firstName || (fn.includes(' ') ? fn.split(' ')[0] : fn);
+          const finalLast = lastName || (fn.includes(' ') ? fn.split(' ').slice(1).join(' ') : '');
+          const bday = get('BDAY');
+          const bdayFmt = bday.length === 8 ? `${bday.slice(0,4)}-${bday.slice(4,6)}-${bday.slice(6,8)}` : bday;
+          const cats = get('CATEGORIES');
+          const lm = block.match(/^X-LOYALTY-POINTS[^:]*:(\d+)$/im);
+          return {
+            firstName: finalFirst, lastName: finalLast,
+            phone: get('TEL'), email: get('EMAIL'),
+            birthDate: bdayFmt, notes: get('NOTE'),
+            allergies: '', tags: cats ? cats.split(',').map(t => t.trim()).filter(Boolean) : [],
+            loyaltyPoints: lm ? Number(lm[1]) : 0, gdprConsent: false, gdprDate: '',
+          };
+        }).filter(c => c.firstName || c.lastName);
+
+      } else if (name.endsWith('.xml')) {
+        const doc = new DOMParser().parseFromString(text, 'application/xml');
+        const items = Array.from(doc.querySelectorAll('cliente'));
+        const txt = (el: Element, tag: string) => el.querySelector(tag)?.textContent?.trim() ?? '';
+        parsed = items.map(el => ({
+          firstName: txt(el, 'nome'), lastName: txt(el, 'cognome'),
+          phone: txt(el, 'telefono'), email: txt(el, 'email'),
+          birthDate: txt(el, 'dataNascita'), notes: txt(el, 'note'),
+          allergies: txt(el, 'allergie'),
+          tags: Array.from(el.querySelectorAll('tag item')).map(i => i.textContent?.trim() ?? '').filter(Boolean),
+          loyaltyPoints: Number(txt(el, 'puntiFedelta')) || 0,
+          gdprConsent: txt(el, 'gdprConsent') === 'true',
+          gdprDate: txt(el, 'gdprDate'),
+        })).filter(c => c.firstName || c.lastName);
+
+      } else {
+        // CSV — auto-detect separator (semicolon wins for Italian locale)
+        const rawText = text.replace(/^\uFEFF/, '');
+        const firstLine = rawText.split(/\r?\n/)[0] || '';
+        const sep = firstLine.split(';').length > firstLine.split(',').length ? ';' : ',';
+        const lines = rawText.split(/\r?\n/).filter(l => l.trim());
+        if (lines.length < 2) { setImportError('File CSV vuoto o formato non riconosciuto.'); return; }
+        const parseRow = (row: string): string[] => {
+          const res: string[] = []; let cur = ''; let inQ = false;
+          for (let i = 0; i < row.length; i++) {
+            const ch = row[i];
+            if (ch === '"') { if (inQ && row[i + 1] === '"') { cur += '"'; i++; } else { inQ = !inQ; } }
+            else if (ch === sep && !inQ) { res.push(cur); cur = ''; }
+            else { cur += ch; }
+          }
+          res.push(cur); return res;
+        };
+        const headers = parseRow(lines[0]).map(h => h.toLowerCase().replace(/[\s_\-]/g, ''));
+        const col = (...ns: string[]) => { for (const n of ns) { const i = headers.indexOf(n); if (i >= 0) return i; } return -1; };
+        const iFirst = col('nome', 'firstname'); const iLast = col('cognome', 'lastname');
+        const iPhone = col('telefono', 'phone', 'tel'); const iEmail = col('email');
+        const iBday = col('datanascita', 'birthdate'); const iNotes = col('note', 'notes');
+        const iAller = col('allergie', 'allergies'); const iTags = col('tag', 'tags');
+        const iLoy = col('puntifedelta', 'loyaltypoints', 'punti'); const iGdpr = col('consensogdpr', 'gdprconsent', 'gdpr');
+        parsed = lines.slice(1).map(line => {
+          const cols = parseRow(line);
+          const get = (i: number) => (i >= 0 ? (cols[i] ?? '').trim() : '');
+          return {
+            firstName: get(iFirst), lastName: get(iLast), phone: get(iPhone),
+            email: get(iEmail).toLowerCase(), birthDate: get(iBday), notes: get(iNotes),
+            allergies: get(iAller), tags: get(iTags).split('|').map(t => t.trim()).filter(Boolean),
+            loyaltyPoints: Number(get(iLoy)) || 0,
+            gdprConsent: ['sì', 'si', 'yes', 'true', '1'].includes(get(iGdpr).toLowerCase()),
+            gdprDate: '',
+          };
+        }).filter(c => c.firstName || c.lastName);
+      }
+
+      const existingPhones = new Set(clients.map(c => c.phone.trim()).filter(Boolean));
+      const existingEmails = new Set(clients.map(c => c.email.trim().toLowerCase()).filter(Boolean));
+      const dups = parsed.filter(c =>
+        (c.phone && existingPhones.has(c.phone.trim())) ||
+        (c.email && existingEmails.has(c.email.toLowerCase()))
+      ).length;
+      setImportDupCount(dups);
+      setImportData(parsed);
+    } catch (_e) {
+      setImportError('Errore nella lettura del file. Verifica il formato e riprova.');
+    }
+  }
+
+  function executeImport() {
+    if (!importData) return;
+    const existingPhones = new Set(clients.map(c => c.phone.trim()).filter(Boolean));
+    const existingEmails = new Set(clients.map(c => c.email.trim().toLowerCase()).filter(Boolean));
+    let added = 0;
+    for (const c of importData) {
+      if ((c.phone && existingPhones.has(c.phone.trim())) ||
+          (c.email && existingEmails.has(c.email.toLowerCase()))) continue;
+      addClient({ ...c, gdprDate: c.gdprConsent ? (c.gdprDate || new Date().toISOString()) : '' });
+      added++;
+    }
+    setShowImport(false);
+    setImportData(null);
+    setImportError('');
+    alert(`Importazione completata: ${added} nuovi clienti aggiunti${importData.length - added > 0 ? `, ${importData.length - added} duplicati ignorati` : '.'}.`);
+  }
+
   return (
     <div className="flex flex-col md:flex-row gap-4 md:gap-5 h-full" style={{ minHeight: 0 }}>
       {/* ── LEFT: list ── */}
@@ -198,6 +401,14 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Cerca nome, tel, email…" style={{ ...inputStyle, paddingLeft: '32px' }} />
           </div>
           <button onClick={openNew} style={btnPrimary} title="Nuovo cliente"><UserPlus size={15} /></button>
+        </div>
+        <div className="flex gap-2">
+          <button onClick={() => setShowExport(true)} style={{ ...btnPrimary, flex: 1, justifyContent: 'center', fontSize: '12px', padding: '6px 10px' }}>
+            <Download size={13} /> Esporta
+          </button>
+          <button onClick={() => { setImportData(null); setImportError(''); setShowImport(true); }} style={{ ...btnPrimary, flex: 1, justifyContent: 'center', fontSize: '12px', padding: '6px 10px' }}>
+            <Upload size={13} /> Importa
+          </button>
         </div>
 
         <div className="flex flex-col gap-2 overflow-y-auto" style={{ flex: 1 }}>
@@ -515,6 +726,97 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
           <div className="flex justify-end gap-2 mt-4">
             <button onClick={() => setShowCardForm(false)} style={btnDanger}>Annulla</button>
             <button onClick={handleSaveCard} style={btnPrimary}>Salva</button>
+          </div>
+        </Modal>
+      )}
+
+      {/* ── Modal: Esporta Clienti ── */}
+      {showExport && (
+        <Modal title={`Esporta Clienti (${clients.length})`} onClose={() => setShowExport(false)}>
+          <p className="text-sm mb-4" style={{ color: 'var(--muted)' }}>Scegli il formato. Verranno inclusi tutti i {clients.length} clienti.</p>
+          <div className="grid grid-cols-2 gap-3">
+            {([
+              { fmt: 'csv' as const, label: 'CSV', desc: 'Excel / LibreOffice / Numbers', icon: '📊' },
+              { fmt: 'json' as const, label: 'JSON', desc: 'Backup / API / sviluppatori', icon: '📋' },
+              { fmt: 'vcf' as const, label: 'vCard .vcf', desc: 'Rubrica / Outlook / iPhone', icon: '👤' },
+              { fmt: 'xml' as const, label: 'XML', desc: 'Gestionali / TeamSystem / Zucchetti', icon: '🖥️' },
+            ]).map(({ fmt, label, desc, icon }) => (
+              <button key={fmt} onClick={() => exportClients(fmt)}
+                className="flex flex-col items-center gap-1 rounded-xl p-4 transition-all hover:opacity-80"
+                style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', cursor: 'pointer' }}>
+                <span style={{ fontSize: '28px', lineHeight: 1 }}>{icon}</span>
+                <span className="text-sm font-semibold text-white">{label}</span>
+                <span className="text-xs text-center" style={{ color: 'var(--muted)' }}>{desc}</span>
+              </button>
+            ))}
+          </div>
+        </Modal>
+      )}
+
+      {/* ── Modal: Importa Clienti ── */}
+      {showImport && (
+        <Modal title="Importa Clienti" onClose={() => { setShowImport(false); setImportData(null); setImportError(''); }}>
+          <div className="space-y-4">
+            <div className="rounded-xl p-3" style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)' }}>
+              <p className="text-xs" style={{ color: 'var(--muted)' }}>
+                <strong style={{ color: 'var(--accent-light)' }}>Formati supportati:</strong>{' '}
+                CSV (Excel/LibreOffice), JSON, vCard (.vcf), XML<br />
+                I duplicati per telefono o email vengono automaticamente ignorati.
+              </p>
+            </div>
+            <label className="flex flex-col items-center justify-center gap-2 rounded-xl cursor-pointer transition-opacity hover:opacity-70"
+              style={{ border: '2px dashed var(--border)', padding: '32px', color: 'var(--muted)' }}>
+              <Upload size={24} />
+              <span className="text-sm font-medium text-white">Clicca per selezionare il file</span>
+              <span className="text-xs">.csv · .json · .vcf · .xml</span>
+              <input type="file" accept=".csv,.json,.vcf,.xml" className="hidden"
+                onChange={e => { const f = e.target.files?.[0]; if (f) handleImportFile(f); e.target.value = ''; }} />
+            </label>
+            {importError && (
+              <div className="rounded-xl p-3" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)' }}>
+                <p className="text-sm" style={{ color: '#f87171' }}>{importError}</p>
+              </div>
+            )}
+            {importData && (
+              <div className="space-y-3">
+                <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--border)' }}>
+                  <div className="px-4 py-2 flex justify-between text-sm" style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-input)' }}>
+                    <span style={{ color: 'var(--text-2)' }}>Clienti trovati nel file</span>
+                    <span className="font-semibold text-white">{importData.length}</span>
+                  </div>
+                  <div className="px-4 py-2 flex justify-between text-sm" style={{ borderBottom: '1px solid var(--border)' }}>
+                    <span style={{ color: 'var(--muted)' }}>Già presenti (ignorati)</span>
+                    <span style={{ color: '#f59e0b' }}>{importDupCount}</span>
+                  </div>
+                  <div className="px-4 py-2 flex justify-between text-sm font-semibold" style={{ background: 'rgba(34,197,94,0.05)' }}>
+                    <span style={{ color: '#22c55e' }}>Nuovi da importare</span>
+                    <span style={{ color: '#22c55e' }}>{importData.length - importDupCount}</span>
+                  </div>
+                </div>
+                {importData.slice(0, 5).length > 0 && (
+                  <div className="rounded-xl overflow-hidden text-xs" style={{ border: '1px solid var(--border)' }}>
+                    {importData.slice(0, 5).map((c, i) => (
+                      <div key={i} className="px-3 py-2" style={{ borderBottom: i < Math.min(importData.length, 5) - 1 ? '1px solid var(--border)' : undefined, color: 'var(--text-2)' }}>
+                        {c.firstName} {c.lastName}{c.phone ? ` · ${c.phone}` : ''}{c.email ? ` · ${c.email}` : ''}
+                      </div>
+                    ))}
+                    {importData.length > 5 && (
+                      <div className="px-3 py-2 text-center" style={{ color: 'var(--muted)', background: 'var(--bg-input)' }}>…e altri {importData.length - 5} clienti</div>
+                    )}
+                  </div>
+                )}
+                {importData.length - importDupCount > 0 ? (
+                  <div className="flex gap-2 justify-end">
+                    <button onClick={() => { setImportData(null); setImportError(''); }} style={btnDanger}>Annulla</button>
+                    <button onClick={executeImport} style={btnPrimary}>
+                      <Upload size={13} /> Importa {importData.length - importDupCount} clienti
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-sm text-center py-2" style={{ color: 'var(--muted)' }}>Nessun nuovo cliente da aggiungere (tutti già presenti).</p>
+                )}
+              </div>
+            )}
           </div>
         </Modal>
       )}
