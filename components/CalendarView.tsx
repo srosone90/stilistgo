@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { useSalon } from '@/context/SalonContext';
 import { Appointment, AppointmentStatus, STATUS_LABELS, Service } from '@/types/salon';
-import { format, parseISO, addDays, startOfWeek, isSameDay, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, addMonths, getISOWeek, startOfYear, addWeeks } from 'date-fns';
+import { format, parseISO, addDays, startOfWeek, isSameDay, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, addMonths } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, Plus, X, UserPlus, ZoomIn, ZoomOut, Search, Printer, Copy, Clock, AlertCircle, FileText } from 'lucide-react';
 
@@ -206,25 +206,9 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
       return inRange && opOk && a.status !== 'completed';
     }), [appointments, days, filterOperator]);
 
-  // ─── Week strip: 52 weeks from start of year ──────────────────────────────
-  const weekStripRef = useRef<HTMLDivElement>(null);
-  const weekStrip = useMemo(() => {
-    const ws: { label: string; monthLabel: string; weekStart: Date }[] = [];
-    for (let w = 0; w < 53; w++) {
-      const wStart = startOfWeek(addWeeks(startOfYear(new Date(currentDate.getFullYear(), 0, 1)), w), { weekStartsOn: 1 });
-      if (wStart.getFullYear() > currentDate.getFullYear()) break;
-      const monthAbbr = format(wStart, 'MMM yy', { locale: it }).toUpperCase();
-      ws.push({ label: String(getISOWeek(wStart)).padStart(2, '0'), monthLabel: monthAbbr, weekStart: wStart });
-    }
-    return ws;
-  }, [currentDate]);
-  // Scroll week strip to active week
-  useEffect(() => {
-    const el = weekStripRef.current;
-    if (!el) return;
-    const active = el.querySelector('[data-active="true"]') as HTMLElement | null;
-    if (active) active.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
-  }, [currentDate]);
+  // ─── Go-to-date picker ─────────────────────────────────────────────────────
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [gotoDateValue, setGotoDateValue] = useState('');
 
   // ─── Search filter ────────────────────────────────────────────────────────
   const searchResults = useMemo(() => {
@@ -539,33 +523,8 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
 
   return (
     <div className="flex flex-col gap-0 h-full" style={{ minHeight: 0 }}>
-      {/* ─── Week strip ───────────────────────────────────────────────────── */}
-      <div ref={weekStripRef} className="flex overflow-x-auto gap-0 pb-1 pt-1"
-        style={{ scrollbarWidth: 'none', flexShrink: 0, borderBottom: '1px solid var(--border)' }}>
-        {weekStrip.map((w, i) => {
-          const isActive = isSameDay(startOfWeek(currentDate, { weekStartsOn: 1 }), startOfWeek(w.weekStart, { weekStartsOn: 1 }));
-          const isToday = isSameDay(w.weekStart, new Date()) || (new Date() >= w.weekStart && new Date() < addDays(w.weekStart, 7));
-          // Show month label only when month changes
-          const showMonth = i === 0 || w.monthLabel !== weekStrip[i - 1].monthLabel;
-          return (
-            <button key={i} data-active={isActive ? 'true' : 'false'}
-              onClick={() => { setCurrentDate(w.weekStart); if (view === 'month') setView('day'); }}
-              style={{
-                flexShrink: 0, padding: '3px 10px', border: 'none', cursor: 'pointer', borderRadius: 6,
-                background: isActive ? 'rgba(99,102,241,0.25)' : 'transparent',
-                color: isActive ? 'var(--accent-light)' : isToday ? '#f59e0b' : 'var(--muted)',
-                fontSize: 11, fontWeight: isActive ? 700 : 500, lineHeight: 1.3, textAlign: 'center',
-              }}>
-              {showMonth && <span style={{ display: 'block', fontSize: 9, opacity: 0.7, letterSpacing: '0.04em' }}>{w.monthLabel}</span>}
-              {!showMonth && <span style={{ display: 'block', fontSize: 9, opacity: 0 }}>--</span>}
-              <span>{isToday ? 'OGGI' : format(w.weekStart, 'd MMM', { locale: it })}</span>
-            </button>
-          );
-        })}
-      </div>
-
       {/* ─── Toolbar ──────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between flex-wrap gap-2 pt-3 pb-1 px-0">
+      <div className="flex items-center justify-between flex-wrap gap-2 pt-2 pb-1 px-0">
         <div>
           <h1 className="text-2xl font-bold text-white">Agenda</h1>
           <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>
@@ -599,6 +558,31 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
             </>
           )}
           <button onClick={() => openNew()} style={btnPrimary}><Plus size={14} /> Nuovo</button>
+          {/* Vai a data */}
+          <div style={{ position: 'relative' }}>
+            <button onClick={() => setShowDatePicker(p => !p)} style={{ ...btnPrimary, gap: 6 }} title="Vai a data">
+              📅 Vai a data
+            </button>
+            {showDatePicker && (
+              <div style={{ position: 'absolute', top: '110%', right: 0, zIndex: 50, background: '#18181f', border: '1px solid var(--border)', borderRadius: 12, padding: '12px', boxShadow: '0 8px 32px rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column', gap: 8, minWidth: 220 }}>
+                <label style={{ fontSize: 11, color: 'var(--muted)' }}>Seleziona data</label>
+                <input
+                  autoFocus
+                  type="date"
+                  value={gotoDateValue}
+                  onChange={e => setGotoDateValue(e.target.value)}
+                  style={{ ...inputStyle }}
+                />
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button onClick={() => setShowDatePicker(false)}
+                    style={{ flex: 1, background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--muted)', borderRadius: 8, padding: '6px', fontSize: 12, cursor: 'pointer' }}>Annulla</button>
+                  <button
+                    onClick={() => { if (gotoDateValue) { setCurrentDate(parseISO(gotoDateValue)); setView('day'); } setShowDatePicker(false); setGotoDateValue(''); }}
+                    style={{ ...btnPrimary, flex: 1, justifyContent: 'center' }}>Vai</button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
