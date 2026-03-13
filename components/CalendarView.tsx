@@ -299,8 +299,8 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
       // SERVICE RESIZE
       if (serviceResizeRef.current) {
         const delta = e.clientY - serviceResizeRef.current.startY;
-        const deltaMin = Math.round((delta / hourPxRef.current) * 60 / 15) * 15;
-        setServiceResizingOpDur(Math.max(15, serviceResizeRef.current.origOpDur + deltaMin));
+        const deltaMin = Math.round((delta / hourPxRef.current) * 60);
+        setServiceResizingOpDur(Math.max(5, serviceResizeRef.current.origOpDur + deltaMin));
         return;
       }
       // SERVICE DRAG
@@ -329,8 +329,8 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
       // RESIZE
       if (resizeRef.current) {
         const delta = e.clientY - resizeRef.current.startY;
-        const deltaMin = Math.round((delta / hourPxRef.current) * 60 / 15) * 15;
-        const newEnd = Math.max(resizeRef.current.origStartMin + 15, resizeRef.current.origEndMin + deltaMin);
+        const deltaMin = Math.round((delta / hourPxRef.current) * 60);
+        const newEnd = Math.max(resizeRef.current.origStartMin + 5, resizeRef.current.origEndMin + deltaMin);
         setResizingEndTimeState(minutesToTime(newEnd));
         return;
       }
