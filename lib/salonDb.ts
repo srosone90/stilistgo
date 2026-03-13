@@ -26,10 +26,24 @@ export async function dbSaveSalonState(userId: string, state: Record<string, unk
     const adminState = (existing?.admin_state ?? {}) as Record<string, unknown>;
     const merged = { ...state };
     if (Array.isArray(adminState.operators) && adminState.operators.length > 0) {
-      merged.operators = adminState.operators;
+      // Preserve pin and privatePin fields set by the salon owner — admin_state never contains them
+      type OpPin = { id: string; pin?: string; privatePin?: string };
+      const savedOps = Array.isArray(state.operators) ? (state.operators as OpPin[]) : [];
+      merged.operators = (adminState.operators as OpPin[]).map(adminOp => {
+        const saved = savedOps.find(o => o.id === adminOp.id);
+        return saved ? { ...adminOp, pin: saved.pin, privatePin: saved.privatePin } : adminOp;
+      });
     }
     if (adminState.salonConfig) {
-      merged.salonConfig = { ...(state.salonConfig as Record<string, unknown> ?? {}), ...(adminState.salonConfig as Record<string, unknown>) };
+      // Preserve ownerPublicPin/ownerPrivatePin set locally — admin_state never contains them
+      const localCfg = (state.salonConfig as Record<string, unknown>) ?? {};
+      const adminCfg = adminState.salonConfig as Record<string, unknown>;
+      merged.salonConfig = {
+        ...localCfg,
+        ...adminCfg,
+        ownerPublicPin: localCfg.ownerPublicPin,
+        ownerPrivatePin: localCfg.ownerPrivatePin,
+      };
     }
     await supabase
       .from('salon_data')

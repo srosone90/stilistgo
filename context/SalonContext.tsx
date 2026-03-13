@@ -335,8 +335,23 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
         const cloudState = await dbGetSalonState(user.id as string);
         if (!cloudState) return;
         const adminState = cloudState.admin_state as Record<string, unknown> | undefined;
-        if (adminState?.operators) { setOperators(adminState.operators as Operator[]); storageSaveOperators(adminState.operators as Operator[]); }
-        if (adminState?.salonConfig) { setSalonConfig(prev => ({ ...prev, ...(adminState.salonConfig as SalonConfig) })); storageSaveSalonConfig({ ...({} as SalonConfig), ...(adminState.salonConfig as SalonConfig) }); }
+        // When loading admin-configured operators, preserve any pin/privatePin already stored locally.
+        // admin_state never contains PINs (set by salon admin onboarding, not by the user).
+        if (adminState?.operators) {
+          const localOps = storageGetOperators();
+          const withPins = (adminState.operators as Operator[]).map(op => {
+            const local = localOps.find(l => l.id === op.id);
+            return local ? { ...op, pin: local.pin, privatePin: local.privatePin } : op;
+          });
+          setOperators(withPins); storageSaveOperators(withPins);
+        }
+        if (adminState?.salonConfig) {
+          // Preserve owner PINs stored in salonConfig — admin_state never contains them
+          const localCfg = storageGetSalonConfig();
+          const adminCfg = adminState.salonConfig as SalonConfig;
+          const merged = { ...adminCfg, ownerPublicPin: localCfg.ownerPublicPin, ownerPrivatePin: localCfg.ownerPrivatePin };
+          setSalonConfig(prev => ({ ...prev, ...merged })); storageSaveSalonConfig({ ...({} as SalonConfig), ...merged });
+        }
         // Only overwrite local data if cloud has actual content (non-empty arrays).
         // This prevents a partial/empty cloud state from wiping freshly-read local data.
         const arr = <T,>(v: unknown): v is T[] => Array.isArray(v) && (v as T[]).length > 0;
@@ -346,7 +361,16 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
         if (cloudIsNewer && Array.isArray(cloudState.clients))                   { setClients(cloudState.clients as Client[]); storageSaveClients(cloudState.clients as Client[]); }
         if (cloudIsNewer && Array.isArray(cloudState.technicalCards))     { setTechnicalCards(cloudState.technicalCards as TechnicalCard[]); storageSaveTechnicalCards(cloudState.technicalCards as TechnicalCard[]); }
         if (cloudIsNewer && Array.isArray(cloudState.services))                 { setServices(cloudState.services as Service[]); storageSaveServices(cloudState.services as Service[]); }
-        if (cloudIsNewer && Array.isArray(cloudState.operators))               { setOperators(cloudState.operators as Operator[]); storageSaveOperators(cloudState.operators as Operator[]); }
+        if (cloudIsNewer && Array.isArray(cloudState.operators)) {
+          // Cloud operators may have had PINs stripped by dbSaveSalonState if admin_state was present.
+          // Always re-apply locally stored pins so they are never lost.
+          const localOps = storageGetOperators();
+          const withPins = (cloudState.operators as Operator[]).map(op => {
+            const local = localOps.find(l => l.id === op.id);
+            return local ? { ...op, pin: local.pin || op.pin, privatePin: local.privatePin || op.privatePin } : op;
+          });
+          setOperators(withPins); storageSaveOperators(withPins);
+        }
         if (cloudIsNewer && Array.isArray(cloudState.absences))                 { setAbsences(cloudState.absences as Absence[]); storageSaveAbsences(cloudState.absences as Absence[]); }
         if (cloudIsNewer && Array.isArray(cloudState.appointments))         { setAppointments(cloudState.appointments as Appointment[]); storageSaveAppointments(cloudState.appointments as Appointment[]); }
         if (cloudIsNewer && Array.isArray(cloudState.waitingList))     { setWaitingList(cloudState.waitingList as WaitingListEntry[]); storageSaveWaitingList(cloudState.waitingList as WaitingListEntry[]); }
@@ -362,7 +386,17 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
         // For object fields (salonConfig, gamificationConfig) compare timestamps:
         // only apply cloud data if cloud saved it MORE RECENTLY than our last local save.
         if (cloudIsNewer) {
-          if (cloudState.salonConfig)        { setSalonConfig(cloudState.salonConfig as SalonConfig); storageSaveSalonConfig(cloudState.salonConfig as SalonConfig); }
+          if (cloudState.salonConfig) {
+            // Always preserve owner PINs from local storage — they are never in the cloud state
+            const localCfg = storageGetSalonConfig();
+            const cloudCfg = cloudState.salonConfig as SalonConfig;
+            const mergedCfg: SalonConfig = {
+              ...cloudCfg,
+              ownerPublicPin: localCfg.ownerPublicPin || cloudCfg.ownerPublicPin,
+              ownerPrivatePin: localCfg.ownerPrivatePin || cloudCfg.ownerPrivatePin,
+            };
+            setSalonConfig(mergedCfg); storageSaveSalonConfig(mergedCfg);
+          }
           if (cloudState.gamificationConfig) { setGamificationConfig(cloudState.gamificationConfig as GamificationConfig); storageSaveGamificationConfig(cloudState.gamificationConfig as GamificationConfig); }
           if ((cloudState as Record<string, unknown>).clientAppConfig) { const cac = (cloudState as Record<string, unknown>).clientAppConfig as ClientAppConfig; setClientAppConfig(cac); storageSaveClientAppConfig(cac); }
         } else if (cloudState.salonConfig) {
