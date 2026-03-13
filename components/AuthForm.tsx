@@ -45,9 +45,13 @@ function Spinner() {
   );
 }
 
-export default function AuthForm() {
+interface AuthFormProps {
+  initialMode?: Mode;
+}
+
+export default function AuthForm({ initialMode = 'login' }: AuthFormProps) {
   const router = useRouter();
-  const [mode, setMode] = useState<Mode>('login');
+  const [mode, setMode] = useState<Mode>(initialMode);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -61,8 +65,7 @@ export default function AuthForm() {
   const [newPasswordConfirm, setNewPasswordConfirm] = useState('');
   const [fullName, setFullName] = useState('');
 
-  // Rileva il callback recovery di Supabase tramite onAuthStateChange
-  // (l'SDK cancella l'hash PRIMA che useEffect possa leggerlo — race condition)
+  // Backup: ascolta PASSWORD_RECOVERY nel caso in cui arrivi dopo il mount
   useEffect(() => {
     const supabase = getSupabaseClient();
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
@@ -70,10 +73,6 @@ export default function AuthForm() {
         setMode('reset');
       }
     });
-    // Fallback: controlla anche l'hash nel caso il componente monti dopo l'evento
-    if (typeof window !== 'undefined' && window.location.hash.includes('type=recovery')) {
-      setMode('reset');
-    }
     return () => subscription.unsubscribe();
   }, []);
 
