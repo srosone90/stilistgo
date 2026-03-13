@@ -51,8 +51,8 @@ export default function OperatorLockScreen({ onUnlock }: { onUnlock: () => void 
       setPinInput('');
       return;
     }
-    setPrivateMode(mode === 'private');
-    if (step !== 'owner-pin') setActiveOperatorId(selectedId);
+    if (step !== 'owner-pin') setActiveOperatorId(selectedId); // first (internally resets private mode)
+    setPrivateMode(mode === 'private'); // then override with correct value
     onUnlock();
   }
 

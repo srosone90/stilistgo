@@ -99,8 +99,8 @@ export default function Sidebar({ activeView, onNavigate, onLock, permissions, p
   function handlePinSubmit() {
     const mode = checkPinMode(selectedOpId, pinInput);
     if (mode === 'invalid') { setPinError(true); setPinInput(''); return; }
-    setPrivateMode(mode === 'private');
-    setActiveOperatorId(selectedOpId);
+    setActiveOperatorId(selectedOpId); // first (internally resets private mode)
+    setPrivateMode(mode === 'private'); // then override with correct value
     setShowPinModal(false);
   }
 
