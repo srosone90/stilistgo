@@ -63,13 +63,27 @@ function paymentToCashIn(p: Payment, services: Service[]): CashIn {
  */
 export function useCombinedTransactions(): Transaction[] {
   const { transactions } = useApp();
-  const { payments, services } = useSalon();
+  const { payments, services, operators, activeOperatorId, isPrivateMode, salonConfig } = useSalon();
 
   return useMemo(() => {
+    // Apply the same hidden-payment visibility rules as CashView:
+    // - Non-owner session: never see hidden payments
+    // - Owner with no private PIN configured: always see (prevents permanent data loss)
+    // - Owner with private PIN: only visible in private mode
+    const activeOp = operators.find(o => o.id === activeOperatorId);
+    const isOwnerSession = !activeOperatorId || activeOp?.role === 'owner';
+    const ownerHasPrivatePin = !!(operators.find(o => o.role === 'owner')?.privatePin || salonConfig.ownerPrivatePin);
+    const visiblePayments = payments.filter(p => {
+      if (!p.isHidden) return true;
+      if (!isOwnerSession) return false;
+      if (!ownerHasPrivatePin) return true;
+      return isPrivateMode;
+    });
+
     // manual entries that are NOT already from salon (safety check)
     const manual = transactions.filter(t => !t.id.startsWith(SALON_PAY_PREFIX));
-    // convert all salon payments, passing services for proper category mapping
-    const salonTx: Transaction[] = payments.map(p => paymentToCashIn(p, services));
+    // convert visible salon payments, passing services for proper category mapping
+    const salonTx: Transaction[] = visiblePayments.map(p => paymentToCashIn(p, services));
     return [...manual, ...salonTx];
-  }, [transactions, payments, services]);
+  }, [transactions, payments, services, operators, activeOperatorId, isPrivateMode, salonConfig]);
 }

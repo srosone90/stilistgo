@@ -41,16 +41,29 @@ function getRange(period: string): { from: string; to: string } {
 }
 
 export default function ReportOperatoriView() {
-  const { operators, payments, appointments } = useSalon();
+  const { operators, payments, appointments, activeOperatorId, isPrivateMode, salonConfig } = useSalon();
   const [period, setPeriod] = useState<'month' | 'quarter' | 'year' | 'all'>('month');
   const [selectedOpId, setSelectedOpId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const { from, to } = useMemo(() => getRange(period), [period]);
 
+  // Apply hidden-payment visibility rules (same as CashView)
+  const visiblePayments = useMemo(() => {
+    const activeOp = operators.find(o => o.id === activeOperatorId);
+    const isOwnerSession = !activeOperatorId || activeOp?.role === 'owner';
+    const ownerHasPrivatePin = !!(operators.find(o => o.role === 'owner')?.privatePin || salonConfig.ownerPrivatePin);
+    return payments.filter(p => {
+      if (!p.isHidden) return true;
+      if (!isOwnerSession) return false;
+      if (!ownerHasPrivatePin) return true;
+      return isPrivateMode;
+    });
+  }, [payments, operators, activeOperatorId, isPrivateMode, salonConfig]);
+
   const filteredPayments = useMemo(() =>
-    payments.filter(p => p.date >= from && p.date <= to),
-    [payments, from, to]
+    visiblePayments.filter(p => p.date >= from && p.date <= to),
+    [visiblePayments, from, to]
   );
 
   const filteredApts = useMemo(() =>
