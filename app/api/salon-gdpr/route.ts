@@ -5,37 +5,34 @@
  * DELETE /api/salon-gdpr                → elimina definitivamente un cliente
  *        body: { clientId: string }
  *
- * Autenticazione: sessione Supabase (anon key + RLS).
- * Il salon_id è derivato dalla sessione, quindi un utente
- * può operare SOLO sui propri clienti.
+ * Autenticazione: il client invia il proprio access_token come Bearer.
+ * Il server lo verifica con il service-role admin client (auth.getUser(token)),
+ * che è l'approccio raccomandato per le route server-side di Next.js.
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { getAdminDb } from '@/lib/adminAuth';
 
-function getSupabaseFromRequest(req: NextRequest) {
+/** Estrae l'user_id dal token Bearer, usando il service role per la verifica. */
+async function getUserIdFromRequest(req: NextRequest): Promise<string | null> {
   const authHeader = req.headers.get('authorization') ?? '';
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
-  // Strip BOM (\uFEFF) that some tools prepend to env vars
-  const url  = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').replace(/^\uFEFF/, '').trim();
-  const anonKey = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '').replace(/^\uFEFF/, '').trim();
-  return createClient(
-    url,
-    anonKey,
-    token ? { global: { headers: { Authorization: `Bearer ${token}` } } } : undefined
-  );
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+  if (!token) return null;
+  const admin = getAdminDb();
+  const { data: { user }, error } = await admin.auth.getUser(token);
+  if (error || !user) return null;
+  return user.id;
 }
 
 // ── GET: esporta tutti i dati di un cliente ─────────────────────────────────
 export async function GET(req: NextRequest) {
-  const supabase = getSupabaseFromRequest(req);
-  const { data: authData } = await supabase.auth.getUser();
-  const userId = authData?.user?.id ?? null;
+  const userId = await getUserIdFromRequest(req);
   if (!userId) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 });
 
   const clientId = req.nextUrl.searchParams.get('clientId');
   if (!clientId) return NextResponse.json({ error: 'clientId richiesto' }, { status: 400 });
 
-  const { data, error } = await supabase
+  const admin = getAdminDb();
+  const { data, error } = await admin
     .from('salon_data')
     .select('state')
     .eq('user_id', userId)
@@ -73,16 +70,15 @@ export async function GET(req: NextRequest) {
 
 // ── DELETE: eliminazione definitiva cliente ─────────────────────────────────
 export async function DELETE(req: NextRequest) {
-  const supabase = getSupabaseFromRequest(req);
-  const { data: authData } = await supabase.auth.getUser();
-  const userId = authData?.user?.id ?? null;
+  const userId = await getUserIdFromRequest(req);
   if (!userId) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 });
 
   const body = await req.json().catch(() => null);
   const clientId: string = body?.clientId;
   if (!clientId) return NextResponse.json({ error: 'clientId richiesto' }, { status: 400 });
 
-  const { data, error } = await supabase
+  const admin = getAdminDb();
+  const { data, error } = await admin
     .from('salon_data')
     .select('state')
     .eq('user_id', userId)
@@ -108,7 +104,7 @@ export async function DELETE(req: NextRequest) {
     ),
   };
 
-  const { error: saveError } = await supabase
+  const { error: saveError } = await admin
     .from('salon_data')
     .update({ state: newState, updated_at: new Date().toISOString() })
     .eq('user_id', userId);
@@ -117,7 +113,7 @@ export async function DELETE(req: NextRequest) {
 
   // Log evento cancellazione (best-effort)
   try {
-    await supabase.from('security_events').insert({
+    await admin.from('security_events').insert({
       user_id: userId,
       event_type: 'data_delete',
       metadata: { clientId, reason: 'gdpr_erasure_request' },
@@ -129,22 +125,15 @@ export async function DELETE(req: NextRequest) {
 
 // ── POST: registra accettazione consenso GDPR del tenant ───────────────────
 export async function POST(req: NextRequest) {
-  const supabase = getSupabaseFromRequest(req);
-  const { data: authData } = await supabase.auth.getUser();
-  const userId = authData?.user?.id ?? null;
+  const userId = await getUserIdFromRequest(req);
   if (!userId) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 });
 
   const body = await req.json().catch(() => null);
   const { tosVersion = '1.0', dpaVersion = '1.0' } = body ?? {};
 
-  // Usa la service_role per aggiornare admin_tenants (su cui non c'è RLS utente)
-  const { createClient: createServiceClient } = await import('@supabase/supabase-js');
-  const serviceDb = createServiceClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  const admin = getAdminDb();
 
-  const { error } = await serviceDb
+  const { error } = await admin
     .from('admin_tenants')
     .update({
       legal_consents: {
@@ -158,7 +147,7 @@ export async function POST(req: NextRequest) {
 
   // Log evento (best-effort)
   try {
-    await supabase.from('security_events').insert({
+    await admin.from('security_events').insert({
       user_id: userId,
       event_type: 'consent',
       metadata: { tosVersion, dpaVersion },
