@@ -34,50 +34,42 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const event = body.event as string | undefined;
-    // WAHA uses 'session' field; Evolution API used 'instance'
-    const session = (body.session as string | undefined) ?? (body.instance as string | undefined);
+    // Maytapi uses 'type' instead of 'event'
+    const event = (body.type as string | undefined) ?? (body.event as string | undefined);
+    // Maytapi phoneId (numeric, sent as number in JSON)
+    const phoneId = body.phone_id != null ? String(body.phone_id) : undefined;
 
     if (!event) {
       return NextResponse.json({ ok: true });
     }
 
     // ── Event handlers ────────────────────────────────────────────────────
-    if (event === 'session.status') {
-      const payload = body.payload as Record<string, unknown> | undefined;
-      const status = payload?.status as string | undefined;
-      const me = payload?.me as Record<string, unknown> | null | undefined;
-
+    if (event === 'channel_status' && phoneId) {
+      // Maytapi connection status change
+      const status = body.status as string | undefined;
       const supabase = adminClient();
 
-      if (status === 'WORKING') {
-        const phone = me?.id ? (me.id as string).split('@')[0] : null;
+      if (status === 'active') {
+        const phone = body.phone as string | null | undefined;
 
         await supabase
           .from('admin_tenants')
           .update({
             whatsapp_connected: true,
             whatsapp_connected_at: new Date().toISOString(),
-            whatsapp_instance_name: session ?? 'default',
-            ...(phone ? { whatsapp_phone: phone } : {}),
+            ...(phone ? { whatsapp_phone: phone.replace(/\D/g, '') } : {}),
           })
-          .eq('whatsapp_instance_name', session ?? 'default');
+          .eq('whatsapp_instance_name', phoneId);
 
-        console.info(`[waha-webhook] session ${session} connected — phone: ${phone ?? 'unknown'}`);
-      } else if (status === 'STOPPED' || status === 'FAILED') {
+        console.info(`[maytapi-webhook] phone ${phoneId} connected — ${phone ?? 'unknown'}`);
+      } else if (status === 'timeout' || status === 'disconnected') {
         await supabase
           .from('admin_tenants')
           .update({ whatsapp_connected: false })
-          .eq('whatsapp_instance_name', session ?? 'default');
+          .eq('whatsapp_instance_name', phoneId);
 
-        console.info(`[waha-webhook] session ${session} disconnected (${status})`);
-      } else if (status === 'SCAN_QR_CODE') {
-        // No action needed — client polls /api/whatsapp/status for QR
-        console.info(`[waha-webhook] session ${session} waiting for QR scan`);
+        console.info(`[maytapi-webhook] phone ${phoneId} disconnected (${status})`);
       }
-    } else if (event === 'QRCODE_UPDATED') {
-      // Legacy Evolution API event — ignore
-      console.info(`[waha-webhook] legacy QRCODE_UPDATED event ignored`);
     }
 
     return NextResponse.json({ ok: true });

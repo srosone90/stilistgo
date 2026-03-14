@@ -23,11 +23,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'salonId obbligatorio' }, { status: 400 });
     }
 
-    const instanceName = salonId.replace(/-/g, '_');
-
-    await disconnectInstance(instanceName);
-
     const supabase = adminClient();
+
+    // Read the Maytapi phoneId from DB
+    const { data: tenant } = await supabase
+      .from('admin_tenants')
+      .select('whatsapp_instance_name')
+      .eq('user_id', salonId)
+      .maybeSingle();
+
+    const phoneId = tenant?.whatsapp_instance_name as string | null;
+    if (phoneId) await disconnectInstance(phoneId);
     await supabase
       .from('admin_tenants')
       .update({

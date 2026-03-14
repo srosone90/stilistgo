@@ -3,45 +3,45 @@ import { fetchInstance, createInstance, getQRCode } from './evolutionClient';
 // ─── ensureInstance ───────────────────────────────────────────────────────────
 
 /**
- * Ensures an Evolution API instance exists for the given salon slug.
- * Creates it if it doesn't exist yet. Returns connection state + QR if disconnected.
+ * Checks or creates a Maytapi phone slot for the salon.
+ *
+ * @param salonSlug       - used as the display name when creating a new phone
+ * @param existingPhoneId - Maytapi phoneId already stored in DB (if any)
+ * Returns connection state + QR code + phoneId (to persist in DB if new).
  */
 export async function ensureInstance(
   salonSlug: string,
-): Promise<{ connected: boolean; qrcode?: string }> {
-  const existing = await fetchInstance(salonSlug);
-
-  if (!existing) {
-    // Instance doesn't exist → create it, then fetch QR
-    const created = await createInstance(salonSlug);
-    // v2 may include QR in create response; if not, fetch it separately
-    const qrFromCreate = created?.qrcode?.base64 ?? null;
-    if (qrFromCreate) return { connected: false, qrcode: qrFromCreate };
-    // Give Evolution API a moment to initialise the instance before fetching QR
-    await new Promise(r => setTimeout(r, 1000));
-    const qr = await getQRCode(salonSlug);
-    return { connected: false, qrcode: qr?.base64 ?? undefined };
+  existingPhoneId?: string,
+): Promise<{ connected: boolean; qrcode?: string; phoneId?: string }> {
+  if (existingPhoneId) {
+    const existing = await fetchInstance(existingPhoneId);
+    if (existing?.connectionStatus === 'active') {
+      return { connected: true, phoneId: existingPhoneId };
+    }
+    // Phone exists in Maytapi but not yet connected → get QR
+    const qr = await getQRCode(existingPhoneId);
+    return { connected: false, qrcode: qr?.base64, phoneId: existingPhoneId };
   }
 
-  if (existing.connectionStatus === 'WORKING') {
-    return { connected: true };
-  }
-
-  // Instance exists but not connected → fetch fresh QR
-  const qr = await getQRCode(salonSlug);
-  return { connected: false, qrcode: qr?.base64 ?? undefined };
+  // No phone yet for this salon → create one in Maytapi
+  const created = await createInstance(salonSlug);
+  if (!created) return { connected: false };
+  const phoneId = created.instance.instanceName;
+  // Give Maytapi a moment to prepare the QR
+  await new Promise(r => setTimeout(r, 1500));
+  const qr = await getQRCode(phoneId);
+  return { connected: false, qrcode: qr?.base64, phoneId };
 }
 
 // ─── refreshQR ────────────────────────────────────────────────────────────────
 
 /**
- * Forces a QR code refresh for an existing instance.
- * Returns the new QR base64 string.
+ * Forces a QR code refresh for an existing phone.
  */
-export async function refreshQR(salonSlug: string): Promise<{ qrcode: string }> {
-  const qr = await getQRCode(salonSlug);
+export async function refreshQR(phoneId: string): Promise<{ qrcode: string }> {
+  const qr = await getQRCode(phoneId);
   if (!qr?.base64) {
-    throw new Error(`Impossibile ottenere il QR per l'istanza: ${salonSlug}`);
+    throw new Error(`Impossibile ottenere il QR per il telefono: ${phoneId}`);
   }
   return { qrcode: qr.base64 };
 }

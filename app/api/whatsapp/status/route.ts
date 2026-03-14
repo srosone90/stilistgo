@@ -24,23 +24,31 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'salonId obbligatorio' }, { status: 400 });
   }
 
-  // Derive Evolution instance name from the salon user_id
-  const instanceName = salonId.replace(/-/g, '_');
-
   try {
-    const result = await ensureInstance(instanceName);
+    const supabase = adminClient();
+
+    // Read the existing Maytapi phoneId for this salon (if already created)
+    const { data: tenant } = await supabase
+      .from('admin_tenants')
+      .select('whatsapp_instance_name')
+      .eq('user_id', salonId)
+      .maybeSingle();
+
+    const existingPhoneId = (tenant?.whatsapp_instance_name as string | null) ?? undefined;
+
+    const result = await ensureInstance(salonId, existingPhoneId);
 
     if (result.connected) {
       return NextResponse.json({ connected: true });
     }
 
-    // Store 'default' as the instance name — WAHA Core always uses the "default" session.
-    // The webhook identifies the tenant by whatsapp_instance_name = 'default'.
-    const supabase = adminClient();
-    await supabase
-      .from('admin_tenants')
-      .update({ whatsapp_instance_name: 'default' })
-      .eq('user_id', salonId);
+    // If a new phone was created in Maytapi, persist its ID
+    if (result.phoneId && result.phoneId !== existingPhoneId) {
+      await supabase
+        .from('admin_tenants')
+        .update({ whatsapp_instance_name: result.phoneId })
+        .eq('user_id', salonId);
+    }
 
     return NextResponse.json({
       connected: false,
