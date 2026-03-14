@@ -414,13 +414,14 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
         const newSuppliers = mArr<Supplier>(storageGetSuppliers() as Supplier[], (cloudState as Record<string, unknown>).suppliers, 'suppliers');
         const newSubs      = mArr<ClientSubscription>(storageGetSubscriptions() as ClientSubscription[], (cloudState as Record<string, unknown>).subscriptions, 'subscriptions');
 
-        // Operators: merge per-item but also preserve PINs (they are local-only fields)
+        // Operators: merge per-item. Cloud/merged version wins (it's the newer one via mergeItems);
+        // local is used only as fallback for fields that the cloud version may lack (e.g. PIN on old records).
         const localOpsStorage = storageGetOperators();
         const newOpsRaw = mArr<Operator>(localOpsStorage, cloudState.operators, 'operators');
         const newOps = newOpsRaw.map(op => {
           const local = localOpsStorage.find(l => l.id === op.id);
           if (!local) return op;
-          return { ...op, pin: local.pin || op.pin, privatePin: local.privatePin || op.privatePin, color: local.color || op.color, commissionRate: local.commissionRate ?? op.commissionRate, schedule: local.schedule?.length ? local.schedule : op.schedule };
+          return { ...op, pin: op.pin || local.pin, privatePin: op.privatePin || local.privatePin, color: op.color || local.color, commissionRate: op.commissionRate ?? local.commissionRate, schedule: op.schedule?.length ? op.schedule : local.schedule };
         });
 
         // cashSessions / whatsappMessages / subscriptions: merge as arrays (no updatedAt)
@@ -497,7 +498,8 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
           const withPins = adminOps.map(op => {
             const local = localOps2.find(l => l.id === op.id);
             if (!local) return op;
-            return { ...op, pin: local.pin, privatePin: local.privatePin, color: local.color || op.color, commissionRate: local.commissionRate ?? op.commissionRate, schedule: local.schedule?.length ? local.schedule : op.schedule };
+            // Prefer local PIN/schedule (set by the salon on this device) with admin version as fallback
+            return { ...op, pin: local.pin || op.pin, privatePin: local.privatePin || op.privatePin, color: op.color || local.color, commissionRate: op.commissionRate ?? local.commissionRate, schedule: local.schedule?.length ? local.schedule : op.schedule };
           });
           const merged = [...withPins, ...salonOnlyOps];
           setOperators(merged);
@@ -617,7 +619,7 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
             const withPins = adminOps.map(op => {
               const local = localOps.find(l => l.id === op.id);
               if (!local) return op;
-              return { ...op, pin: local.pin, privatePin: local.privatePin, color: local.color || op.color, commissionRate: local.commissionRate ?? op.commissionRate, schedule: local.schedule?.length ? local.schedule : op.schedule };
+              return { ...op, pin: local.pin || op.pin, privatePin: local.privatePin || op.privatePin, color: op.color || local.color, commissionRate: op.commissionRate ?? local.commissionRate, schedule: local.schedule?.length ? local.schedule : op.schedule };
             });
             const mergedOps = [...withPins, ...salonOnlyOps];
             setOperators(mergedOps); storageSaveOperators(mergedOps);
@@ -651,7 +653,15 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
         const nc   = ma<Client>(snap.clients as Client[], newState.clients, 'clients');
         const ntc  = ma<TechnicalCard>(snap.technicalCards as TechnicalCard[], newState.technicalCards, 'technicalCards');
         const ns   = ma<Service>(snap.services as Service[], newState.services, 'services');
-        const no   = ma<Operator>(snap.operators as Operator[], newState.operators, 'operators');
+        const noRaw = ma<Operator>(snap.operators as Operator[], newState.operators, 'operators');
+        // Restore PIN/schedule from in-memory state if the incoming cloud version lacks them.
+        // Guards against peers that saved operators without these fields (e.g. fresh device before cloud load).
+        const snapOpsRT = snap.operators as Operator[];
+        const no = noRaw.map(op => {
+          const snapOp = snapOpsRT.find(x => x.id === op.id);
+          if (!snapOp) return op;
+          return { ...op, pin: op.pin || snapOp.pin, privatePin: op.privatePin || snapOp.privatePin, schedule: op.schedule?.length ? op.schedule : snapOp.schedule };
+        });
         const nab  = ma<Absence>(snap.absences as Absence[], newState.absences, 'absences');
         const na   = ma<Appointment>(snap.appointments as Appointment[], newState.appointments, 'appointments');
         const nwl  = ma<WaitingListEntry>(snap.waitingList as WaitingListEntry[], newState.waitingList, 'waitingList');
