@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
   if (!email) return NextResponse.json({ error: 'Email non trovata per questo tenant' }, { status: 404 });
 
   // Generate magic link using service-role admin auth
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? process.env.NEXTAUTH_URL ?? 'http://localhost:3000';
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://stylistgo.app';
   const { data, error } = await db.auth.admin.generateLink({
     type: 'magiclink',
     email,

@@ -10,7 +10,7 @@ import {
   Link2, ExternalLink, UserPlus, ImagePlus, X,
 } from 'lucide-react';
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://stilistgo.vercel.app';
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://stylistgo.app';
 
 // ─── Shared UI helpers ────────────────────────────────────────────────────────
 

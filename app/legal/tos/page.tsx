@@ -36,7 +36,7 @@ export default function TosPage() {
       <p style={s.p}>Il Cliente è responsabile della sicurezza delle proprie credenziali. Stylistgo utilizza Supabase Auth con hashing password bcrypt/Argon2. Non condividere le credenziali di accesso. In caso di compromissione sospetta, notifica immediatamente support@stylistgo.it.</p>
 
       <h2 style={s.h2}>4. Abbonamento e Pagamento</h2>
-      <p style={s.p}>Il servizio è erogato su base di abbonamento mensile prepagato. I piani disponibili (Trial, Starter, Pro, Business) e i relativi prezzi sono pubblicati su stylistgo.it/prezzi. L&apos;abbonamento si rinnova automaticamente. Il recesso può essere esercitato in qualsiasi momento con effetto al termine del periodo già pagato, senza ulteriori addebiti.</p>
+      <p style={s.p}>Il servizio è erogato su base di abbonamento mensile prepagato. I piani disponibili (Trial, Starter, Pro, Business) e i relativi prezzi sono pubblicati su stylistgo.app/prezzi. L&apos;abbonamento si rinnova automaticamente. Il recesso può essere esercitato in qualsiasi momento con effetto al termine del periodo già pagato, senza ulteriori addebiti.</p>
 
       <h2 style={s.h2}>5. Dati, Privacy e Sicurezza</h2>
       <p style={s.p}>I dati inseriti dal Cliente (anagrafiche clienti, appuntamenti, dati finanziari) rimangono di proprietà esclusiva del Cliente. Stylistgo agisce come Responsabile del Trattamento ai sensi del GDPR. I dati sono:</p>

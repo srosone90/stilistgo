@@ -13,7 +13,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendEmailChangeVerificationEmail } from '@/lib/email';
 
-const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://app.stylistgo.it').replace(/\/$/, '');
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://stylistgo.app').replace(/\/$/, '');
 const TOKEN_EXPIRY_HOURS = 24;
 
 function getAdminClient() {

@@ -15,7 +15,7 @@ import {
   sendPasswordResetEmail,
 } from '@/lib/email';
 
-const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://app.stylistgo.it').replace(/\/$/, '');
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://stylistgo.app').replace(/\/$/, '');
 const RATE_LIMIT_MAX = 5; // max richieste per ora per email
 
 function getAdminClient() {

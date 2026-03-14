@@ -18,7 +18,7 @@ import { createClient } from '@supabase/supabase-js';
 const FROM = 'StylistGo <noreply@stylistgo.app>';
 
 const SITE_URL = (
-  process.env.NEXT_PUBLIC_SITE_URL || 'https://app.stylistgo.app'
+  process.env.NEXT_PUBLIC_SITE_URL || 'https://stylistgo.app'
 ).replace(/\/$/, '');
 
 // ─── Client factory (lazy, server-side only) ─────────────────────────────────
@@ -344,7 +344,7 @@ function tplPasswordChangedText(salonName: string, email: string): string {
 
 La password del tuo account ${email} è stata modificata con successo.
 
-Se non sei stato tu, contatta subito il supporto su stylistgo.it.
+Se non sei stato tu, contatta subito il supporto su stylistgo.app.
 
 — Team StylistGo`;
 }
@@ -391,7 +391,7 @@ function tplEmailChangedHtml(salonName: string, oldEmail: string, newEmail: stri
       p(`Vecchio indirizzo: <strong>${oldEmail}</strong><br/>Nuovo indirizzo: <strong>${newEmail}</strong>`),
       p("Se non sei stato tu ad effettuare questa modifica, contatta immediatamente il supporto."),
       hr(),
-      small('Notifica automatica di sicurezza — stylistgo.it'),
+      small('Notifica automatica di sicurezza — stylistgo.app'),
     ].join(''),
   );
 }
@@ -402,7 +402,7 @@ function tplEmailChangedText(salonName: string, oldEmail: string, newEmail: stri
 Vecchio indirizzo: ${oldEmail}
 Nuovo indirizzo: ${newEmail}
 
-Se non eri tu, contatta subito il supporto su stylistgo.it.
+Se non eri tu, contatta subito il supporto su stylistgo.app.
 
 — Team StylistGo`;
 }
