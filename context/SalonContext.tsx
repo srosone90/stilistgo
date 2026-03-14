@@ -336,7 +336,7 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
         try {
           const wa = sc?.whatsapp;
           const clientPhone = b.client_phone?.replace(/\D/g, '');
-          if (wa?.ultraMsgInstanceId && wa?.ultraMsgToken && (wa.appointmentConfirmEnabled ?? true) && clientPhone) {
+          if (wa?.ultraMsgInstanceId && (wa.appointmentConfirmEnabled ?? true) && clientPhone) {
             const svcName  = matchedService?.name || b.service || 'appuntamento';
             const salonName = sc?.salonName ?? 'il salone';
             const DEFAULT_APPT_MSG = 'Ciao {nome}! ✅ Il tuo appuntamento di *{servizio}* è confermato per il {data} alle {ora} da {salone}. A presto!';
@@ -348,7 +348,7 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
               .split('{salone}').join(salonName);
             fetch('/api/ultramsg/send', {
               method: 'POST', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ instanceId: wa.ultraMsgInstanceId, token: wa.ultraMsgToken, to: clientPhone, message: msg }),
+              body: JSON.stringify({ instanceId: wa.ultraMsgInstanceId, to: clientPhone, message: msg }),
             }).catch(() => {});
           }
         } catch { /* non bloccare l'import */ }
@@ -824,7 +824,7 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
     try {
       const snap = latestStateRef.current;
       const wa = (snap.salonConfig as SalonConfig | undefined)?.whatsapp;
-      if (wa?.ultraMsgInstanceId && wa?.ultraMsgToken && (wa.appointmentConfirmEnabled ?? true)) {
+      if (wa?.ultraMsgInstanceId && (wa.appointmentConfirmEnabled ?? true)) {
         const clientsList = (snap.clients as Client[]) ?? [];
         const servicesList = (snap.services as Service[]) ?? [];
         const client = clientsList.find(c => c.id === a.clientId);
@@ -842,7 +842,7 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
           fetch('/api/ultramsg/send', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ instanceId: wa.ultraMsgInstanceId, token: wa.ultraMsgToken, to: client.phone, message: msg }),
+            body: JSON.stringify({ instanceId: wa.ultraMsgInstanceId, to: client.phone, message: msg }),
           }).catch(() => {});
         }
       }

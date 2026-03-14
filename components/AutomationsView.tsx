@@ -148,7 +148,14 @@ function AutomationRow({
   );
 }
 // ── Main ───────────────────────────────────────────────────────────────────
-type ConnStatus = 'loading' | 'connected' | 'disconnected' | 'not-configured';
+type ConnStatus = 'loading' | 'connected' | 'disconnected';
+
+interface WaStatus {
+  connected: boolean;
+  qrcode?: string | null;
+  phone?: string | null;
+  connectedAt?: string | null;
+}
 
 export default function AutomationsView() {
   const { salonConfig, updateSalonConfig, whatsappMessages } = useSalon();
@@ -158,61 +165,94 @@ export default function AutomationsView() {
   );
   const [connStatus, setConnStatus] = useState<ConnStatus>('loading');
   const [qrCode, setQrCode] = useState<string | null>(null);
+  const [waPhone, setWaPhone] = useState<string | null>(null);
+  const [waConnectedAt, setWaConnectedAt] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [debugInfo, setDebugInfo] = useState<string>('');
+  const [userId, setUserId] = useState<string | null>(null);
+  const [disconnecting, setDisconnecting] = useState(false);
+  const [showDisconnectDialog, setShowDisconnectDialog] = useState(false);
   const [testPhone, setTestPhone] = useState('');
   const [testSending, setTestSending] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null);
+  const pollingRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Fetch credentials directly from DB on mount — never depends on SalonContext timing
+  const stopPolling = useCallback(() => {
+    if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; }
+  }, []);
+
+  const applyStatus = useCallback((d: WaStatus) => {
+    if (d.connected) {
+      setConnStatus('connected');
+      setQrCode(null);
+      if (d.phone) setWaPhone(d.phone);
+      if (d.connectedAt) setWaConnectedAt(d.connectedAt);
+      stopPolling();
+    } else {
+      setConnStatus('disconnected');
+      setQrCode(d.qrcode ?? null);
+    }
+  }, [stopPolling]);
+
+  const fetchStatus = useCallback(async (uid: string) => {
+    try {
+      const res = await fetch(`/api/whatsapp/status?salonId=${uid}`);
+      if (!res.ok) return;
+      const d: WaStatus = await res.json();
+      applyStatus(d);
+    } catch { /* ignore network errors during polling */ }
+  }, [applyStatus]);
+
+  // On mount: get user, fetch status, start polling if disconnected
   useEffect(() => {
     (async () => {
-      try {
-        const user = await getCurrentUser();
-        if (!user) { setConnStatus('not-configured'); setDebugInfo('no user session'); return; }
-
-        const r = await fetch(`/api/admin/whatsapp?user_id=${user.id}`);
-        if (!r.ok) { setConnStatus('not-configured'); setDebugInfo(`api error ${r.status}`); return; }
-
-        const d = await r.json();
-        const instanceId: string = d.ultraMsgInstanceId ?? '';
-        const token: string = d.ultraMsgToken ?? '';
-        setDebugInfo(`db:${d.debug ?? '?'} id:${instanceId ? instanceId.slice(0,12)+'…' : 'empty'}`);
-
-        if (!instanceId || !token) { setConnStatus('not-configured'); return; }
-
-        setCfg(prev => ({ ...prev, ultraMsgInstanceId: instanceId, ultraMsgToken: token }));
-
-        // Check connection status and grab QR if not connected
-        const sr = await fetch(`/api/ultramsg/status?instanceId=${instanceId}&token=${token}`);
-        const sd = await sr.json();
-        setConnStatus(sd.connected ? 'connected' : 'disconnected');
-        setQrCode(sd.qrCode ?? null);
-      } catch (e) {
-        setConnStatus('not-configured');
-        setDebugInfo(String(e));
-      }
+      const user = await getCurrentUser();
+      if (!user) { setConnStatus('disconnected'); return; }
+      setUserId(user.id as string);
+      await fetchStatus(user.id as string);
     })();
+    return () => stopPolling();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Start polling every 5 s when disconnected, stop when connected
+  useEffect(() => {
+    if (connStatus === 'disconnected' && userId && !pollingRef.current) {
+      pollingRef.current = setInterval(() => fetchStatus(userId), 5000);
+    }
+    if (connStatus === 'connected') stopPolling();
+    return () => {};
+  }, [connStatus, userId, fetchStatus, stopPolling]);
+
   const refresh = useCallback(async () => {
-    if (!cfg.ultraMsgInstanceId || !cfg.ultraMsgToken) return;
+    if (!userId) return;
     setChecking(true);
     try {
-      const res = await fetch(`/api/ultramsg/status?instanceId=${cfg.ultraMsgInstanceId}&token=${cfg.ultraMsgToken}`);
-      const d = await res.json();
-      setConnStatus(d.connected ? 'connected' : 'disconnected');
-      setQrCode(d.qrCode ?? null);
-    } catch {
-      setConnStatus('disconnected');
+      await fetchStatus(userId);
     } finally {
       setChecking(false);
     }
-  }, [cfg.ultraMsgInstanceId, cfg.ultraMsgToken]);
+  }, [userId, fetchStatus]);
 
-  function patch(updates: Partial<Omit<WhatsAppConfig, 'ultraMsgInstanceId' | 'ultraMsgToken'>>) {
+  const handleDisconnect = useCallback(async () => {
+    if (!userId) return;
+    setDisconnecting(true);
+    try {
+      await fetch('/api/whatsapp/disconnect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ salonId: userId }),
+      });
+      setConnStatus('disconnected');
+      setWaPhone(null);
+      setWaConnectedAt(null);
+    } finally {
+      setDisconnecting(false);
+      setShowDisconnectDialog(false);
+    }
+  }, [userId]);
+
+  function patch(updates: Partial<WhatsAppConfig>) {
     const next = { ...cfg, ...updates };
     setCfg(next);
     updateSalonConfig({ whatsapp: next });
@@ -244,14 +284,9 @@ export default function AutomationsView() {
         )}
       </div>
 
-      {/* ── Debug pill (rimuovere dopo fix) ── */}
-      {debugInfo && (
-        <div style={{ fontSize: 11, color: 'var(--muted)', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 6, padding: '3px 10px', alignSelf: 'flex-start', fontFamily: 'monospace' }}>
-          debug: {debugInfo}
-        </div>
-      )}
-
       {/* ── Stato connessione ── */}
+
+      {/* Loading */}
       {connStatus === 'loading' && (
         <div style={card({ display: 'flex', alignItems: 'center', gap: 12 })}>
           <RefreshCw size={18} style={{ color: 'var(--muted)', ...spinStyle }} />
@@ -259,38 +294,55 @@ export default function AutomationsView() {
         </div>
       )}
 
-      {connStatus === 'not-configured' && (
-        <div style={{ ...card(), background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-            <WifiOff size={18} style={{ color: '#f59e0b' }} />
-            <p style={{ color: '#fbbf24', fontWeight: 600, fontSize: 14, margin: 0 }}>WhatsApp non ancora attivato</p>
-          </div>
-          <p style={{ color: 'var(--text-3)', fontSize: 13, lineHeight: 1.6, margin: '0 0 14px' }}>
-            Il numero WhatsApp per questo salone non è ancora configurato.
-            Puoi già impostare i messaggi che vuoi — partiranno appena attivato.
-          </p>
-          <a href="mailto:support@stylistgo.it?subject=Attivazione WhatsApp"
-            style={{ display: 'inline-block', padding: '8px 18px', borderRadius: 10, background: '#f59e0b', color: 'white', fontWeight: 600, fontSize: 13, textDecoration: 'none' }}>
-            Richiedi attivazione
-          </a>
-        </div>
-      )}
-
+      {/* ── STATO B — Connesso ── */}
       {connStatus === 'connected' && (
         <div style={{ ...card(), background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.25)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <Wifi size={18} style={{ color: '#22c55e' }} />
               <div>
-                <p style={{ color: '#22c55e', fontWeight: 600, fontSize: 14, margin: 0 }}>WhatsApp connesso ✓</p>
-                <p style={{ color: 'var(--muted)', fontSize: 12, margin: '2px 0 0' }}>Istanza: {cfg.ultraMsgInstanceId}</p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <p style={{ color: '#22c55e', fontWeight: 700, fontSize: 14, margin: 0 }}>WhatsApp Attivo</p>
+                  <span style={{ background: '#22c55e', color: 'white', fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20 }}>●&nbsp;LIVE</span>
+                </div>
+                {waPhone && (
+                  <p style={{ color: 'var(--muted)', fontSize: 12, margin: '3px 0 0' }}>Numero collegato: +{waPhone}</p>
+                )}
+                {waConnectedAt && (
+                  <p style={{ color: 'var(--muted)', fontSize: 11, margin: '2px 0 0' }}>
+                    Connesso il {new Date(waConnectedAt).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                )}
               </div>
             </div>
-            <button onClick={refresh} disabled={checking}
-              style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 8, padding: '5px 12px', color: 'var(--text-3)', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
-              <RefreshCw size={12} style={checking ? spinStyle : {}} /> Aggiorna
+            <button
+              onClick={() => setShowDisconnectDialog(true)}
+              style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '6px 14px', color: '#ef4444', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+              Disconnetti
             </button>
           </div>
+
+          {/* Dialog conferma disconnessione */}
+          {showDisconnectDialog && (
+            <div style={{ marginTop: 16, padding: '14px 16px', borderRadius: 10, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)' }}>
+              <p style={{ color: 'var(--text)', fontSize: 13, fontWeight: 600, margin: '0 0 6px' }}>Conferma disconnessione</p>
+              <p style={{ color: 'var(--muted)', fontSize: 12, margin: '0 0 12px' }}>
+                Il numero WhatsApp verrà disconnesso. I messaggi automatici si interromperanno fino alla prossima connessione.
+              </p>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  onClick={handleDisconnect} disabled={disconnecting}
+                  style={{ background: '#ef4444', color: 'white', border: 'none', borderRadius: 8, padding: '7px 16px', fontSize: 12, fontWeight: 600, cursor: disconnecting ? 'not-allowed' : 'pointer', opacity: disconnecting ? 0.6 : 1 }}>
+                  {disconnecting ? 'Disconnessione…' : 'Sì, disconnetti'}
+                </button>
+                <button
+                  onClick={() => setShowDisconnectDialog(false)}
+                  style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 8, padding: '7px 16px', fontSize: 12, color: 'var(--text-3)', cursor: 'pointer' }}>
+                  Annulla
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Messaggio di prova */}
           <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid rgba(34,197,94,0.2)' }}>
@@ -304,23 +356,22 @@ export default function AutomationsView() {
                 style={{ flex: 1, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 10, padding: '8px 12px', color: 'var(--text)', fontSize: 13, outline: 'none' }}
               />
               <button
-                disabled={testSending || !testPhone.trim()}
+                disabled={testSending || !testPhone.trim() || !userId}
                 onClick={async () => {
                   setTestSending(true);
                   setTestResult(null);
                   try {
-                    const res = await fetch('/api/ultramsg/send', {
+                    const res = await fetch('/api/whatsapp/send', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({
-                        instanceId: cfg.ultraMsgInstanceId,
-                        token: cfg.ultraMsgToken,
+                        salonId: userId,
                         to: testPhone.trim(),
                         message: '✅ Messaggio di prova da ' + (salonConfig?.salonName ?? 'il tuo salone') + ' — WhatsApp funziona correttamente!',
                       }),
                     });
                     const d = await res.json();
-                    setTestResult(res.ok && !d.error ? { ok: true, msg: 'Inviato!' } : { ok: false, msg: d.error ?? 'Errore invio' });
+                    setTestResult(res.ok && d.success ? { ok: true, msg: 'Inviato!' } : { ok: false, msg: d.error ?? 'Errore invio' });
                   } catch (e) {
                     setTestResult({ ok: false, msg: String(e) });
                   } finally {
@@ -341,15 +392,16 @@ export default function AutomationsView() {
         </div>
       )}
 
+      {/* ── STATO A — Non connesso ── */}
       {connStatus === 'disconnected' && (
         <div style={{ ...card(), border: '1px solid rgba(251,191,36,0.3)', background: 'rgba(251,191,36,0.05)' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <WifiOff size={18} style={{ color: '#fbbf24', flexShrink: 0 }} />
               <div>
-                <p style={{ color: '#fbbf24', fontWeight: 600, fontSize: 14, margin: 0 }}>Collega WhatsApp al tuo numero</p>
+                <p style={{ color: '#fbbf24', fontWeight: 600, fontSize: 14, margin: 0 }}>Collega il tuo WhatsApp</p>
                 <p style={{ color: 'var(--text-3)', fontSize: 12, margin: '3px 0 0', lineHeight: 1.5 }}>
-                  Apri WhatsApp → Impostazioni → Dispositivi collegati → Collega dispositivo
+                  Apri WhatsApp → <strong>Dispositivi collegati</strong> → Collega un dispositivo → Scansiona il QR
                 </p>
               </div>
             </div>
@@ -363,10 +415,13 @@ export default function AutomationsView() {
             {qrCode ? (
               <>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={qrCode} alt="QR code WhatsApp"
-                  style={{ width: 200, height: 200, background: 'white', borderRadius: 12, padding: 8, border: '4px solid white' }} />
+                <img
+                  src={qrCode.startsWith('data:') ? qrCode : `data:image/png;base64,${qrCode}`}
+                  alt="QR code WhatsApp"
+                  style={{ width: 200, height: 200, background: 'white', borderRadius: 12, padding: 8, border: '4px solid white' }}
+                />
                 <p style={{ color: 'var(--muted)', fontSize: 12, textAlign: 'center', margin: 0 }}>
-                  Il QR scade ogni 45 secondi — clicca &quot;Aggiorna QR&quot; per rigenerarlo
+                  Scansiona con il tuo telefono — il QR si aggiorna automaticamente ogni 5 secondi
                 </p>
               </>
             ) : (

@@ -292,12 +292,14 @@ export interface GiftCard {
   updatedAt?: string;
 }
 
-// ─── WhatsApp Automations (UltraMsg) ─────────────────────────────────────────
+// ─── WhatsApp Automations (Evolution API) ────────────────────────────────────
 
 export interface WhatsAppConfig {
   enabled: boolean;
-  // UltraMsg credentials — set by admin, NOT by the salon user
+  // Evolution API instance name (= user_id with hyphens → underscores).
+  // Populated automatically when the salon connects WhatsApp; replaces the old UltraMsg instanceId.
   ultraMsgInstanceId: string;
+  /** @deprecated No longer used — kept for backward compatibility with stored state */
   ultraMsgToken: string;
   // Automation toggles — set by salon user
   reminderEnabled: boolean;
@@ -327,8 +329,8 @@ export interface WhatsAppConfig {
 
 export const DEFAULT_WHATSAPP_CONFIG: WhatsAppConfig = {
   enabled: false,
-  ultraMsgInstanceId: '',
-  ultraMsgToken: '',
+  ultraMsgInstanceId: '', // populated from Evolution API instance name on connect
+  ultraMsgToken: '',      // deprecated — no longer required
   reminderEnabled: true,
   birthdayEnabled: true,
   postVisitEnabled: true,

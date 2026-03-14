@@ -62,7 +62,7 @@ export default function GiftCardsView({ newTrigger }: { newTrigger?: number }) {
 
   async function sendWhatsApp(gc: GiftCard) {
     const wa = salonConfig?.whatsapp;
-    if (!wa?.ultraMsgInstanceId || !wa?.ultraMsgToken) {
+    if (!wa?.ultraMsgInstanceId) {
       setWaResult({ id: gc.id, ok: false, msg: 'WhatsApp non configurato — configuralo nelle Automazioni.' });
       return;
     }
@@ -78,7 +78,7 @@ export default function GiftCardsView({ newTrigger }: { newTrigger?: number }) {
       const res = await fetch('/api/ultramsg/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ instanceId: wa.ultraMsgInstanceId, token: wa.ultraMsgToken, to: phone, message: defaultMsg }),
+        body: JSON.stringify({ instanceId: wa.ultraMsgInstanceId, to: phone, message: defaultMsg }),
       });
       const data = await res.json();
       if (res.ok) {

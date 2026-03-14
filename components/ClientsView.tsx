@@ -313,7 +313,7 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
       const waCfg = salonConfig.whatsapp;
       if (
         waCfg?.enabled && waCfg?.newClientAppLinkEnabled &&
-        waCfg?.ultraMsgInstanceId && waCfg?.ultraMsgToken &&
+        waCfg?.ultraMsgInstanceId &&
         form.phone.trim() && currentSalonId
       ) {
         const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://stylistgo.app';
@@ -340,7 +340,6 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 instanceId: waCfg.ultraMsgInstanceId,
-                token: waCfg.ultraMsgToken,
                 to: form.phone.trim(),
                 message,
               }),
