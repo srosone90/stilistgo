@@ -64,6 +64,26 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
   const [quickClient, setQuickClient] = useState(EMPTY_QUICK_CLIENT);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
+  // --- Combobox: cliente ---------------------------------------------------
+  const [clientSearch, setClientSearch] = useState('');
+  const [showClientDrop, setShowClientDrop] = useState(false);
+  const clientComboRef = useRef<HTMLDivElement>(null);
+
+  // --- Combobox: servizi ---------------------------------------------------
+  const [serviceSearch, setServiceSearch] = useState('');
+  const [showServiceDrop, setShowServiceDrop] = useState(false);
+  const serviceComboRef = useRef<HTMLDivElement>(null);
+
+  // Close comboboxes on outside click
+  useEffect(() => {
+    function handleOutside(e: MouseEvent) {
+      if (clientComboRef.current && !clientComboRef.current.contains(e.target as Node)) setShowClientDrop(false);
+      if (serviceComboRef.current && !serviceComboRef.current.contains(e.target as Node)) setShowServiceDrop(false);
+    }
+    document.addEventListener('mousedown', handleOutside);
+    return () => document.removeEventListener('mousedown', handleOutside);
+  }, []);
+
   // --- Bottom toolbar: search, slot size, duplicate -------------------------
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
@@ -133,6 +153,10 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
   useEffect(() => {
     if (newTrigger && newTrigger > 0) {
       setEditAppt(null);
+      setClientSearch('');
+      setServiceSearch('');
+      setShowClientDrop(false);
+      setShowServiceDrop(false);
       setForm({ ...EMPTY_APPT, date: format(new Date(), 'yyyy-MM-dd'), operatorId: operators[0]?.id || '' });
       setShowForm(true);
     }
@@ -273,12 +297,20 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
     const start = startTime || '09:00';
     const end = minutesToTime(timeToMinutes(start) + 60);
     setEditAppt(null);
+    setClientSearch('');
+    setServiceSearch('');
+    setShowClientDrop(false);
+    setShowServiceDrop(false);
     setForm({ ...EMPTY_APPT, date: d, operatorId: op, startTime: start, endTime: end });
     setShowForm(true);
   }
 
   function openEdit(a: Appointment) {
     setEditAppt(a);
+    setClientSearch('');
+    setServiceSearch('');
+    setShowClientDrop(false);
+    setShowServiceDrop(false);
     setForm({ clientId: a.clientId, operatorId: a.operatorId, serviceIds: [...a.serviceIds], serviceOperators: { ...(a.serviceOperators ?? {}) }, serviceStartTimes: { ...(a.serviceStartTimes ?? {}) }, serviceOperatorDurations: { ...(a.serviceOperatorDurations ?? {}) }, date: a.date, startTime: a.startTime, endTime: a.endTime, status: a.status, notes: a.notes, isBlock: a.isBlock, blockReason: a.blockReason, recurringGroupId: a.recurringGroupId, feedbackScore: a.feedbackScore });
     setShowForm(true);
   }
@@ -1384,12 +1416,66 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
                       <UserPlus size={12} /> Nuovo cliente
                     </button>
                   </div>
-                  <select value={form.clientId} onChange={e => setForm(p => ({ ...p, clientId: e.target.value }))} style={inputStyle}>
-                    <option value="">� Seleziona cliente �</option>
-                    {[...clients].sort((a, b) => `${a.firstName}${a.lastName}`.localeCompare(`${b.firstName}${b.lastName}`)).map(c => (
-                      <option key={c.id} value={c.id}>{c.firstName} {c.lastName}{c.phone ? ` � ${c.phone}` : ''}</option>
-                    ))}
-                  </select>
+                  {/* Searchable client combobox */}
+                  <div ref={clientComboRef} style={{ position: 'relative' }}>
+                    <input
+                      type="text"
+                      autoComplete="off"
+                      placeholder="🔍 Cerca cliente..."
+                      value={clientSearch}
+                      onFocus={() => setShowClientDrop(true)}
+                      onChange={e => { setClientSearch(e.target.value); setShowClientDrop(true); }}
+                      style={{ ...inputStyle, paddingRight: form.clientId ? '32px' : undefined }}
+                    />
+                    {/* Overlay showing selected client name when dropdown is closed */}
+                    {form.clientId && !showClientDrop && (() => {
+                      const sel = clients.find(c => c.id === form.clientId);
+                      return sel ? (
+                        <div
+                          onClick={() => { setShowClientDrop(true); setClientSearch(''); }}
+                          style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', paddingLeft: '13px', paddingRight: '32px', cursor: 'text', borderRadius: '10px', background: 'var(--bg-input)', border: '1px solid var(--border)', fontSize: '13px', color: 'var(--text)', userSelect: 'none' }}>
+                          {sel.firstName} {sel.lastName}{sel.phone ? ` \u2014 ${sel.phone}` : ''}
+                        </div>
+                      ) : null;
+                    })()}
+                    {form.clientId && (
+                      <button
+                        type="button"
+                        onClick={() => { setForm(p => ({ ...p, clientId: '' })); setClientSearch(''); }}
+                        style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                        <X size={14} />
+                      </button>
+                    )}
+                    {showClientDrop && (
+                      <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 200, maxHeight: '220px', overflowY: 'auto', borderRadius: '10px', background: 'var(--bg-card)', border: '1px solid var(--border)', boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}>
+                        {[...clients]
+                          .sort((a, b) => `${a.firstName}${a.lastName}`.localeCompare(`${b.firstName}${b.lastName}`))
+                          .filter(c => {
+                            if (!clientSearch.trim()) return true;
+                            const q = clientSearch.toLowerCase();
+                            return `${c.firstName} ${c.lastName}`.toLowerCase().includes(q) || (c.phone || '').includes(q);
+                          })
+                          .map(c => (
+                            <div
+                              key={c.id}
+                              onMouseDown={() => { setForm(p => ({ ...p, clientId: c.id })); setClientSearch(''); setShowClientDrop(false); }}
+                              style={{ padding: '9px 13px', cursor: 'pointer', fontSize: '13px', color: form.clientId === c.id ? 'var(--accent-light)' : 'var(--text)', background: form.clientId === c.id ? 'rgba(99,102,241,0.15)' : 'transparent', borderBottom: '1px solid var(--border)' }}
+                              onMouseEnter={e => { if (form.clientId !== c.id) (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.05)'; }}
+                              onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = form.clientId === c.id ? 'rgba(99,102,241,0.15)' : 'transparent'; }}>
+                              <span style={{ fontWeight: 500 }}>{c.firstName} {c.lastName}</span>
+                              {c.phone && <span style={{ color: 'var(--muted)', marginLeft: '6px', fontSize: '12px' }}>{c.phone}</span>}
+                            </div>
+                          ))}
+                        {clients.filter(c => {
+                          if (!clientSearch.trim()) return true;
+                          const q = clientSearch.toLowerCase();
+                          return `${c.firstName} ${c.lastName}`.toLowerCase().includes(q) || (c.phone || '').includes(q);
+                        }).length === 0 && (
+                          <div style={{ padding: '10px 13px', fontSize: '13px', color: 'var(--muted)' }}>Nessun cliente trovato</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
               <div className="grid grid-cols-2 gap-3">
@@ -1407,14 +1493,53 @@ export default function CalendarView({ newTrigger, onGoToCash }: { newTrigger?: 
               {!form.isBlock && (
                 <div className="space-y-2">
                   <label style={labelStyle}>Servizi</label>
-                  <div className="flex flex-wrap gap-2">
-                    {services.filter(s => s.active).map(s => (
-                      <button key={s.id} type="button" onClick={() => handleServiceToggle(s.id)}
-                        className="text-xs px-2.5 py-1 rounded-lg transition-all"
-                        style={{ background: form.serviceIds.includes(s.id) ? 'rgba(99,102,241,0.25)' : 'var(--bg-input)', border: `1px solid ${form.serviceIds.includes(s.id) ? 'rgba(99,102,241,0.5)' : 'var(--border)'}`, color: form.serviceIds.includes(s.id) ? 'var(--accent-light)' : 'var(--muted)', cursor: 'pointer' }}>
-                        {s.name} ({s.duration}')
-                      </button>
-                    ))}
+                  {/* Selected service chips */}
+                  {form.serviceIds.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mb-1">
+                      {form.serviceIds.map(sid => {
+                        const svc = services.find(s => s.id === sid);
+                        if (!svc) return null;
+                        return (
+                          <span key={sid} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(99,102,241,0.2)', border: '1px solid rgba(99,102,241,0.4)', color: 'var(--accent-light)', borderRadius: '20px', padding: '3px 10px', fontSize: '12px' }}>
+                            {svc.name} ({svc.duration}')
+                            <button type="button" onMouseDown={() => handleServiceToggle(sid)} style={{ background: 'none', border: 'none', color: 'var(--accent-light)', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 0, marginLeft: '2px' }}><X size={11} /></button>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {/* Searchable service combobox */}
+                  <div ref={serviceComboRef} style={{ position: 'relative' }}>
+                    <input
+                      type="text"
+                      autoComplete="off"
+                      placeholder="🔍 Cerca servizio..."
+                      value={serviceSearch}
+                      onFocus={() => setShowServiceDrop(true)}
+                      onChange={e => { setServiceSearch(e.target.value); setShowServiceDrop(true); }}
+                      style={inputStyle}
+                    />
+                    {showServiceDrop && (
+                      <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 200, maxHeight: '220px', overflowY: 'auto', borderRadius: '10px', background: 'var(--bg-card)', border: '1px solid var(--border)', boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}>
+                        {services
+                          .filter(s => s.active)
+                          .filter(s => !serviceSearch.trim() || s.name.toLowerCase().includes(serviceSearch.toLowerCase()))
+                          .map(s => (
+                            <div
+                              key={s.id}
+                              onMouseDown={() => { handleServiceToggle(s.id); setServiceSearch(''); }}
+                              style={{ padding: '9px 13px', cursor: 'pointer', fontSize: '13px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: form.serviceIds.includes(s.id) ? 'var(--accent-light)' : 'var(--text)', background: form.serviceIds.includes(s.id) ? 'rgba(99,102,241,0.15)' : 'transparent', borderBottom: '1px solid var(--border)' }}
+                              onMouseEnter={e => { if (!form.serviceIds.includes(s.id)) (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.05)'; }}
+                              onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = form.serviceIds.includes(s.id) ? 'rgba(99,102,241,0.15)' : 'transparent'; }}>
+                              <span style={{ fontWeight: form.serviceIds.includes(s.id) ? 600 : 400 }}>{s.name}</span>
+                              <span style={{ fontSize: '12px', color: 'var(--muted)', marginLeft: '8px' }}>{s.duration}'</span>
+                            </div>
+                          ))}
+                        {services.filter(s => s.active && (!serviceSearch.trim() || s.name.toLowerCase().includes(serviceSearch.toLowerCase()))).length === 0 && (
+                          <div style={{ padding: '10px 13px', fontSize: '13px', color: 'var(--muted)' }}>Nessun servizio trovato</div>
+                        )}
+                      </div>
+                    )}
                   </div>
                   {/* Per-service operator assignment (shown when multiple services selected) */}
                   {form.serviceIds.length > 0 && (
