@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+
 import { signIn, signUp, getSupabaseClient } from '@/lib/supabase';
 import { Scissors } from 'lucide-react';
 
@@ -50,7 +50,7 @@ interface AuthFormProps {
 }
 
 export default function AuthForm({ initialMode = 'login' }: AuthFormProps) {
-  const router = useRouter();
+
   const [mode, setMode] = useState<Mode>(initialMode);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -102,8 +102,9 @@ export default function AuthForm({ initialMode = 'login' }: AuthFormProps) {
           return;
         }
         if (data?.session) {
-          router.push('/');
-          router.refresh();
+          // Hard reload so SalonProvider (in root layout) re-mounts fresh
+          // with the correct user — router.push alone doesn't remount providers.
+          window.location.href = '/';
         }
       } else {
         const { data, error: err } = await signUp(email, password, fullName);
@@ -113,11 +114,10 @@ export default function AuthForm({ initialMode = 'login' }: AuthFormProps) {
           return;
         }
         if (data?.session) {
-          router.push('/');
-          router.refresh();
+          window.location.href = '/';
         } else {
           setSuccess('Account creato! Accesso in corso...');
-          setTimeout(() => { router.push('/'); router.refresh(); }, 1000);
+          setTimeout(() => { window.location.href = '/'; }, 1000);
         }
       }
     } catch (e: unknown) {
@@ -173,7 +173,7 @@ export default function AuthForm({ initialMode = 'login' }: AuthFormProps) {
         }).catch(() => {});
       }
       setSuccess('Password aggiornata! Accesso in corso...');
-      setTimeout(() => { router.push('/'); router.refresh(); }, 1500);
+      setTimeout(() => { window.location.href = '/'; }, 1500);
     } catch {
       setError('Errore durante il cambio password. Riprova.');
     } finally {
