@@ -11,9 +11,12 @@ function adminClient() {
 /**
  * POST /api/webhooks/evolution
  *
- * Receives events from Evolution API.
- * Security: verifies that body.apikey === EVOLUTION_WEBHOOK_SECRET.
- * Always responds 200 to prevent Evolution API retries.
+ * Receives events from WAHA (WhatsApp HTTP API).
+ * WAHA event format: { event: 'session.status', session: 'default', payload: { status, me } }
+ *
+ * Security: checks X-Webhook-Secret header against EVOLUTION_WEBHOOK_SECRET.
+ * Configure WAHA with: WHATSAPP_HOOK_HEADERS=X-Webhook-Secret:<your-secret>
+ * Always responds 200 to prevent WAHA retries.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -21,61 +24,66 @@ export async function POST(req: NextRequest) {
 
     // ── Authentication ────────────────────────────────────────────────────
     const secret = process.env.EVOLUTION_WEBHOOK_SECRET;
-    if (secret && body.apikey !== secret) {
-      // Log but still return 200 to avoid revealing endpoint existence
-      console.warn('[evolution-webhook] invalid apikey received');
-      return NextResponse.json({ ok: false }, { status: 200 });
+    if (secret) {
+      const headerSecret = req.headers.get('x-webhook-secret');
+      // Also accept legacy body.apikey for backward compat
+      const bodyApiKey = body.apikey as string | undefined;
+      if (headerSecret !== secret && bodyApiKey !== secret) {
+        console.warn('[waha-webhook] invalid secret received');
+        return NextResponse.json({ ok: false }, { status: 200 });
+      }
     }
 
     const event = body.event as string | undefined;
-    const instanceName = body.instance as string | undefined;
+    // WAHA uses 'session' field; Evolution API used 'instance'
+    const session = (body.session as string | undefined) ?? (body.instance as string | undefined);
 
-    if (!event || !instanceName) {
+    if (!event) {
       return NextResponse.json({ ok: true });
     }
 
     // ── Event handlers ────────────────────────────────────────────────────
-    if (event === 'CONNECTION_UPDATE') {
-      const data = body.data as Record<string, unknown> | undefined;
-      const status = data?.state as string | undefined;
+    if (event === 'session.status') {
+      const payload = body.payload as Record<string, unknown> | undefined;
+      const status = payload?.status as string | undefined;
+      const me = payload?.me as Record<string, unknown> | null | undefined;
 
-      // Reverse the instance name → user_id mapping (underscores → hyphens)
-      const userId = instanceName.replace(/_/g, '-');
       const supabase = adminClient();
 
-      if (status === 'open') {
-        // WhatsApp connected — extract the phone number from ownerJid if present
-        const ownerJid = data?.ownerJid as string | undefined;
-        const phone = ownerJid ? ownerJid.split('@')[0] : null;
+      if (status === 'WORKING') {
+        const phone = me?.id ? (me.id as string).split('@')[0] : null;
 
         await supabase
           .from('admin_tenants')
           .update({
             whatsapp_connected: true,
             whatsapp_connected_at: new Date().toISOString(),
-            whatsapp_instance_name: instanceName,
+            whatsapp_instance_name: session ?? 'default',
             ...(phone ? { whatsapp_phone: phone } : {}),
           })
-          .eq('user_id', userId);
+          .eq('whatsapp_instance_name', session ?? 'default');
 
-        console.info(`[evolution-webhook] ${instanceName} connected — phone: ${phone ?? 'unknown'}`);
-      } else if (status === 'close') {
+        console.info(`[waha-webhook] session ${session} connected — phone: ${phone ?? 'unknown'}`);
+      } else if (status === 'STOPPED' || status === 'FAILED') {
         await supabase
           .from('admin_tenants')
           .update({ whatsapp_connected: false })
-          .eq('user_id', userId);
+          .eq('whatsapp_instance_name', session ?? 'default');
 
-        console.info(`[evolution-webhook] ${instanceName} disconnected`);
+        console.info(`[waha-webhook] session ${session} disconnected (${status})`);
+      } else if (status === 'SCAN_QR_CODE') {
+        // No action needed — client polls /api/whatsapp/status for QR
+        console.info(`[waha-webhook] session ${session} waiting for QR scan`);
       }
     } else if (event === 'QRCODE_UPDATED') {
-      // No action needed — the client polls /api/whatsapp/status for fresh QR
-      console.info(`[evolution-webhook] QRCODE_UPDATED for ${instanceName}`);
+      // Legacy Evolution API event — ignore
+      console.info(`[waha-webhook] legacy QRCODE_UPDATED event ignored`);
     }
 
     return NextResponse.json({ ok: true });
   } catch (e: unknown) {
-    console.error('[evolution-webhook] error:', e);
-    // Always return 200 so Evolution API doesn't retry
+    console.error('[waha-webhook] error:', e);
+    // Always return 200 so WAHA doesn't retry
     return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : 'error' });
   }
 }

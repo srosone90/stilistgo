@@ -34,11 +34,12 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ connected: true });
     }
 
-    // Persist the instance name so async sends know which instance to use
+    // Store 'default' as the instance name — WAHA Core always uses the "default" session.
+    // The webhook identifies the tenant by whatsapp_instance_name = 'default'.
     const supabase = adminClient();
     await supabase
       .from('admin_tenants')
-      .update({ whatsapp_instance_name: instanceName })
+      .update({ whatsapp_instance_name: 'default' })
       .eq('user_id', salonId);
 
     return NextResponse.json({

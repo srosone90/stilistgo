@@ -23,7 +23,7 @@ export async function ensureInstance(
     return { connected: false, qrcode: qr?.base64 ?? undefined };
   }
 
-  if (existing.connectionStatus === 'open') {
+  if (existing.connectionStatus === 'WORKING') {
     return { connected: true };
   }
 
