@@ -142,10 +142,10 @@ export async function DELETE(req: NextRequest) {
 
     const newState = {
       ...state,
-      clients: (state.clients as { id: string }[]).filter(c => c.id !== clientId),
-      appointments: (state.appointments as { clientId: string }[]).filter(a => a.clientId !== clientId),
-      technicalCards: (state.technicalCards as { clientId: string }[]).filter(c => c.clientId !== clientId),
-      cashEntries: (state.cashEntries as { clientId?: string }[]).map(e =>
+      clients: ((state.clients as { id: string }[]) ?? []).filter(c => c.id !== clientId),
+      appointments: ((state.appointments as { clientId: string }[]) ?? []).filter(a => a.clientId !== clientId),
+      technicalCards: ((state.technicalCards as { clientId: string }[]) ?? []).filter(c => c.clientId !== clientId),
+      cashEntries: ((state.cashEntries as { clientId?: string }[]) ?? []).map(e =>
         e.clientId === clientId ? { ...e, clientId: undefined } : e
       ),
     };
