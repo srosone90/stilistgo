@@ -35,14 +35,14 @@ export async function dbSaveSalonState(userId: string, state: Record<string, unk
       });
     }
     if (adminState.salonConfig) {
-      // Preserve ownerPublicPin/ownerPrivatePin set locally — admin_state never contains them
+      // Cloud (admin_state) wins; fall back to salon's own value if admin didn't set these fields
       const localCfg = (state.salonConfig as Record<string, unknown>) ?? {};
       const adminCfg = adminState.salonConfig as Record<string, unknown>;
       merged.salonConfig = {
         ...localCfg,
         ...adminCfg,
-        ownerPublicPin: localCfg.ownerPublicPin,
-        ownerPrivatePin: localCfg.ownerPrivatePin,
+        ownerPublicPin: (adminCfg as Record<string, unknown>).ownerPublicPin ?? localCfg.ownerPublicPin,
+        ownerPrivatePin: (adminCfg as Record<string, unknown>).ownerPrivatePin ?? localCfg.ownerPrivatePin,
       };
     }
     await supabase

@@ -469,7 +469,7 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
         if (cloudIsNewer && cloudState.salonConfig) {
           const localCfg = storageGetSalonConfig();
           const cloudCfg = cloudState.salonConfig as SalonConfig;
-          const mergedCfg: SalonConfig = { ...cloudCfg, ownerPublicPin: localCfg.ownerPublicPin || cloudCfg.ownerPublicPin, ownerPrivatePin: localCfg.ownerPrivatePin || cloudCfg.ownerPrivatePin };
+          const mergedCfg: SalonConfig = { ...cloudCfg, ownerPublicPin: cloudCfg.ownerPublicPin || localCfg.ownerPublicPin, ownerPrivatePin: cloudCfg.ownerPrivatePin || localCfg.ownerPrivatePin };
           setSalonConfig(mergedCfg);
           if (!isViewMode) storageSaveSalonConfig(mergedCfg);
         } else if (!cloudIsNewer && cloudState.salonConfig) {
@@ -508,7 +508,7 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
         if (adminState?.salonConfig) {
           const localCfg2 = storageGetSalonConfig();
           const adminCfg = adminState.salonConfig as SalonConfig;
-          const merged2 = { ...adminCfg, ownerPublicPin: localCfg2.ownerPublicPin, ownerPrivatePin: localCfg2.ownerPrivatePin };
+          const merged2 = { ...adminCfg, ownerPublicPin: adminCfg.ownerPublicPin || localCfg2.ownerPublicPin, ownerPrivatePin: adminCfg.ownerPrivatePin || localCfg2.ownerPrivatePin };
           setSalonConfig(prev => ({ ...prev, ...merged2 }));
           if (!isViewMode) storageSaveSalonConfig({ ...({} as SalonConfig), ...merged2 });
         }
@@ -619,7 +619,7 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
             const withPins = adminOps.map(op => {
               const local = localOps.find(l => l.id === op.id);
               if (!local) return op;
-              return { ...op, pin: local.pin || op.pin, privatePin: local.privatePin || op.privatePin, color: op.color || local.color, commissionRate: op.commissionRate ?? local.commissionRate, schedule: local.schedule?.length ? local.schedule : op.schedule };
+              return { ...op, pin: op.pin || local.pin, privatePin: op.privatePin || local.privatePin, color: op.color || local.color, commissionRate: op.commissionRate ?? local.commissionRate, schedule: op.schedule?.length ? op.schedule : local.schedule };
             });
             const mergedOps = [...withPins, ...salonOnlyOps];
             setOperators(mergedOps); storageSaveOperators(mergedOps);
@@ -627,7 +627,7 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
           if (adminState.salonConfig) {
             const localCfgAdm = storageGetSalonConfig();
             const adminCfg = adminState.salonConfig as SalonConfig;
-            const mergedAdm: SalonConfig = { ...localCfgAdm, ...adminCfg, ownerPublicPin: localCfgAdm.ownerPublicPin, ownerPrivatePin: localCfgAdm.ownerPrivatePin };
+            const mergedAdm: SalonConfig = { ...localCfgAdm, ...adminCfg, ownerPublicPin: adminCfg.ownerPublicPin || localCfgAdm.ownerPublicPin, ownerPrivatePin: adminCfg.ownerPrivatePin || localCfgAdm.ownerPrivatePin };
             setSalonConfig(mergedAdm); storageSaveSalonConfig(mergedAdm);
           }
         }
@@ -692,7 +692,7 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
         if (newState.salonConfig) {
           const localCfgRt = storageGetSalonConfig();
           const cloudCfgRt = newState.salonConfig as SalonConfig;
-          const mergedCfgRt: SalonConfig = { ...cloudCfgRt, ownerPublicPin: localCfgRt.ownerPublicPin || cloudCfgRt.ownerPublicPin, ownerPrivatePin: localCfgRt.ownerPrivatePin || cloudCfgRt.ownerPrivatePin };
+          const mergedCfgRt: SalonConfig = { ...cloudCfgRt, ownerPublicPin: cloudCfgRt.ownerPublicPin || localCfgRt.ownerPublicPin, ownerPrivatePin: cloudCfgRt.ownerPrivatePin || localCfgRt.ownerPrivatePin };
           setSalonConfig(mergedCfgRt); storageSaveSalonConfig(mergedCfgRt);
         }
         // ── GamificationConfig ────────────────────────────────────────────
