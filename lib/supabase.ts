@@ -122,22 +122,12 @@ export async function signOut() {
 }
 
 export async function getCurrentUser() {
-  // 1. Read Supabase session from the SDK's built-in localStorage token (instant)
-  //    This is the most reliable path for an already-logged-in user on page reload.
+  // getSession() reads from localStorage — no network call, no 403.
+  // With sb_publishable_* keys, getUser() always 403s, so we skip it entirely.
   try {
     const { data: { session } } = await supabase.auth.getSession();
     if (session?.user) return session.user;
   } catch { /* ignore */ }
 
-  // 2. Validate token with server (covers edge cases like token refresh)
-  const online = await isSupabaseReachable();
-  if (online) {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) return user;
-    } catch { /* ignore */ }
-  }
-
-  // No valid session — user must log in.
   return null;
 }
