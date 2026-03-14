@@ -94,14 +94,32 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  // Sync live salon info (name, email) back to existing admin_tenants records
+  // Sync live salon info back to existing admin_tenants records.
+  // IMPORTANT: only overwrite salon_name if the tenant has set a real custom name
+  // (not empty and not the factory default "Stylistgo"). This prevents the auto-sync
+  // from clobbering names that were manually set by the admin.
+  const DEFAULT_SALON_NAME = 'Stylistgo';
   const toSync = (salonRows ?? []).flatMap((row: { user_id: string; state: SalonState }) => {
     const cfg2 = ((row.state ?? {}) as SalonState).salonConfig ?? {};
     const meta2 = metaMap.get(row.user_id) as MetaRow | undefined;
     if (!meta2) return []; // will be created via toCreate
-    if (!cfg2.salonName && !cfg2.email) return [];
-    if (meta2.salon_name === cfg2.salonName && meta2.email === (cfg2.email ?? '')) return [];
-    return [{ user_id: row.user_id, salon_name: cfg2.salonName ?? meta2.salon_name, email: cfg2.email ?? meta2.email }];
+
+    const liveName = cfg2.salonName?.trim() ?? '';
+    const liveEmail = cfg2.email?.trim() ?? '';
+
+    // Only propagate a custom name — skip if empty or still the factory default
+    const shouldSyncName = liveName && liveName !== DEFAULT_SALON_NAME;
+    const shouldSyncEmail = !!liveEmail;
+
+    if (!shouldSyncName && !shouldSyncEmail) return [];
+
+    const newName = shouldSyncName ? liveName : meta2.salon_name;
+    const newEmail = shouldSyncEmail ? liveEmail : meta2.email;
+
+    // No change needed
+    if (meta2.salon_name === newName && meta2.email === newEmail) return [];
+
+    return [{ user_id: row.user_id, salon_name: newName, email: newEmail }];
   });
   if (toSync.length > 0) {
     db.from('admin_tenants').upsert(toSync, { onConflict: 'user_id' }).then(({ error }) => {
