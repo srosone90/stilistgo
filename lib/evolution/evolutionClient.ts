@@ -51,6 +51,20 @@ export interface EvolutionCreateResult {
   qrcode?: EvolutionQRCode;
 }
 
+// ─── ping ─────────────────────────────────────────────────────────────────────
+
+/** Quick reachability check — returns true if Railway responds at all. */
+export async function pingEvolution(): Promise<boolean> {
+  const base = BASE();
+  if (!base) return false;
+  try {
+    const res = await fetch(`${base}/`, { headers: headers(), cache: 'no-store', signal: AbortSignal.timeout(5000) });
+    return res.status < 500;
+  } catch {
+    return false;
+  }
+}
+
 // ─── fetchInstance ────────────────────────────────────────────────────────────
 
 /**
@@ -139,7 +153,7 @@ export async function listPhones(): Promise<string[]> {
  * Fetches the QR code for an instance that is not yet connected.
  * Calls GET /instance/connect/{instanceName}.
  */
-export async function getQRCode(instanceName: string, retries = 8): Promise<EvolutionQRCode | null> {
+export async function getQRCode(instanceName: string, retries = 3): Promise<EvolutionQRCode | null> {
   const base = BASE();
   if (!base) return null;
   for (let i = 0; i < retries; i++) {
@@ -149,13 +163,13 @@ export async function getQRCode(instanceName: string, retries = 8): Promise<Evol
         cache: 'no-store',
       });
       if (!res.ok) {
-        if (i < retries - 1) await new Promise(r => setTimeout(r, 2000));
+        if (i < retries - 1) await new Promise(r => setTimeout(r, 800));
         continue;
       }
       const data = (await res.json()) as Record<string, unknown>;
       if (data.base64) return { base64: data.base64 as string, code: data.code as string | undefined };
     } catch { }
-    if (i < retries - 1) await new Promise(r => setTimeout(r, 2000));
+    if (i < retries - 1) await new Promise(r => setTimeout(r, 800));
   }
   return null;
 }

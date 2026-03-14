@@ -1,4 +1,7 @@
 {
+  "functions": {
+    "app/api/whatsapp/status/route.ts": { "maxDuration": 30 }
+  },
   "crons": [
     {
       "path": "/api/cron/whatsapp-scheduler",

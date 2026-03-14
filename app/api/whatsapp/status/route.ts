@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { ensureInstance } from '@/lib/evolution/instanceManager';
+import { pingEvolution } from '@/lib/evolution/evolutionClient';
 
 function adminClient() {
   return createClient(
@@ -30,6 +31,17 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(
       { connected: false, qrcode: null, error: 'Evolution API non configurata (variabili mancanti)' },
     );
+  }
+
+  // Quick reachability check before doing heavier work
+  const reachable = await pingEvolution();
+  if (!reachable) {
+    console.error('[whatsapp/status] Railway non raggiungibile. URL:', process.env.EVOLUTION_API_URL);
+    return NextResponse.json({
+      connected: false,
+      qrcode: null,
+      error: `Railway non raggiungibile (${process.env.EVOLUTION_API_URL}). Verifica che il servizio sia attivo.`,
+    });
   }
 
   try {

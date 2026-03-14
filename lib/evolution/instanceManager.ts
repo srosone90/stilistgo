@@ -30,7 +30,7 @@ export async function ensureInstance(
       return { connected: false, qrcode: created.qrcode.base64, phoneId: instanceName };
     }
     // Give Evolution API a moment to prepare the QR
-    await new Promise(r => setTimeout(r, 1500));
+    await new Promise(r => setTimeout(r, 500));
   }
 
   const qr = await getQRCode(instanceName);
