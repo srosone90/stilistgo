@@ -134,8 +134,10 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
     setGdprExporting(true);
     try {
       const { getSupabaseClient } = await import('@/lib/supabase');
-      const session = (await getSupabaseClient().auth.getSession()).data.session;
+      // getSession() reads from localStorage without a network call — always returns stored token
+      const { data: { session } } = await getSupabaseClient().auth.getSession();
       const token = session?.access_token ?? '';
+      if (!token) { alert('Sessione non trovata. Ricarica la pagina e riprova.'); return; }
       const res = await fetch(`/api/salon-gdpr?clientId=${encodeURIComponent(clientId)}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -159,8 +161,10 @@ export default function ClientsView({ newTrigger }: { newTrigger?: number }) {
     setGdprDeleting(true);
     try {
       const { getSupabaseClient } = await import('@/lib/supabase');
-      const session = (await getSupabaseClient().auth.getSession()).data.session;
+      // getSession() reads from localStorage without a network call — always returns stored token
+      const { data: { session } } = await getSupabaseClient().auth.getSession();
       const token = session?.access_token ?? '';
+      if (!token) { alert('Sessione non trovata. Ricarica la pagina e riprova.'); return; }
       const res = await fetch('/api/salon-gdpr', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },

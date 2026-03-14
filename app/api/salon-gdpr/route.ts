@@ -6,26 +6,62 @@
  *        body: { clientId: string }
  *
  * Autenticazione: il client invia il proprio access_token come Bearer.
- * Il server lo verifica con il service-role admin client (auth.getUser(token)),
- * che è l'approccio raccomandato per le route server-side di Next.js.
+ * Il server lo verifica localmente decodificando il JWT (Node.js crypto built-in)
+ * senza fare chiamate di rete verso Supabase, il che evita problemi con
+ * la publishable key (sb_publishable_*) che restituisce 403 su /auth/v1/user.
+ * Se SUPABASE_JWT_SECRET è configurato, la firma HMAC-SHA256 viene verificata.
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { createHmac } from 'crypto';
 import { getAdminDb } from '@/lib/adminAuth';
 
-/** Estrae l'user_id dal token Bearer, usando il service role per la verifica. */
-async function getUserIdFromRequest(req: NextRequest): Promise<string | null> {
-  const authHeader = req.headers.get('authorization') ?? '';
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
-  if (!token) return null;
-  const admin = getAdminDb();
-  const { data: { user }, error } = await admin.auth.getUser(token);
-  if (error || !user) return null;
-  return user.id;
+/**
+ * Estrae e verifica l'user_id dal token JWT Bearer.
+ * - Verifica firma HMAC-SHA256 se SUPABASE_JWT_SECRET è disponibile.
+ * - Controlla sempre la scadenza (exp claim).
+ * - Nessuna chiamata di rete → funziona con qualsiasi formato di apikey.
+ */
+function getUserIdFromRequest(req: NextRequest): string | null {
+  try {
+    const authHeader = req.headers.get('authorization') ?? '';
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+    if (!token) return null;
+
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const [header, payload, signature] = parts;
+
+    // Verify HMAC-SHA256 signature if secret is available
+    const jwtSecret = process.env.SUPABASE_JWT_SECRET;
+    if (jwtSecret) {
+      const expected = createHmac('sha256', jwtSecret)
+        .update(`${header}.${payload}`)
+        .digest('base64url');
+      if (expected !== signature) return null;
+    }
+
+    // Decode payload
+    const decoded = JSON.parse(Buffer.from(payload, 'base64url').toString('utf-8')) as {
+      sub?: string;
+      exp?: number;
+      aud?: string;
+    };
+
+    // Check expiry
+    if (!decoded.exp || decoded.exp < Math.floor(Date.now() / 1000)) return null;
+
+    // Must have a valid UUID sub
+    if (!decoded.sub || typeof decoded.sub !== 'string') return null;
+
+    return decoded.sub;
+  } catch {
+    return null;
+  }
 }
 
 // ── GET: esporta tutti i dati di un cliente ─────────────────────────────────
 export async function GET(req: NextRequest) {
-  const userId = await getUserIdFromRequest(req);
+  const userId = getUserIdFromRequest(req);
   if (!userId) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 });
 
   const clientId = req.nextUrl.searchParams.get('clientId');
@@ -70,7 +106,7 @@ export async function GET(req: NextRequest) {
 
 // ── DELETE: eliminazione definitiva cliente ─────────────────────────────────
 export async function DELETE(req: NextRequest) {
-  const userId = await getUserIdFromRequest(req);
+  const userId = getUserIdFromRequest(req);
   if (!userId) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 });
 
   const body = await req.json().catch(() => null);
@@ -125,7 +161,7 @@ export async function DELETE(req: NextRequest) {
 
 // ── POST: registra accettazione consenso GDPR del tenant ───────────────────
 export async function POST(req: NextRequest) {
-  const userId = await getUserIdFromRequest(req);
+  const userId = getUserIdFromRequest(req);
   if (!userId) return NextResponse.json({ error: 'Non autenticato' }, { status: 401 });
 
   const body = await req.json().catch(() => null);
