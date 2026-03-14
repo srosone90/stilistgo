@@ -41,33 +41,25 @@ export async function GET(req: NextRequest) {
 
   const DEFAULT_SALON_NAME = 'Stylistgo';
   const metaMap = new Map((metaRows ?? []).map((m: MetaRow) => [m.user_id, m]));
+  const salonDataIds = new Set((salonRows ?? []).map((r: { user_id: string }) => r.user_id));
   const toCreate: { user_id: string; salon_name: string; email: string; full_name: string; registered_at: string }[] = [];
 
-  const tenants = (salonRows ?? []).map((row: { user_id: string; state: SalonState; updated_at: string }) => {
-    const state = (row.state ?? {}) as SalonState;
+  // ── Helper: build one tenant record ──────────────────────────────────────
+  function buildTenant(
+    user_id: string,
+    state: SalonState,
+    updated_at: string,
+    meta: MetaRow | undefined,
+  ) {
     const cfg = state.salonConfig ?? {};
-    const meta = metaMap.get(row.user_id) as MetaRow | undefined;
-
-    if (!meta) {
-      toCreate.push({
-        user_id: row.user_id,
-        salon_name: cfg.salonName ?? row.user_id.slice(0, 12),
-        email: cfg.email ?? '',
-        full_name: '',
-        registered_at: row.updated_at,
-      });
-    }
-
-    // Use the live salon name only if it is a real custom name (not empty, not factory default).
-    // Otherwise prefer whatever the admin manually set in admin_tenants — it is more reliable.
     const liveSalonName = cfg.salonName?.trim() ?? '';
     const hasRealLiveName = liveSalonName && liveSalonName !== DEFAULT_SALON_NAME;
     const displaySalonName = hasRealLiveName
       ? liveSalonName
-      : (meta?.salon_name || liveSalonName || row.user_id.slice(0, 12));
+      : (meta?.salon_name || liveSalonName || user_id.slice(0, 12));
 
     return {
-      user_id: row.user_id,
+      user_id,
       email: cfg.email || meta?.email || '',
       full_name: meta?.full_name ?? '',
       salon_name: displaySalonName,
@@ -79,21 +71,47 @@ export async function GET(req: NextRequest) {
       sector: meta?.sector ?? 'parrucchiere',
       notes: meta?.notes ?? '',
       csm: meta?.csm ?? '',
-      registered_at: meta?.registered_at ?? row.updated_at,
-      last_seen_at: meta?.last_seen_at ?? row.updated_at,
-      // Live metrics from salon_data
+      registered_at: meta?.registered_at ?? updated_at,
+      last_seen_at: meta?.last_seen_at ?? updated_at,
+      // Live metrics from salon_data (may be 0 if no sync yet)
       clients_count: (state.clients ?? []).length,
       appointments_count: (state.appointments ?? []).length,
       operators_count: (state.operators ?? []).length,
       services_count: (state.services ?? []).length,
-      last_sync: row.updated_at,
+      last_sync: updated_at,
       // Config extras
       phone: cfg.phone ?? '',
       vat_number: cfg.vatNumber ?? '',
       // Client app & online bookings
-      online_bookings_30d: bookingCountMap.get(row.user_id) ?? 0,
+      online_bookings_30d: bookingCountMap.get(user_id) ?? 0,
     };
+  }
+
+  // ── Tenants with a salon_data record ────────────────────────────────────
+  const tenants = (salonRows ?? []).map((row: { user_id: string; state: SalonState; updated_at: string }) => {
+    const meta = metaMap.get(row.user_id) as MetaRow | undefined;
+
+    if (!meta) {
+      const cfg = (row.state ?? {} as SalonState).salonConfig ?? {};
+      toCreate.push({
+        user_id: row.user_id,
+        salon_name: cfg.salonName ?? row.user_id.slice(0, 12),
+        email: cfg.email ?? '',
+        full_name: '',
+        registered_at: row.updated_at,
+      });
+    }
+
+    return buildTenant(row.user_id, (row.state ?? {}) as SalonState, row.updated_at, meta);
   });
+
+  // ── Tenants in admin_tenants but with NO salon_data row yet ─────────────
+  // These are manually-added or offline users whose app has not synced to cloud.
+  for (const meta of (metaRows ?? []) as MetaRow[]) {
+    if (!salonDataIds.has(meta.user_id)) {
+      tenants.push(buildTenant(meta.user_id, {}, meta.registered_at ?? new Date().toISOString(), meta));
+    }
+  }
 
   // Auto-upsert new tenants (fire and forget — errors logged, not fatal)
   if (toCreate.length > 0) {
