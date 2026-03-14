@@ -12,10 +12,15 @@ export async function ensureInstance(
   const existing = await fetchInstance(salonSlug);
 
   if (!existing) {
-    // Instance doesn't exist → create it
+    // Instance doesn't exist → create it, then fetch QR
     const created = await createInstance(salonSlug);
-    const qrBase64 = created?.qrcode?.base64 ?? null;
-    return { connected: false, qrcode: qrBase64 ?? undefined };
+    // v2 may include QR in create response; if not, fetch it separately
+    const qrFromCreate = created?.qrcode?.base64 ?? null;
+    if (qrFromCreate) return { connected: false, qrcode: qrFromCreate };
+    // Give Evolution API a moment to initialise the instance before fetching QR
+    await new Promise(r => setTimeout(r, 1000));
+    const qr = await getQRCode(salonSlug);
+    return { connected: false, qrcode: qr?.base64 ?? undefined };
   }
 
   if (existing.connectionStatus === 'open') {

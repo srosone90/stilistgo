@@ -57,17 +57,18 @@ export async function fetchInstance(instanceName: string): Promise<EvolutionInst
     );
     if (!res.ok) return null;
     const data: unknown = await res.json();
-    // Evolution API returns an array of instances
+    // Evolution API v2 returns a flat array with 'name' field (not 'instanceName')
     const list = Array.isArray(data) ? data : [data];
     const found = list.find(
       (i: Record<string, unknown>) =>
         (i.instance as Record<string, unknown> | undefined)?.instanceName === instanceName ||
-        i.instanceName === instanceName,
+        i.instanceName === instanceName ||
+        i.name === instanceName,
     );
     if (!found) return null;
     const raw = (found.instance as Record<string, unknown> | undefined) ?? found;
     return {
-      instanceName: raw.instanceName as string,
+      instanceName: (raw.instanceName ?? raw.name) as string,
       connectionStatus: (raw.connectionStatus ?? raw.state ?? 'close') as string,
       profileName: raw.profileName as string | undefined,
       ownerJid: raw.ownerJid as string | undefined,
@@ -107,23 +108,28 @@ export async function createInstance(instanceName: string): Promise<EvolutionCre
 /**
  * Fetches a fresh QR code for an existing disconnected instance.
  */
-export async function getQRCode(instanceName: string): Promise<EvolutionQRCode | null> {
-  try {
-    const base = BASE_URL();
-    if (!base) return null;
-    const res = await fetch(
-      `${base}/instance/connect/${encodeURIComponent(instanceName)}`,
-      { headers: headers(), cache: 'no-store' },
-    );
-    if (!res.ok) return null;
-    const data = (await res.json()) as Record<string, unknown>;
-    const qr = (data.qrcode ?? data) as Record<string, unknown> | undefined;
-    const base64 = qr?.base64 as string | undefined;
-    if (!base64) return null;
-    return { base64, code: qr?.code as string | undefined };
-  } catch {
-    return null;
+export async function getQRCode(instanceName: string, retries = 3): Promise<EvolutionQRCode | null> {
+  const base = BASE_URL();
+  if (!base) return null;
+  for (let i = 0; i < retries; i++) {
+    try {
+      const res = await fetch(
+        `${base}/instance/connect/${encodeURIComponent(instanceName)}`,
+        { headers: headers(), cache: 'no-store' },
+      );
+      if (!res.ok) return null;
+      const data = (await res.json()) as Record<string, unknown>;
+      // v2: base64 is at top level; v1: nested under qrcode
+      const qr = (data.qrcode ?? data) as Record<string, unknown> | undefined;
+      const base64 = qr?.base64 as string | undefined;
+      if (base64) return { base64, code: qr?.code as string | undefined };
+      // count:0 means QR not ready yet — wait and retry
+      if (i < retries - 1) await new Promise(r => setTimeout(r, 1500));
+    } catch {
+      return null;
+    }
   }
+  return null;
 }
 
 // ─── sendTextMessage ──────────────────────────────────────────────────────────
