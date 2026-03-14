@@ -1,4 +1,4 @@
-import { fetchInstance, createInstance, getQRCode } from './evolutionClient';
+import { fetchInstance, createInstance, listPhones, getQRCode } from './evolutionClient';
 
 // ─── ensureInstance ───────────────────────────────────────────────────────────
 
@@ -23,12 +23,20 @@ export async function ensureInstance(
     return { connected: false, qrcode: qr?.base64, phoneId: existingPhoneId };
   }
 
-  // No phone yet for this salon → create one in Maytapi
+  // No phone yet for this salon → try to create one
+  let phoneId: string | undefined;
   const created = await createInstance(salonSlug);
-  if (!created) return { connected: false };
-  const phoneId = created.instance.instanceName;
-  // Give Maytapi a moment to prepare the QR
-  await new Promise(r => setTimeout(r, 1500));
+  if (created?.instance.instanceName) {
+    phoneId = created.instance.instanceName;
+    // Give Maytapi a moment to prepare the QR
+    await new Promise(r => setTimeout(r, 1500));
+  } else {
+    // createPhone not available (free trial) → use the first phone in the account
+    const phones = await listPhones();
+    if (phones.length > 0) phoneId = phones[0];
+  }
+
+  if (!phoneId) return { connected: false };
   const qr = await getQRCode(phoneId);
   return { connected: false, qrcode: qr?.base64, phoneId };
 }

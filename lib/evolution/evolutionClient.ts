@@ -64,7 +64,7 @@ export async function fetchInstance(phoneId: string): Promise<EvolutionInstance 
   }
 }
 
-// ─── createInstance ───────────────────────────────────────────────────────────
+// ─── createInstance ────────────────────────────────────────────────────────────────────────────
 
 /**
  * Creates a new phone slot in Maytapi for this salon.
@@ -84,6 +84,7 @@ export async function createInstance(salonSlug: string): Promise<EvolutionCreate
     // Maytapi returns { success: true, data: { id, status, ... } }
     const phone = (data.data as Record<string, unknown> | undefined) ?? data;
     const id = String(phone.id ?? '');
+    if (!id || id === 'undefined') return null;
     return {
       instance: {
         instanceName: id,
@@ -92,6 +93,29 @@ export async function createInstance(salonSlug: string): Promise<EvolutionCreate
     };
   } catch {
     return null;
+  }
+}
+
+// ─── listPhones ────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Lists all phones in the Maytapi product.
+ * Used as fallback when createPhone is not available (e.g. free trial).
+ */
+export async function listPhones(): Promise<string[]> {
+  try {
+    const pid = PRODUCT_ID();
+    if (!pid) return [];
+    const res = await fetch(`${BASE}/${pid}/listPhones`, {
+      headers: headers(),
+      cache: 'no-store',
+    });
+    if (!res.ok) return [];
+    const data = (await res.json()) as unknown;
+    const list = Array.isArray(data) ? data : [];
+    return list.map((p: Record<string, unknown>) => String(p.id)).filter(Boolean);
+  } catch {
+    return [];
   }
 }
 
