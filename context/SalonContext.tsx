@@ -488,14 +488,20 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
 
         // Admin state overrides (operator list + salonConfig pushed by admin panel)
         if (adminState?.operators) {
+          const adminOps = adminState.operators as Operator[];
           const localOps2 = storageGetOperators();
-          const withPins = (adminState.operators as Operator[]).map(op => {
+          // Merge: admin edits win for known operators, but salon-added operators
+          // (not present in admin's list) are preserved to avoid data loss.
+          const adminIds = new Set(adminOps.map(o => o.id));
+          const salonOnlyOps = localOps2.filter(o => !adminIds.has(o.id));
+          const withPins = adminOps.map(op => {
             const local = localOps2.find(l => l.id === op.id);
             if (!local) return op;
             return { ...op, pin: local.pin, privatePin: local.privatePin, color: local.color || op.color, commissionRate: local.commissionRate ?? op.commissionRate, schedule: local.schedule?.length ? local.schedule : op.schedule };
           });
-          setOperators(withPins);
-          if (!isViewMode) storageSaveOperators(withPins);
+          const merged = [...withPins, ...salonOnlyOps];
+          setOperators(merged);
+          if (!isViewMode) storageSaveOperators(merged);
         }
         if (adminState?.salonConfig) {
           const localCfg2 = storageGetSalonConfig();
@@ -603,13 +609,18 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
         // These bypass the timestamp filter — the admin always wins immediately.
         if (adminState && Object.keys(adminState).length > 0) {
           if (adminState.operators) {
+            const adminOps = adminState.operators as Operator[];
             const localOps = storageGetOperators();
-            const withPins = (adminState.operators as Operator[]).map(op => {
+            // Merge: admin edits win for known operators, salon-added operators are preserved.
+            const adminIds = new Set(adminOps.map(o => o.id));
+            const salonOnlyOps = localOps.filter(o => !adminIds.has(o.id));
+            const withPins = adminOps.map(op => {
               const local = localOps.find(l => l.id === op.id);
               if (!local) return op;
               return { ...op, pin: local.pin, privatePin: local.privatePin, color: local.color || op.color, commissionRate: local.commissionRate ?? op.commissionRate, schedule: local.schedule?.length ? local.schedule : op.schedule };
             });
-            setOperators(withPins); storageSaveOperators(withPins);
+            const mergedOps = [...withPins, ...salonOnlyOps];
+            setOperators(mergedOps); storageSaveOperators(mergedOps);
           }
           if (adminState.salonConfig) {
             const localCfgAdm = storageGetSalonConfig();
