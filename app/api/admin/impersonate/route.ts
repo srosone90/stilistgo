@@ -11,9 +11,23 @@ export async function POST(req: NextRequest) {
 
   const db = getAdminDb();
 
-  // Get user's email from salon_data
-  const { data: salon } = await db.from('salon_data').select('state').eq('user_id', user_id).single();
-  const email = (salon?.state as { salonConfig?: { email?: string } } | null)?.salonConfig?.email;
+  // Resolve the tenant's real login email from auth.users via service-role API.
+  // We never rely on salonConfig.email because that field is optional and may differ
+  // from the actual Supabase account email.
+  let email: string | undefined;
+  try {
+    const { data: authUser, error: authErr } = await db.auth.admin.getUserById(user_id);
+    if (!authErr && authUser?.user?.email) {
+      email = authUser.user.email;
+    }
+  } catch { /* fall through */ }
+
+  // Fallback: try salonConfig.email (legacy / edge case)
+  if (!email) {
+    const { data: salon } = await db.from('salon_data').select('state').eq('user_id', user_id).single();
+    email = (salon?.state as { salonConfig?: { email?: string } } | null)?.salonConfig?.email;
+  }
+
   if (!email) return NextResponse.json({ error: 'Email non trovata per questo tenant' }, { status: 404 });
 
   // Generate magic link using service-role admin auth
