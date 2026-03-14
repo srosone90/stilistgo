@@ -7,11 +7,10 @@ import * as local from './storage';
 let supabaseAvailable: boolean | null = null; // null = not yet tested
 
 async function isSupabaseAvailable(): Promise<boolean> {
-  if (supabaseAvailable !== null) return supabaseAvailable;
+  if (supabaseAvailable === true) return true; // only cache positive result
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 5000);
-    // /auth/v1/health risponde sempre 200 senza auth — nessun 401
     const res = await fetch(
       `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/health`,
       {
@@ -20,11 +19,11 @@ async function isSupabaseAvailable(): Promise<boolean> {
       }
     );
     clearTimeout(timeout);
-    supabaseAvailable = res.ok;
+    if (res.ok) supabaseAvailable = true;
+    return res.ok; // negative result not cached — will retry on next call
   } catch {
-    supabaseAvailable = false;
+    return false; // not cached — retry next time
   }
-  return supabaseAvailable;
 }
 
 export function resetSupabaseAvailability() {

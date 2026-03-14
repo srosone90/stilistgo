@@ -24,38 +24,16 @@ export const supabase = new Proxy({} as SupabaseClient, {
   },
 });
 
-// ─── Fallback local auth (when Supabase is unreachable) ───────────────────────
-const LOCAL_USER_KEY = 'stylistgo_local_user';
-
-interface LocalUser {
-  id: string;
-  email: string;
-  full_name: string;
-  user_metadata: { full_name: string };
-}
-
-function getLocalUser(): LocalUser | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    const raw = localStorage.getItem(LOCAL_USER_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
-}
-
-function setLocalUser(user: LocalUser) {
-  localStorage.setItem(LOCAL_USER_KEY, JSON.stringify(user));
-}
-
-function clearLocalUser() {
-  localStorage.removeItem(LOCAL_USER_KEY);
-}
-
 // ─── Connectivity probe (cached) ─────────────────────────────────────────────
-// Stato: null = non ancora testato, true/false = risultato cachato
+// Only the POSITIVE result is cached: once we know Supabase is reachable we
+// keep that knowledge for the session. A negative result (unreachable) is
+// never cached so the next call will retry — avoids locking into offline mode
+// if Supabase was briefly down at startup.
+
 let _supabaseReachable: boolean | null = null;
 
 async function isSupabaseReachable(): Promise<boolean> {
-  if (_supabaseReachable !== null) return _supabaseReachable;
+  if (_supabaseReachable === true) return true; // only cache positive result
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 4000);
@@ -64,11 +42,11 @@ async function isSupabaseReachable(): Promise<boolean> {
       signal: controller.signal,
     });
     clearTimeout(timeout);
-    _supabaseReachable = res.ok;
+    if (res.ok) _supabaseReachable = true;
+    return res.ok;
   } catch {
-    _supabaseReachable = false;
+    return false; // not cached — will retry next call
   }
-  return _supabaseReachable;
 }
 
 export function resetSupabaseReachable() {
@@ -77,24 +55,8 @@ export function resetSupabaseReachable() {
 
 // ─── Auth helpers ─────────────────────────────────────────────────────────────
 
-function localSignUp(email: string, password: string, fullName: string) {
-  const existingUsers = JSON.parse(localStorage.getItem('stylistgo_users') || '[]') as (LocalUser & { password: string })[];
-  if (existingUsers.find(u => u.email === email)) {
-    return { data: null, error: { message: 'Email già registrata in locale.' } };
-  }
-  const newUser: LocalUser = {
-    id: `local-${Date.now()}`,
-    email,
-    full_name: fullName,
-    user_metadata: { full_name: fullName },
-  };
-  localStorage.setItem('stylistgo_users', JSON.stringify([...existingUsers, { ...newUser, password }]));
-  setLocalUser(newUser);
-  return { data: { session: { user: newUser }, user: newUser }, error: null };
-}
-
 export async function signUp(email: string, password: string, fullName: string) {
-  // Chiama la route server-side sicura (la service key non è mai esposta al browser)
+  // Calls the secure server-side route (service key never exposed to browser)
   try {
     const res = await fetch('/api/auth/signup', {
       method: 'POST',
@@ -103,21 +65,18 @@ export async function signUp(email: string, password: string, fullName: string) 
     });
     const json = await res.json();
 
-    // flag offline → Supabase non raggiungibile → fallback locale
-    if (json.offline) {
-      return localSignUp(email, password, fullName);
-    }
-
     if (!res.ok) {
+      // json.offline = true when the API route itself couldn't reach Supabase
+      if (json.offline) {
+        return { data: null, error: { message: 'Server non raggiungibile. Verifica la connessione e riprova.' } };
+      }
       return { data: null, error: { message: json.error || 'Errore durante la registrazione.' } };
     }
 
-    // Utente creato — email di conferma inviata via Resend (email_confirm: false)
-    // Non fare auto-login: l'utente deve cliccare il link nell'email.
+    // Account created — confirmation email sent via Resend
     return { data: { session: null, user: json.user, check_email: true }, error: null };
   } catch {
-    // fetch ha lanciato eccezione (Supabase non raggiungibile) → fallback locale
-    return localSignUp(email, password, fullName);
+    return { data: null, error: { message: 'Impossibile contattare il server. Verifica la connessione.' } };
   }
 }
 
@@ -136,38 +95,22 @@ function isNetworkError(msg: string) {
 export async function signIn(email: string, password: string) {
   const online = await isSupabaseReachable();
 
-  if (online) {
-    // Supabase è raggiungibile: prova login cloud
-    try {
-      const result = await supabase.auth.signInWithPassword({ email, password });
-      if (!result.error) return result;                              // ✅ successo
-      if (!isNetworkError(result.error.message)) return result;     // ❌ errore reale (es. password sbagliata)
-      // errore di rete inaspettato → aggiorna cache e caduta al fallback
-      _supabaseReachable = false;
-    } catch {
-      _supabaseReachable = false;
-    }
-  }
-
-  // Supabase offline → fallback utenti locali
-  const users = JSON.parse(localStorage.getItem('stylistgo_users') || '[]') as (LocalUser & { password: string })[];
-  const user = users.find(u => u.email === email && u.password === password);
-  if (user) {
-    const { password: _pw, ...safeUser } = user;
-    setLocalUser(safeUser as LocalUser);
-    return { data: { session: { user: safeUser }, user: safeUser }, error: null };
-  }
-
   if (!online) {
-    return { data: null, error: { message: 'Server non raggiungibile. Verifica la connessione.' } };
+    return { data: null, error: { message: 'Server non raggiungibile. Verifica la connessione e riprova.' } };
   }
-  return { data: null, error: { message: 'Email o password non corretti.' } };
+
+  try {
+    const result = await supabase.auth.signInWithPassword({ email, password });
+    if (!result.error) return result;                          // ✅ successo
+    if (!isNetworkError(result.error.message)) return result;  // ❌ credenziali errate
+    // unexpected network error during the request
+    return { data: null, error: { message: 'Errore di rete durante il login. Riprova.' } };
+  } catch {
+    return { data: null, error: { message: 'Impossibile contattare il server. Verifica la connessione.' } };
+  }
 }
 
 export async function signOut() {
-  // Only clear local-session token — per-user localStorage keys stay intact
-  // so data reloads instantly when the same user logs back in.
-  clearLocalUser();
   try {
     return await supabase.auth.signOut();
   } catch {
@@ -176,23 +119,22 @@ export async function signOut() {
 }
 
 export async function getCurrentUser() {
-  // 1. Try local session from localStorage first (instant, no network needed)
-  //    This is the most reliable path for a logged-in user on page reload.
+  // 1. Read Supabase session from the SDK's built-in localStorage token (instant)
+  //    This is the most reliable path for an already-logged-in user on page reload.
   try {
     const { data: { session } } = await supabase.auth.getSession();
     if (session?.user) return session.user;
   } catch { /* ignore */ }
 
-  // 2. Try full getUser (validates token with server)
+  // 2. Validate token with server (covers edge cases like token refresh)
   const online = await isSupabaseReachable();
   if (online) {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) return user;
-    } catch { /* ignora */ }
+    } catch { /* ignore */ }
   }
 
-  // 3. Fallback sessione locale (offline / local accounts)
-  const local = getLocalUser();
-  return local as unknown as ReturnType<typeof supabase.auth.getUser> extends Promise<{ data: { user: infer U } }> ? U : null;
+  // No valid session — user must log in.
+  return null;
 }
