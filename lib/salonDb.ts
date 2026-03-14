@@ -56,10 +56,14 @@ export async function dbSaveSalonState(userId: string, state: Record<string, unk
 /**
  * Subscribe to real-time changes on salon_data for a given user.
  * Returns an unsubscribe function.  Call it on component unmount.
+ *
+ * The callback receives:
+ *  - newState    : the full `state` column (peer-device saves)
+ *  - adminState  : the `admin_state` column if present (admin panel writes)
  */
 export function dbSubscribeToSalonChanges(
   userId: string,
-  onUpdate: (newState: Record<string, unknown>) => void,
+  onUpdate: (newState: Record<string, unknown>, adminState?: Record<string, unknown>) => void,
 ): () => void {
   try {
     const channel = supabase
@@ -68,8 +72,14 @@ export function dbSubscribeToSalonChanges(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'salon_data', filter: `user_id=eq.${userId}` },
         (payload) => {
-          const row = payload.new as { state?: Record<string, unknown>; user_id?: string } | undefined;
-          if (row?.state) onUpdate(row.state);
+          const row = payload.new as {
+            state?: Record<string, unknown>;
+            admin_state?: Record<string, unknown>;
+            user_id?: string;
+          } | undefined;
+          if (row?.state || row?.admin_state) {
+            onUpdate(row.state ?? {}, row.admin_state ?? undefined);
+          }
         },
       )
       .subscribe();

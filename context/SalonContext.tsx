@@ -598,7 +598,28 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
     getCurrentUser().then(user => {
       if (!user || (user.id as string).startsWith('local-')) return;
       const userId = user.id as string;
-      unsub = dbSubscribeToSalonChanges(userId, (newState) => {
+      unsub = dbSubscribeToSalonChanges(userId, (newState, adminState) => {
+        // ── Admin-panel writes (admin_state changed) ──────────────────────
+        // These bypass the timestamp filter — the admin always wins immediately.
+        if (adminState && Object.keys(adminState).length > 0) {
+          if (adminState.operators) {
+            const localOps = storageGetOperators();
+            const withPins = (adminState.operators as Operator[]).map(op => {
+              const local = localOps.find(l => l.id === op.id);
+              if (!local) return op;
+              return { ...op, pin: local.pin, privatePin: local.privatePin, color: local.color || op.color, commissionRate: local.commissionRate ?? op.commissionRate, schedule: local.schedule?.length ? local.schedule : op.schedule };
+            });
+            setOperators(withPins); storageSaveOperators(withPins);
+          }
+          if (adminState.salonConfig) {
+            const localCfgAdm = storageGetSalonConfig();
+            const adminCfg = adminState.salonConfig as SalonConfig;
+            const mergedAdm: SalonConfig = { ...localCfgAdm, ...adminCfg, ownerPublicPin: localCfgAdm.ownerPublicPin, ownerPrivatePin: localCfgAdm.ownerPrivatePin };
+            setSalonConfig(mergedAdm); storageSaveSalonConfig(mergedAdm);
+          }
+        }
+
+        // ── Peer-device saves (state column changed) ───────────────────────
         // Skip only if this is our OWN save echoed back (same device, same timestamp)
         const cloudTs = (newState._savedAt as number) ?? 0;
         const localTs = getLocalSavedAt();

@@ -24,12 +24,22 @@ async function readState(supabase: any, user_id: string): Promise<Record<string,
   }
 }
 
-// Write salon state back to the salon_data TABLE
+// Write whatsapp config into admin_state.salonConfig.whatsapp
+// Using admin_state keeps it consistent with other admin writes and avoids
+// overwriting the user's state column (which would break timestamp-based sync).
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function writeState(supabase: any, user_id: string, state: Record<string, unknown>) {
+async function writeAdminState(supabase: any, user_id: string, adminStatePatch: Record<string, unknown>) {
+  // Read current admin_state first so we don't clobber other admin fields
+  const { data } = await supabase
+    .from('salon_data')
+    .select('admin_state')
+    .eq('user_id', user_id)
+    .maybeSingle();
+  const current = (data?.admin_state ?? {}) as Record<string, unknown>;
+  const merged = { ...current, ...adminStatePatch };
   await supabase
     .from('salon_data')
-    .upsert({ user_id, state, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+    .upsert({ user_id, admin_state: merged, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
 }
 
 // PATCH — assign or remove UltraMsg instance for a tenant
@@ -41,10 +51,10 @@ export async function PATCH(req: NextRequest) {
   }
 
   const supabase = getAdminClient();
-  const state = await readState(supabase, user_id);
 
-  const current = state;
-  const currentSalonConfig = (current.salonConfig as Record<string, unknown>) ?? {};
+  // Read existing state to preserve other whatsapp fields (enabled, templates, etc.)
+  const currentState = await readState(supabase, user_id);
+  const currentSalonConfig = (currentState.salonConfig as Record<string, unknown>) ?? {};
   const currentWhatsapp = (currentSalonConfig.whatsapp as Record<string, unknown>) ?? {};
 
   const updatedWhatsapp = {
@@ -54,15 +64,11 @@ export async function PATCH(req: NextRequest) {
     enabled: (ultraMsgInstanceId && ultraMsgToken) ? (currentWhatsapp.enabled ?? false) : false,
   };
 
-  const updatedState = {
-    ...current,
-    salonConfig: {
-      ...currentSalonConfig,
-      whatsapp: updatedWhatsapp,
-    },
-  };
+  // Write to admin_state so realtime propagates correctly to the salon client
+  await writeAdminState(supabase, user_id, {
+    salonConfig: { ...(currentSalonConfig), whatsapp: updatedWhatsapp },
+  });
 
-  await writeState(supabase, user_id, updatedState);
   return NextResponse.json({ success: true });
 }
 
@@ -76,10 +82,18 @@ export async function GET(req: NextRequest) {
   }
 
   const supabase = getAdminClient();
-  const state = await readState(supabase, user_id);
 
-  const salonConfig = (state.salonConfig as Record<string, unknown>) ?? {};
-  const whatsapp = (salonConfig.whatsapp as Record<string, unknown>) ?? {};
+  // Read both columns — admin_state takes precedence (written by this API),
+  // state is the fallback for tenants who had WA configured before this migration.
+  const { data } = await supabase
+    .from('salon_data')
+    .select('state, admin_state')
+    .eq('user_id', user_id)
+    .maybeSingle();
+
+  const adminCfg = ((data?.admin_state as Record<string, unknown> | null)?.salonConfig as Record<string, unknown> | undefined);
+  const stateCfg = ((data?.state as Record<string, unknown> | null)?.salonConfig as Record<string, unknown> | undefined);
+  const whatsapp = ((adminCfg?.whatsapp ?? stateCfg?.whatsapp ?? {}) as Record<string, unknown>);
 
   const instanceId = (whatsapp.ultraMsgInstanceId ?? '') as string;
   const token      = (whatsapp.ultraMsgToken      ?? '') as string;
