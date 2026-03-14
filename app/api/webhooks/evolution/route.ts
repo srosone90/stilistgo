@@ -11,71 +11,87 @@ function adminClient() {
 /**
  * POST /api/webhooks/evolution
  *
- * Receives events from WAHA (WhatsApp HTTP API).
- * WAHA event format: { event: 'session.status', session: 'default', payload: { status, me } }
+ * Receives connection events from the self-hosted Evolution API on Railway.
  *
- * Security: checks X-Webhook-Secret header against EVOLUTION_WEBHOOK_SECRET.
- * Configure WAHA with: WHATSAPP_HOOK_HEADERS=X-Webhook-Secret:<your-secret>
- * Always responds 200 to prevent WAHA retries.
+ * Evolution API global webhook format:
+ *   { event: 'connection.update', instance: '<instanceName>', data: { state: 'open'|'close'|'connecting' } }
+ *
+ * Instance names are deterministic: user_id.replace(/-/g, '_')
+ * so the reverse mapping is: instanceName.replace(/_/g, '-') → user_id.
+ *
+ * Security: validates X-Api-Key header against EVOLUTION_API_KEY
+ * (Evolution API sends its own API key in webhook calls).
+ * Always returns 200 to prevent Evolution API retries.
  */
 export async function POST(req: NextRequest) {
   try {
     const body = (await req.json()) as Record<string, unknown>;
 
     // ── Authentication ────────────────────────────────────────────────────
-    const secret = process.env.EVOLUTION_WEBHOOK_SECRET;
-    if (secret) {
+    const apiKey = process.env.EVOLUTION_API_KEY;
+    if (apiKey) {
+      const headerKey = req.headers.get('apikey') ?? req.headers.get('x-api-key');
+      const secret = process.env.EVOLUTION_WEBHOOK_SECRET;
       const headerSecret = req.headers.get('x-webhook-secret');
-      // Also accept legacy body.apikey for backward compat
       const bodyApiKey = body.apikey as string | undefined;
-      if (headerSecret !== secret && bodyApiKey !== secret) {
-        console.warn('[waha-webhook] invalid secret received');
+      // Accept if either the Evolution API key or the webhook secret matches
+      const valid =
+        headerKey === apiKey ||
+        (secret && (headerSecret === secret || bodyApiKey === secret));
+      if (!valid) {
+        console.warn('[evolution-webhook] autenticazione fallita');
         return NextResponse.json({ ok: false }, { status: 200 });
       }
     }
 
-    // Maytapi uses 'type' instead of 'event'
-    const event = (body.type as string | undefined) ?? (body.event as string | undefined);
-    // Maytapi phoneId (numeric, sent as number in JSON)
-    const phoneId = body.phone_id != null ? String(body.phone_id) : undefined;
+    // Evolution API event format
+    const event = (body.event as string | undefined) ?? (body.type as string | undefined);
+    const instanceName = (body.instance as string | undefined) ?? (body.phone_id != null ? String(body.phone_id) : undefined);
 
-    if (!event) {
+    if (!event || !instanceName) {
       return NextResponse.json({ ok: true });
     }
 
-    // ── Event handlers ────────────────────────────────────────────────────
-    if (event === 'channel_status' && phoneId) {
-      // Maytapi connection status change
-      const status = body.status as string | undefined;
-      const supabase = adminClient();
+    // Derive salon user_id from instance name (reverse of user_id.replace(/-/g, '_'))
+    const userId = instanceName.replace(/_/g, '-');
+    const supabase = adminClient();
 
-      if (status === 'active') {
-        const phone = body.phone as string | null | undefined;
+    if (event === 'connection.update') {
+      const data = body.data as Record<string, unknown> | undefined;
+      // Evolution API uses 'state', Maytapi legacy used 'status'
+      const state = (data?.state as string | undefined) ?? (body.status as string | undefined);
+
+      if (state === 'open') {
+        // ownerJid format: "393331234567@s.whatsapp.net"
+        const ownerJid = (data?.wuid ?? data?.id ?? data?.ownerJid) as string | undefined;
+        const phone = ownerJid ? ownerJid.split('@')[0] : null;
 
         await supabase
           .from('admin_tenants')
           .update({
             whatsapp_connected: true,
             whatsapp_connected_at: new Date().toISOString(),
-            ...(phone ? { whatsapp_phone: phone.replace(/\D/g, '') } : {}),
+            whatsapp_instance_name: instanceName,
+            ...(phone ? { whatsapp_phone: phone } : {}),
           })
-          .eq('whatsapp_instance_name', phoneId);
+          .eq('user_id', userId);
 
-        console.info(`[maytapi-webhook] phone ${phoneId} connected — ${phone ?? 'unknown'}`);
-      } else if (status === 'timeout' || status === 'disconnected') {
+        console.info(`[evolution-webhook] ${instanceName} connesso${phone ? ' — ' + phone : ''}`);
+
+      } else if (state === 'close') {
         await supabase
           .from('admin_tenants')
           .update({ whatsapp_connected: false })
-          .eq('whatsapp_instance_name', phoneId);
+          .eq('user_id', userId);
 
-        console.info(`[maytapi-webhook] phone ${phoneId} disconnected (${status})`);
+        console.info(`[evolution-webhook] ${instanceName} disconnesso`);
       }
     }
 
     return NextResponse.json({ ok: true });
   } catch (e: unknown) {
-    console.error('[waha-webhook] error:', e);
-    // Always return 200 so WAHA doesn't retry
+    console.error('[evolution-webhook] error:', e);
+    // Always return 200 so Evolution API doesn't retry
     return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : 'error' });
   }
 }

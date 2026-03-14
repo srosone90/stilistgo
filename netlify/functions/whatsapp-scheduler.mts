@@ -1,12 +1,17 @@
 /**
- * Netlify Scheduled Function — WhatsApp Automation Engine (UltraMsg)
+ * Netlify Scheduled Function — WhatsApp Automation Engine (Evolution API / Railway)
  * Runs every day at 08:00 UTC (09:00 Rome CET / 10:00 CEST)
  *
- * For each salon with UltraMsg configured and enabled, sends:
+ * For each salon with WhatsApp connected and automation enabled, sends:
  *   - Appointment reminders (tomorrow's appointments)
  *   - Birthday wishes (clients with birthday today)
  *   - Post-visit follow-up (completed appointments yesterday)
  *   - Loyalty milestone notifications
+ *   - Dormant client re-engagement
+ *   - Visit frequency reminders
+ *
+ * Each salon has a unique Evolution API instance: user_id.replace(/-/g, '_')
+ * No per-salon credentials needed — the global EVOLUTION_API_URL/KEY is used.
  */
 import type { Config } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
@@ -14,8 +19,6 @@ import { createClient } from '@supabase/supabase-js';
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface WhatsAppConfig {
   enabled: boolean;
-  ultraMsgInstanceId: string;
-  ultraMsgToken: string;
   reminderEnabled: boolean;
   birthdayEnabled: boolean;
   postVisitEnabled: boolean;
@@ -98,21 +101,29 @@ function sentWithinDays(log: WhatsAppLogEntry[], type: string, clientId: string,
   return log.some(m => m.type === type && m.clientId === clientId && m.sentAt >= cutoffStr);
 }
 
-async function sendUltraMsg(instanceId: string, token: string, to: string, message: string): Promise<boolean> {
-  const phone = to.replace(/\D/g, '');
-  if (!phone) { console.warn('[WhatsApp] numero non valido:', to); return false; }
+/** Sends a WhatsApp message via self-hosted Evolution API on Railway. */
+async function sendViaEvolution(instanceName: string, to: string, message: string): Promise<boolean> {
+  const base = (process.env.EVOLUTION_API_URL ?? '').replace(/\/$/, '');
+  const apiKey = process.env.EVOLUTION_API_KEY ?? '';
+  if (!base || !apiKey) {
+    console.warn('[Scheduler] EVOLUTION_API_URL o EVOLUTION_API_KEY mancanti');
+    return false;
+  }
+  const number = to.replace(/\D/g, '');
+  if (!number) { console.warn('[Scheduler] numero non valido:', to); return false; }
   try {
-    const res = await fetch(`https://api.ultramsg.com/${instanceId}/messages/chat`, {
+    const res = await fetch(`${base}/message/sendText/${instanceName}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ token, to: phone, body: message }),
+      headers: { 'Content-Type': 'application/json', 'apikey': apiKey },
+      body: JSON.stringify({ number, text: message }),
     });
-    const data = await res.json();
-    const ok = data.sent === true || data.message === 'ok';
-    if (!ok) console.warn('[WhatsApp] invio fallito per', phone, '→ risposta API:', JSON.stringify(data));
-    return ok;
+    if (!res.ok) {
+      console.warn('[Scheduler] invio fallito per', number, '→ status', res.status);
+      return false;
+    }
+    return true;
   } catch (err) {
-    console.error('[WhatsApp] errore di rete per', phone, ':', err);
+    console.error('[Scheduler] errore di rete per', number, ':', err);
     return false;
   }
 }
@@ -121,7 +132,11 @@ async function sendUltraMsg(instanceId: string, token: string, to: string, messa
 export default async function handler() {
   // Guard: verify required env vars are present
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    console.error('[Scheduler] ❌ Variabili d\'ambiente mancanti: NEXT_PUBLIC_SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY non impostate su Netlify.');
+    console.error('[Scheduler] ❌ Variabili mancanti: NEXT_PUBLIC_SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY');
+    return;
+  }
+  if (!process.env.EVOLUTION_API_URL || !process.env.EVOLUTION_API_KEY) {
+    console.error('[Scheduler] ❌ Variabili mancanti: EVOLUTION_API_URL o EVOLUTION_API_KEY');
     return;
   }
 
@@ -130,7 +145,7 @@ export default async function handler() {
     process.env.SUPABASE_SERVICE_ROLE_KEY!.trim()
   );
 
-  // Read all salon states from the salon_data TABLE (where the main app writes data)
+  // Read all salon states from the salon_data TABLE
   const { data: rows, error } = await supabase
     .from('salon_data')
     .select('user_id, state')
@@ -140,6 +155,15 @@ export default async function handler() {
     console.error('Scheduler: cannot read salon_data table', error);
     return;
   }
+
+  // Read whatsapp_connected status for all salons from admin_tenants
+  const { data: tenants } = await supabase
+    .from('admin_tenants')
+    .select('user_id, whatsapp_connected');
+
+  const connectedSalons = new Set<string>(
+    (tenants ?? []).filter(t => t.whatsapp_connected).map(t => t.user_id as string)
+  );
 
   const today     = todayStr();
   const tomorrow  = tomorrowStr();
@@ -157,12 +181,14 @@ export default async function handler() {
     } catch { continue; }
 
     const wa = state.salonConfig?.whatsapp;
-    if (!wa?.enabled || !wa.ultraMsgInstanceId || !wa.ultraMsgToken) {
-      if (wa?.enabled) console.warn(`[Scheduler] Salone ${userId.slice(0,8)}… ha WhatsApp abilitato ma InstanceId o Token mancanti.`);
+    if (!wa?.enabled) continue;
+    if (!connectedSalons.has(userId)) {
+      if (wa.enabled) console.info(`[Scheduler] Salone ${userId.slice(0,8)}… saltato — WhatsApp non connesso`);
       continue;
     }
 
-    const { ultraMsgInstanceId: instanceId, ultraMsgToken: token } = wa;
+    // Instance name is deterministic: user_id with hyphens replaced by underscores
+    const instanceName = userId.replace(/-/g, '_');
     const salonName = state.salonConfig?.salonName ?? 'il salone';
     const clients   = state.clients ?? [];
     const apts      = state.appointments ?? [];
@@ -181,7 +207,7 @@ export default async function handler() {
         if (alreadySent.has(key)) continue;
         const svcNames = services.filter(s => apt.serviceIds.includes(s.id)).map(s => s.name).join(', ') || 'appuntamento';
         const msg = renderTemplate(wa.reminderMsg ?? DEFAULT_REMINDER_MSG, { nome: client.firstName, servizio: svcNames, ora: apt.startTime, salone: salonName });
-        const sent = await sendUltraMsg(instanceId, token, client.phone, msg);
+        const sent = await sendViaEvolution(instanceName, client.phone, msg);
         log.push({ id: crypto.randomUUID(), type: 'reminder', clientId: client.id, clientName: `${client.firstName} ${client.lastName}`, phone: client.phone, templateName: 'reminder', status: sent ? 'sent' : 'failed', sentAt: new Date().toISOString() });
         alreadySent.add(key);
       }
@@ -193,7 +219,7 @@ export default async function handler() {
         const key = `birthday:${client.id}`;
         if (alreadySent.has(key)) continue;
         const msg = renderTemplate(wa.birthdayMsg ?? DEFAULT_BIRTHDAY_MSG, { nome: client.firstName, salone: salonName });
-        const sent = await sendUltraMsg(instanceId, token, client.phone, msg);
+        const sent = await sendViaEvolution(instanceName, client.phone, msg);
         log.push({ id: crypto.randomUUID(), type: 'birthday', clientId: client.id, clientName: `${client.firstName} ${client.lastName}`, phone: client.phone, templateName: 'birthday', status: sent ? 'sent' : 'failed', sentAt: new Date().toISOString() });
         alreadySent.add(key);
       }
@@ -207,24 +233,21 @@ export default async function handler() {
         const key = `post_visit:${client.id}`;
         if (alreadySent.has(key)) continue;
         const msg = renderTemplate(wa.postVisitMsg ?? DEFAULT_POSTVISIT_MSG, { nome: client.firstName, salone: salonName });
-        const sent = await sendUltraMsg(instanceId, token, client.phone, msg);
+        const sent = await sendViaEvolution(instanceName, client.phone, msg);
         log.push({ id: crypto.randomUUID(), type: 'post_visit', clientId: client.id, clientName: `${client.firstName} ${client.lastName}`, phone: client.phone, templateName: 'post_visit', status: sent ? 'sent' : 'failed', sentAt: new Date().toISOString() });
         alreadySent.add(key);
       }
     }
 
     // ── Fedeltà milestone ──
-    // Use a milestone-specific deduplication key so we don't spam every day
     if (wa.loyaltyEnabled && wa.loyaltyMilestone) {
       const milestone = wa.loyaltyMilestone;
-      // Compute the highest milestone tier the client has crossed (multiple of milestone)
       for (const client of clients.filter(c => c.loyaltyPoints >= milestone && c.phone)) {
-        const tier = Math.floor(client.loyaltyPoints / milestone); // e.g. 150pts/100=1, 200pts/100=2
-        const milestoneKey = `loyalty_tier${tier}:${client.id}`;   // unique per tier per client
-        // Check against ALL historical logs (not just today) to avoid re-notifying same tier
+        const tier = Math.floor(client.loyaltyPoints / milestone);
+        const milestoneKey = `loyalty_tier${tier}:${client.id}`;
         if (log.some(m => m.type === 'loyalty' && `loyalty_tier${tier}:${m.clientId}` === milestoneKey)) continue;
         const msg = renderTemplate(wa.loyaltyMsg ?? DEFAULT_LOYALTY_MSG, { nome: client.firstName, punti: String(client.loyaltyPoints), salone: salonName });
-        const sent = await sendUltraMsg(instanceId, token, client.phone, msg);
+        const sent = await sendViaEvolution(instanceName, client.phone, msg);
         log.push({ id: crypto.randomUUID(), type: 'loyalty', clientId: client.id, clientName: `${client.firstName} ${client.lastName}`, phone: client.phone, templateName: 'loyalty', status: sent ? 'sent' : 'failed', sentAt: new Date().toISOString() });
       }
     }
@@ -241,7 +264,7 @@ export default async function handler() {
         if (daysSince < dormientiDays) continue;
         if (sentWithinDays(log, 'dormant', client.id, 30)) continue;
         const msg = renderTemplate(wa.dormantMsg ?? DEFAULT_DORMANT_MSG, { nome: client.firstName, giorni: String(daysSince), salone: salonName });
-        const sent = await sendUltraMsg(instanceId, token, client.phone, msg);
+        const sent = await sendViaEvolution(instanceName, client.phone, msg);
         log.push({ id: crypto.randomUUID(), type: 'dormant', clientId: client.id, clientName: `${client.firstName} ${client.lastName}`, phone: client.phone, templateName: 'dormant', status: sent ? 'sent' : 'failed', sentAt: new Date().toISOString() });
         alreadySent.add(key);
       }
@@ -259,7 +282,7 @@ export default async function handler() {
         if (daysSince < freqDays) continue;
         if (sentWithinDays(log, 'visitfreq', client.id, Math.max(freqDays - 2, 1))) continue;
         const msg = renderTemplate(wa.visitFreqReminderMsg ?? DEFAULT_VISITFREQ_MSG, { nome: client.firstName, frequenza: client.visitFrequency!, giorni: String(daysSince), salone: salonName });
-        const sent = await sendUltraMsg(instanceId, token, client.phone, msg);
+        const sent = await sendViaEvolution(instanceName, client.phone, msg);
         log.push({ id: crypto.randomUUID(), type: 'visitfreq', clientId: client.id, clientName: `${client.firstName} ${client.lastName}`, phone: client.phone, templateName: 'visitfreq', status: sent ? 'sent' : 'failed', sentAt: new Date().toISOString() });
         alreadySent.add(key);
       }

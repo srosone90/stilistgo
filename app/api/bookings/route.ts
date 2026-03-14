@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { sendTextMessage, instanceNameFor } from '@/lib/evolution/evolutionClient';
 
 function genId(prefix: string) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
@@ -73,21 +74,26 @@ export async function POST(req: NextRequest) {
         const salonState = sdRow?.state as Record<string, unknown> | null;
         const salonConf = salonState?.salonConfig as Record<string, unknown> | null;
         const wa = salonConf?.whatsapp as Record<string, unknown> | null;
-        if (wa?.bookingConfirmEnabled && wa.enabled && wa.ultraMsgInstanceId && wa.ultraMsgToken && clientPhone) {
-          const salonName = (salonConf?.salonName as string | undefined) ?? 'il salone';
-          const phone = clientPhone.replace(/\D/g, '');
-          const DEFAULT_BOOKING_MSG = 'Ciao {nome}! ✅ La tua prenotazione da *{salone}* per il {data} alle {ora} è confermata. A presto!';
-          const template: string = (wa.bookingConfirmMsg as string | undefined) ?? DEFAULT_BOOKING_MSG;
-          const msg = template
-            .split('{nome}').join(clientName)
-            .split('{salone}').join(salonName)
-            .split('{data}').join(preferredDate)
-            .split('{ora}').join(preferredTime);
-          await fetch(`https://api.ultramsg.com/${wa.ultraMsgInstanceId}/messages/chat`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({ token: wa.ultraMsgToken as string, to: phone, body: msg }).toString(),
-          });
+        if (wa?.bookingConfirmEnabled && wa.enabled && clientPhone) {
+          // Check that the salon's WhatsApp is actually connected
+          const { data: tenant } = await supabase
+            .from('admin_tenants')
+            .select('whatsapp_connected')
+            .eq('user_id', salonId)
+            .maybeSingle();
+          if (tenant?.whatsapp_connected) {
+            const salonName = (salonConf?.salonName as string | undefined) ?? 'il salone';
+            const phone = clientPhone.replace(/\D/g, '');
+            const DEFAULT_BOOKING_MSG = 'Ciao {nome}! ✅ La tua prenotazione da *{salone}* per il {data} alle {ora} è confermata. A presto!';
+            const template: string = (wa.bookingConfirmMsg as string | undefined) ?? DEFAULT_BOOKING_MSG;
+            const msg = template
+              .split('{nome}').join(clientName)
+              .split('{salone}').join(salonName)
+              .split('{data}').join(preferredDate)
+              .split('{ora}').join(preferredTime);
+            const instanceName = instanceNameFor(salonId);
+            await sendTextMessage(instanceName, phone, msg);
+          }
         }
       } catch (waErr) {
         console.error('Booking WA confirmation error:', waErr);

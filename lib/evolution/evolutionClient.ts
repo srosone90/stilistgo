@@ -1,31 +1,43 @@
 /**
- * Maytapi WhatsApp client
+ * Evolution API client (self-hosted on Railway)
  *
- * Each salon has its own "phone" in Maytapi (phoneId stored in admin_tenants.whatsapp_instance_name).
+ * Each salon has its own instance named after the salon's user_id
+ * (hyphens replaced with underscores for URL safety).
  *
- * Env vars (add to Vercel):
- *   MAYTAPI_PRODUCT_ID — your Maytapi Product ID
- *   MAYTAPI_TOKEN      — your Maytapi API token
+ * Env vars:
+ *   EVOLUTION_API_URL  — Railway public URL, e.g. https://evolution-api-xxxx.up.railway.app
+ *   EVOLUTION_API_KEY  — same as AUTHENTICATION_API_KEY on Railway
  */
 
-const BASE = 'https://api.maytapi.com/api';
+function BASE(): string {
+  return (process.env.EVOLUTION_API_URL ?? '').replace(/\/$/, '');
+}
 
-const PRODUCT_ID = (): string | null => process.env.MAYTAPI_PRODUCT_ID ?? null;
-const TOKEN = (): string | null => process.env.MAYTAPI_TOKEN ?? null;
+function API_KEY(): string {
+  return process.env.EVOLUTION_API_KEY ?? '';
+}
 
 function headers(): Record<string, string> {
   return {
     'Content-Type': 'application/json',
-    'x-maytapi-key': TOKEN() ?? '',
+    'apikey': API_KEY(),
   };
+}
+
+// ─── instanceNameFor ──────────────────────────────────────────────────────────
+
+/** Derives the Evolution API instance name from a salon user_id (UUID). */
+export function instanceNameFor(userId: string): string {
+  return userId.replace(/-/g, '_');
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+export type ConnectionState = 'open' | 'connecting' | 'close';
+
 export interface EvolutionInstance {
-  instanceName: string; // Maytapi phoneId (as string)
-  connectionStatus: string; // 'active' | 'loading' | 'qr' | 'timeout'
-  profileName?: string;
+  instanceName: string;
+  connectionStatus: ConnectionState;
   ownerJid?: string;
 }
 
@@ -42,78 +54,80 @@ export interface EvolutionCreateResult {
 // ─── fetchInstance ────────────────────────────────────────────────────────────
 
 /**
- * Returns the Maytapi phone status for the given phoneId.
+ * Returns the connection state of the given Evolution API instance.
  */
-export async function fetchInstance(phoneId: string): Promise<EvolutionInstance | null> {
+export async function fetchInstance(instanceName: string): Promise<EvolutionInstance | null> {
+  const base = BASE();
+  if (!base) return null;
   try {
-    const pid = PRODUCT_ID();
-    if (!pid) return null;
-    const res = await fetch(`${BASE}/${pid}/${phoneId}/status`, {
+    const res = await fetch(`${base}/instance/connectionState/${instanceName}`, {
       headers: headers(),
       cache: 'no-store',
     });
     if (!res.ok) return null;
     const data = (await res.json()) as Record<string, unknown>;
+    const inst = (data.instance as Record<string, unknown>) ?? data;
     return {
-      instanceName: String(data.id ?? phoneId),
-      connectionStatus: (data.status as string) ?? 'loading',
-      ownerJid: data.phone as string | undefined,
+      instanceName,
+      connectionStatus: (inst.state as ConnectionState) ?? 'close',
+      ownerJid: inst.ownerJid as string | undefined,
     };
   } catch {
     return null;
   }
 }
 
-// ─── createInstance ────────────────────────────────────────────────────────────────────────────
+// ─── createInstance ───────────────────────────────────────────────────────────
 
 /**
- * Creates a new phone slot in Maytapi for this salon.
- * Returns the phoneId which must be stored in admin_tenants.whatsapp_instance_name.
+ * Creates a new Evolution API instance for a salon.
+ * Instance name is deterministic: instanceNameFor(userId).
  */
-export async function createInstance(salonSlug: string): Promise<EvolutionCreateResult | null> {
+export async function createInstance(instanceName: string): Promise<EvolutionCreateResult | null> {
+  const base = BASE();
+  if (!base) return null;
   try {
-    const pid = PRODUCT_ID();
-    if (!pid) return null;
-    const res = await fetch(`${BASE}/${pid}/createPhone`, {
+    const res = await fetch(`${base}/instance/create`, {
       method: 'POST',
       headers: headers(),
-      body: JSON.stringify({ name: salonSlug }),
+      body: JSON.stringify({ instanceName, qrcode: true, integration: 'WHATSAPP-BAILEYS' }),
     });
     if (!res.ok) return null;
     const data = (await res.json()) as Record<string, unknown>;
-    // Maytapi returns { success: true, data: { id, status, ... } }
-    const phone = (data.data as Record<string, unknown> | undefined) ?? data;
-    const id = String(phone.id ?? '');
-    if (!id || id === 'undefined') return null;
+    const inst = (data.instance as Record<string, unknown>) ?? {};
+    const qr = data.qrcode as Record<string, unknown> | undefined;
     return {
       instance: {
-        instanceName: id,
-        connectionStatus: (phone.status as string) ?? 'loading',
+        instanceName,
+        connectionStatus: (inst.status as ConnectionState) ?? 'connecting',
       },
+      qrcode: qr ? { base64: qr.base64 as string, code: qr.code as string | undefined } : undefined,
     };
   } catch {
     return null;
   }
 }
 
-// ─── listPhones ────────────────────────────────────────────────────────────────────────────────
+// ─── listPhones ───────────────────────────────────────────────────────────────
 
-/**
- * Lists all phones in the Maytapi product.
- * Used as fallback when createPhone is not available (e.g. free trial).
- */
+/** Lists all instances in the Evolution API server. */
 export async function listPhones(): Promise<string[]> {
+  const base = BASE();
+  if (!base) return [];
   try {
-    const pid = PRODUCT_ID();
-    if (!pid) return [];
-    const res = await fetch(`${BASE}/${pid}/listPhones`, {
+    const res = await fetch(`${base}/instance/fetchInstances`, {
       headers: headers(),
       cache: 'no-store',
     });
     if (!res.ok) return [];
     const data = (await res.json()) as unknown;
     const list = Array.isArray(data) ? data : [];
-    return list.map((p: Record<string, unknown>) => String(p.id)).filter(Boolean);
+    return list
+      .map((p: Record<string, unknown>) => {
+        const inst = p.instance as Record<string, unknown> | undefined;
+        return String(inst?.instanceName ?? p.instanceName ?? '');
+      })
+      .filter(Boolean);
   } catch {
     return [];
   }
@@ -122,15 +136,15 @@ export async function listPhones(): Promise<string[]> {
 // ─── getQRCode ────────────────────────────────────────────────────────────────
 
 /**
- * Fetches the QR code for the given Maytapi phoneId.
- * Returns { type: 'qrCode'|'screen', data: 'data:image/png;base64,...' }
+ * Fetches the QR code for an instance that is not yet connected.
+ * Calls GET /instance/connect/{instanceName}.
  */
-export async function getQRCode(phoneId: string, retries = 8): Promise<EvolutionQRCode | null> {
-  const pid = PRODUCT_ID();
-  if (!pid) return null;
+export async function getQRCode(instanceName: string, retries = 8): Promise<EvolutionQRCode | null> {
+  const base = BASE();
+  if (!base) return null;
   for (let i = 0; i < retries; i++) {
     try {
-      const res = await fetch(`${BASE}/${pid}/${phoneId}/qrCode`, {
+      const res = await fetch(`${base}/instance/connect/${instanceName}`, {
         headers: headers(),
         cache: 'no-store',
       });
@@ -139,12 +153,7 @@ export async function getQRCode(phoneId: string, retries = 8): Promise<Evolution
         continue;
       }
       const data = (await res.json()) as Record<string, unknown>;
-      // Maytapi returns { type: 'qrCode'|'screen'|'loading', data: 'data:image/...' }
-      if (data.type === 'loading') {
-        if (i < retries - 1) await new Promise(r => setTimeout(r, 2000));
-        continue;
-      }
-      if (data.data) return { base64: data.data as string };
+      if (data.base64) return { base64: data.base64 as string, code: data.code as string | undefined };
     } catch { }
     if (i < retries - 1) await new Promise(r => setTimeout(r, 2000));
   }
@@ -154,25 +163,31 @@ export async function getQRCode(phoneId: string, retries = 8): Promise<Evolution
 // ─── sendTextMessage ──────────────────────────────────────────────────────────
 
 /**
- * Sends a plain-text WhatsApp message via Maytapi.
- * `phone` must be in international format without '+', e.g. "393331234567".
+ * Sends a plain-text WhatsApp message via Evolution API.
+ * `phone` must be in international format, e.g. "393331234567".
  */
 export async function sendTextMessage(
-  phoneId: string,
+  instanceName: string,
   phone: string,
   message: string,
 ): Promise<boolean> {
+  const base = BASE();
+  if (!base) return false;
   try {
-    const pid = PRODUCT_ID();
-    if (!pid) return false;
-    const toNumber = phone.replace(/\D/g, '');
-    const res = await fetch(`${BASE}/${pid}/${phoneId}/sendMessage`, {
+    const number = phone.replace(/\D/g, '');
+    if (!number) return false;
+    const res = await fetch(`${base}/message/sendText/${instanceName}`, {
       method: 'POST',
       headers: headers(),
-      body: JSON.stringify({ to_number: toNumber, type: 'text', message }),
+      body: JSON.stringify({ number, text: message }),
     });
-    return res.ok;
-  } catch {
+    if (!res.ok) {
+      console.warn('[Evolution] sendText failed for', number, '→ status', res.status);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('[Evolution] network error for', phone, ':', err);
     return false;
   }
 }
@@ -180,13 +195,13 @@ export async function sendTextMessage(
 // ─── disconnectInstance ───────────────────────────────────────────────────────
 
 /**
- * Deletes the Maytapi phone slot (logs out and removes the phone from Maytapi).
+ * Logs out and deletes the Evolution API instance for the salon.
  */
-export async function disconnectInstance(phoneId: string): Promise<boolean> {
+export async function disconnectInstance(instanceName: string): Promise<boolean> {
+  const base = BASE();
+  if (!base) return false;
   try {
-    const pid = PRODUCT_ID();
-    if (!pid) return false;
-    const res = await fetch(`${BASE}/${pid}/${phoneId}`, {
+    const res = await fetch(`${base}/instance/delete/${instanceName}`, {
       method: 'DELETE',
       headers: headers(),
     });
@@ -196,8 +211,4 @@ export async function disconnectInstance(phoneId: string): Promise<boolean> {
   }
 }
 
-// ─── deleteInstance ───────────────────────────────────────────────────────────
-
-export async function deleteInstance(phoneId: string): Promise<boolean> {
-  return disconnectInstance(phoneId);
-}
+export { disconnectInstance as deleteInstance };
