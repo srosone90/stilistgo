@@ -1,7 +1,10 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').trim();
-const supabaseAnonKey = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '').trim();
+// Strip BOM (\uFEFF) that some editors/tools prepend — .trim() alone does not remove it
+function cleanKey(v: string | undefined): string { return (v ?? '').replace(/^\uFEFF/, '').trim(); }
+
+export const supabaseUrl = cleanKey(process.env.NEXT_PUBLIC_SUPABASE_URL);
+export const supabaseAnonKey = cleanKey(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 
 // Client lazy — non viene creato a livello di modulo per evitare crash SSR
 // se le env var non sono ancora disponibili durante il prerendering

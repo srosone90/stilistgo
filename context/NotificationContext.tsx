@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { createClient, RealtimeChannel } from '@supabase/supabase-js';
-import { getCurrentUser } from '@/lib/supabase';
+import { getCurrentUser, supabaseUrl as SUPA_URL, supabaseAnonKey as SUPA_KEY } from '@/lib/supabase';
 
 // --- Types ------------------------------------------------------------------
 export interface AppNotification {
@@ -124,12 +124,14 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         const userId = user.id as string;
         userIdRef.current = userId;
 
-        // Create a DEDICATED realtime client (not the shared Proxy)
-        const supabaseUrl  = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
-        const supabaseAnon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '';
+        // Create a DEDICATED realtime client (not the shared Proxy).
+        // Uses a unique storageKey to avoid "Multiple GoTrueClient" browser warning.
+        const supabaseUrl  = SUPA_URL;
+        const supabaseAnon = SUPA_KEY;
         if (!supabaseUrl || !supabaseAnon) return;
 
         rt.current = createClient(supabaseUrl, supabaseAnon, {
+          auth: { storageKey: 'sb-notif-auth', autoRefreshToken: false, persistSession: false },
           realtime: { reconnectAfterMs: (tries: number) => Math.min(tries * 1000, 10_000) },
         });
 

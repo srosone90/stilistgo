@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { supabase, supabaseAnonKey } from './supabase';
 import { Transaction, CashIn, CashOut, AppSettings } from '@/types';
 import * as local from './storage';
 
@@ -14,7 +14,7 @@ async function isSupabaseAvailable(): Promise<boolean> {
     const res = await fetch(
       `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/health`,
       {
-        headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY! },
+        headers: { apikey: supabaseAnonKey },
         signal: controller.signal,
       }
     );

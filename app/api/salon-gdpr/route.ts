@@ -15,9 +15,12 @@ import { createClient } from '@supabase/supabase-js';
 function getSupabaseFromRequest(req: NextRequest) {
   const authHeader = req.headers.get('authorization') ?? '';
   const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+  // Strip BOM (\uFEFF) that some tools prepend to env vars
+  const url  = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').replace(/^\uFEFF/, '').trim();
+  const anonKey = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '').replace(/^\uFEFF/, '').trim();
   return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    url,
+    anonKey,
     token ? { global: { headers: { Authorization: `Bearer ${token}` } } } : undefined
   );
 }

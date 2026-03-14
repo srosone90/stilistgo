@@ -38,9 +38,9 @@ export function verifyAdminRequest(authHeader: string | null): boolean {
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 export function getAdminDb(): SupabaseClient {
   // Always create a fresh client — never cache, so env var changes take effect immediately.
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const sk = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
-  const key = sk ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  const url = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').replace(/^\uFEFF/, '').trim();
+  const sk = process.env.SUPABASE_SERVICE_ROLE_KEY?.replace(/^\uFEFF/, '').trim();
+  const key = sk ?? (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '').replace(/^\uFEFF/, '').trim();;
   return createClient(url, key, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
