@@ -39,6 +39,7 @@ export async function GET(req: NextRequest) {
     bookingCountMap.set(r.salon_id, (bookingCountMap.get(r.salon_id) ?? 0) + 1);
   }
 
+  const DEFAULT_SALON_NAME = 'Stylistgo';
   const metaMap = new Map((metaRows ?? []).map((m: MetaRow) => [m.user_id, m]));
   const toCreate: { user_id: string; salon_name: string; email: string; full_name: string; registered_at: string }[] = [];
 
@@ -57,12 +58,19 @@ export async function GET(req: NextRequest) {
       });
     }
 
+    // Use the live salon name only if it is a real custom name (not empty, not factory default).
+    // Otherwise prefer whatever the admin manually set in admin_tenants — it is more reliable.
+    const liveSalonName = cfg.salonName?.trim() ?? '';
+    const hasRealLiveName = liveSalonName && liveSalonName !== DEFAULT_SALON_NAME;
+    const displaySalonName = hasRealLiveName
+      ? liveSalonName
+      : (meta?.salon_name || liveSalonName || row.user_id.slice(0, 12));
+
     return {
       user_id: row.user_id,
-      // Always prefer live salon_data over cached admin_tenants for informational fields
       email: cfg.email || meta?.email || '',
       full_name: meta?.full_name ?? '',
-      salon_name: cfg.salonName || meta?.salon_name || row.user_id.slice(0, 12),
+      salon_name: displaySalonName,
       plan: meta?.plan ?? 'trial',
       monthly_price: meta?.monthly_price ?? 0,
       trial_ends_at: meta?.trial_ends_at ?? null,
@@ -98,7 +106,6 @@ export async function GET(req: NextRequest) {
   // IMPORTANT: only overwrite salon_name if the tenant has set a real custom name
   // (not empty and not the factory default "Stylistgo"). This prevents the auto-sync
   // from clobbering names that were manually set by the admin.
-  const DEFAULT_SALON_NAME = 'Stylistgo';
   const toSync = (salonRows ?? []).flatMap((row: { user_id: string; state: SalonState }) => {
     const cfg2 = ((row.state ?? {}) as SalonState).salonConfig ?? {};
     const meta2 = metaMap.get(row.user_id) as MetaRow | undefined;
