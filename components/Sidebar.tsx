@@ -76,7 +76,7 @@ interface SidebarProps {
 
 export default function Sidebar({ activeView, onNavigate, onLock, permissions, planFeatures }: SidebarProps) {
   const { dataSource } = useApp();
-  const { operators, activeOperatorId, setActiveOperatorId, checkPinMode, setPrivateMode } = useSalon();
+  const { operators, activeOperatorId, setActiveOperatorId, checkPinMode, setPrivateMode, cloudSyncStatus } = useSalon();
   const { isDark, toggleTheme } = useTheme();
   const { notifications, unreadCount } = useNotifications();
   const newBookingCount = notifications.filter(n => !n.read && n.type === 'new_booking').length;
@@ -246,8 +246,8 @@ export default function Sidebar({ activeView, onNavigate, onLock, permissions, p
           <div className="px-1">
             <p className="text-xs font-medium text-white truncate">{userName}</p>
             <div className="flex items-center gap-1 mt-0.5 text-xs"
-              style={{ color: dataSource === 'supabase' ? '#22c55e' : '#f59e0b' }}>
-              {dataSource === 'supabase'
+              style={{ color: cloudSyncStatus === 'cloud' ? '#22c55e' : '#f59e0b' }}>
+              {cloudSyncStatus === 'cloud'
                 ? <><Wifi size={10} /> Cloud</>
                 : <><WifiOff size={10} /> Locale</>}
             </div>

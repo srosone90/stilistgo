@@ -145,6 +145,9 @@ interface SalonContextValue {
 
   // Online bookings → calendar import (called on real-time tick)
   importPendingBookings: () => Promise<void>;
+
+  // Cloud connectivity: 'cloud' = authenticated Supabase user, 'local' = offline/local account
+  cloudSyncStatus: 'cloud' | 'local';
 }
 
 const SalonContext = createContext<SalonContextValue | null>(null);
@@ -206,6 +209,7 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
   const [subscriptions, setSubscriptions] = useState<ClientSubscription[]>([]);
   const [salonLoading, setSalonLoading] = useState(true);
   const [cloudReady, setCloudReady] = useState(false);
+  const [cloudSyncStatus, setCloudSyncStatus] = useState<'cloud' | 'local'>('local');
   const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cloudLoadAttempted = useRef(false);
   // A ref always holding the latest state snapshot — used by the flush-on-hide effect
@@ -371,6 +375,7 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
         const user = await getCurrentUser();
         // Local-only users (id starts with 'local-') have no Supabase session — skip cloud
         if (!user || (user.id as string).startsWith('local-')) return;
+        setCloudSyncStatus('cloud'); // user has a real Supabase account → data syncs to cloud
         setStorageUserId(user.id as string);
         const cloudState = await dbGetSalonState(user.id as string);
         if (!cloudState) return;
@@ -594,11 +599,12 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
       if (!user || (user.id as string).startsWith('local-')) return;
       const userId = user.id as string;
       unsub = dbSubscribeToSalonChanges(userId, (newState) => {
-        // Skip if this update was triggered by our own save (debounce)
+        // Skip only if this is our OWN save echoed back (same device, same timestamp)
         const cloudTs = (newState._savedAt as number) ?? 0;
         const localTs = getLocalSavedAt();
-        if (cloudTs <= localTs) return; // our own save or older — skip
-        // Merge incoming cloud state with current local state
+        if (cloudTs < localTs) return; // strictly older than our last save — skip
+        if (cloudTs === localTs) return; // exact echo of our own save — skip
+        // Merge incoming cloud state with current local state (ALL entities)
         const cloudDel2 = (newState._deleted ?? {}) as DeletedMap;
         const localDel2 = storageGetDeleted();
         const merged2: DeletedMap = { ...localDel2 };
@@ -609,18 +615,58 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
         const ma = <T extends WithId>(local: T[], cloud: unknown, entity: string): T[] =>
           mergeItems(local, Array.isArray(cloud) ? cloud as T[] : [], merged2[entity] ?? [], []);
         const snap = latestStateRef.current;
-        const nc  = ma<Client>(snap.clients as Client[], newState.clients, 'clients');
-        const ns  = ma<Service>(snap.services as Service[], newState.services, 'services');
-        const no  = ma<Operator>(snap.operators as Operator[], newState.operators, 'operators');
-        const na  = ma<Appointment>(snap.appointments as Appointment[], newState.appointments, 'appointments');
-        const np  = ma<Payment>(snap.payments as Payment[], newState.payments, 'payments');
-        const nsu = ma<Supplier>(snap.suppliers as Supplier[], (newState as Record<string, unknown>).suppliers, 'suppliers');
+        // ── Array entities with updatedAt ──────────────────────────────────
+        const nc   = ma<Client>(snap.clients as Client[], newState.clients, 'clients');
+        const ntc  = ma<TechnicalCard>(snap.technicalCards as TechnicalCard[], newState.technicalCards, 'technicalCards');
+        const ns   = ma<Service>(snap.services as Service[], newState.services, 'services');
+        const no   = ma<Operator>(snap.operators as Operator[], newState.operators, 'operators');
+        const nab  = ma<Absence>(snap.absences as Absence[], newState.absences, 'absences');
+        const na   = ma<Appointment>(snap.appointments as Appointment[], newState.appointments, 'appointments');
+        const nwl  = ma<WaitingListEntry>(snap.waitingList as WaitingListEntry[], newState.waitingList, 'waitingList');
+        const nprod = ma<Product>(snap.products as Product[], newState.products, 'products');
+        const nst  = ma<StockMovement>(snap.stockMovements as StockMovement[], newState.stockMovements, 'stockMovements');
+        const ngc  = ma<GiftCard>(snap.giftCards as GiftCard[], newState.giftCards, 'giftCards');
+        const npay = ma<Payment>(snap.payments as Payment[], newState.payments, 'payments');
+        const nsupp = ma<Supplier>(snap.suppliers as Supplier[], (newState as Record<string, unknown>).suppliers, 'suppliers');
+        const nsub = ma<ClientSubscription>(snap.subscriptions as ClientSubscription[], (newState as Record<string, unknown>).subscriptions, 'subscriptions');
         setClients(nc); storageSaveClients(nc);
+        setTechnicalCards(ntc); storageSaveTechnicalCards(ntc);
         setServices(ns); storageSaveServices(ns);
         setOperators(no); storageSaveOperators(no);
+        setAbsences(nab); storageSaveAbsences(nab);
         setAppointments(na); storageSaveAppointments(na);
-        setPayments(np); storageSavePayments(np);
-        setSuppliers(nsu); storageSaveSuppliers(nsu);
+        setWaitingList(nwl); storageSaveWaitingList(nwl);
+        setProducts(nprod); storageSaveProducts(nprod);
+        setStockMovements(nst); storageSaveStockMovements(nst);
+        setGiftCards(ngc); storageSaveGiftCards(ngc);
+        setPayments(npay); storageSavePayments(npay);
+        setSuppliers(nsupp); storageSaveSuppliers(nsupp);
+        setSubscriptions(nsub); storageSaveSubscriptions(nsub);
+        // ── CashSessions: no updatedAt, replace wholesale if cloud is newer ─
+        if (Array.isArray(newState.cashSessions)) {
+          setCashSessions(newState.cashSessions as CashSession[]); storageSaveCashSessions(newState.cashSessions as CashSession[]);
+        }
+        // ── SalonConfig: replace preserving local-only PINs ────────────────
+        if (newState.salonConfig) {
+          const localCfgRt = storageGetSalonConfig();
+          const cloudCfgRt = newState.salonConfig as SalonConfig;
+          const mergedCfgRt: SalonConfig = { ...cloudCfgRt, ownerPublicPin: localCfgRt.ownerPublicPin || cloudCfgRt.ownerPublicPin, ownerPrivatePin: localCfgRt.ownerPrivatePin || cloudCfgRt.ownerPrivatePin };
+          setSalonConfig(mergedCfgRt); storageSaveSalonConfig(mergedCfgRt);
+        }
+        // ── GamificationConfig ────────────────────────────────────────────
+        if (newState.gamificationConfig) {
+          setGamificationConfig(newState.gamificationConfig as GamificationConfig);
+          storageSaveGamificationConfig(newState.gamificationConfig as GamificationConfig);
+        }
+        // ── ClientAppConfig ───────────────────────────────────────────────
+        if ((newState as Record<string, unknown>).clientAppConfig) {
+          const cac = (newState as Record<string, unknown>).clientAppConfig as ClientAppConfig;
+          setClientAppConfig(cac); storageSaveClientAppConfig(cac);
+        }
+        // ── WhatsApp message log (memory-only, no localStorage) ──────────
+        if (Array.isArray((newState as Record<string, unknown>).whatsappMessages)) {
+          setWhatsappMessages((newState as Record<string, unknown>).whatsappMessages as WhatsAppMessage[]);
+        }
       });
     });
     return () => { unsub?.(); };
@@ -1103,6 +1149,7 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
       suppliers, addSupplier, updateSupplier, deleteSupplier,
       subscriptions, addSubscription, updateSubscription, deleteSubscription, useSubscriptionSession,
       importPendingBookings,
+      cloudSyncStatus,
     }}>
       {children}
     </SalonContext.Provider>
