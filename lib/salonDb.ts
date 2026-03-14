@@ -53,6 +53,32 @@ export async function dbSaveSalonState(userId: string, state: Record<string, unk
   }
 }
 
+/**
+ * Subscribe to real-time changes on salon_data for a given user.
+ * Returns an unsubscribe function.  Call it on component unmount.
+ */
+export function dbSubscribeToSalonChanges(
+  userId: string,
+  onUpdate: (newState: Record<string, unknown>) => void,
+): () => void {
+  try {
+    const channel = supabase
+      .channel(`salon_sync_${userId}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'salon_data', filter: `user_id=eq.${userId}` },
+        (payload) => {
+          const row = payload.new as { state?: Record<string, unknown>; user_id?: string } | undefined;
+          if (row?.state) onUpdate(row.state);
+        },
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  } catch {
+    return () => {};
+  }
+}
+
 export interface OnlineBooking {
   id: string;
   created_at: string;

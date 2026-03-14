@@ -36,8 +36,7 @@ export interface Client {
   lastVisitDate?: string;   // YYYY-MM-DD — data ultima visita (da import)
   totalVisits?: number;     // numero totale passaggi (da import)
   totalRevenue?: number;    // fatturato totale (da import)
-  createdAt: string;
-}
+  createdAt: string;  updatedAt?: string;}
 
 export type HairType = 'lisci' | 'mossi' | 'ricci' | 'crespi' | 'altro';
 export type HairCondition = 'sani' | 'secchi' | 'grassi' | 'colorati' | 'trattati' | 'rovinati';
@@ -63,6 +62,7 @@ export interface TechnicalCard {
   photosAfter?: string[];  // base64 data URLs
   appointmentId?: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 // ─── Services ─────────────────────────────────────────────────────────────────
@@ -99,6 +99,7 @@ export interface Service {
   active: boolean;
   productUsage?: ServiceProductUsage[]; // auto-deduct from stock when service is rendered
   createdAt: string;
+  updatedAt?: string;
 }
 
 // ─── Operators / Staff ────────────────────────────────────────────────────────
@@ -156,6 +157,7 @@ export interface Operator {
   privatePin?: string; // PIN privato (solo titolare) — mostra transazioni nascoste
   permissions?: OperatorPermissions; // undefined = accesso completo (titolare)
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface Absence {
@@ -165,6 +167,7 @@ export interface Absence {
   endDate: string;   // YYYY-MM-DD
   reason: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 // ─── Appointments ─────────────────────────────────────────────────────────────
@@ -216,6 +219,7 @@ export interface Appointment {
   feedbackScore: number; // 0 = not given, 1-5
   history: AppointmentHistoryEntry[];
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface WaitingListEntry {
@@ -226,6 +230,7 @@ export interface WaitingListEntry {
   preferredDateFrom: string;
   notes: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 // ─── Inventory ────────────────────────────────────────────────────────────────
@@ -253,6 +258,7 @@ export interface Product {
   active: boolean;
   supplierId?: string; // reference to Supplier
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface StockMovement {
@@ -264,6 +270,7 @@ export interface StockMovement {
   notes: string;
   operatorId: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 // ─── Gift Cards ───────────────────────────────────────────────────────────────
@@ -282,6 +289,7 @@ export interface GiftCard {
   recipientPhone?: string; // phone to send the gift card to (if different from clientId)
   message?: string; // personal message
   createdAt: string;
+  updatedAt?: string;
 }
 
 // ─── WhatsApp Automations (UltraMsg) ─────────────────────────────────────────
@@ -442,6 +450,7 @@ export interface Payment {
   isHidden?: boolean;        // nascosto: visibile solo con PIN privato titolare
   notes: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface CashSession {
@@ -451,6 +460,7 @@ export interface CashSession {
   closingBalance: number | null;
   closedAt: string | null;
   createdAt: string;
+  updatedAt?: string;
 }
 
 // ─── Gamification ───────────────────────────────────────────────────────────
@@ -493,6 +503,7 @@ export interface Supplier {
   notes: string;
   active: boolean;
   createdAt: string;
+  updatedAt?: string;
 }
 
 // ─── Client Subscriptions ─────────────────────────────────────────────────────
@@ -514,6 +525,7 @@ export interface ClientSubscription {
   purchasedByOperatorId?: string;
   notes: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 // ─── Client App Configuration ─────────────────────────────────────────────────

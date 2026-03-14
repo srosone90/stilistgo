@@ -21,7 +21,9 @@ export async function POST(req: NextRequest) {
   const { data, error } = await db.auth.admin.generateLink({
     type: 'magiclink',
     email,
-    options: { redirectTo: `${siteUrl}/` },
+    // ?view=1 tells the app to load data from cloud only and never write back.
+    // This prevents the admin browser's localStorage from contaminating the tenant's data.
+    options: { redirectTo: `${siteUrl}/?view=1` },
   });
 
   if (error || !data?.properties?.action_link) {

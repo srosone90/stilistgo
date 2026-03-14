@@ -64,6 +64,7 @@ const K = () => ({
   subscriptions:     `stylistgo_${_uid}_subscriptions`,
   clientAppConfig:   `stylistgo_${_uid}_client_app_config`,
   savedAt:           `stylistgo_${_uid}_saved_at`,
+  deleted:           `stylistgo_${_uid}_deleted`,
 });
 
 /** Returns the timestamp (ms) of the last successful local save, or 0 if never saved. */
@@ -219,4 +220,27 @@ export function storageGetClientAppConfig(): ClientAppConfig {
 }
 export function storageSaveClientAppConfig(data: ClientAppConfig): void {
   if (typeof window !== 'undefined') localStorage.setItem(K().clientAppConfig, JSON.stringify(data));
+}
+
+// ─── Deleted items tracking (for cross-device delete propagation) ──────────────────
+
+export type DeletedMap = Record<string, string[]>;
+
+export function storageGetDeleted(): DeletedMap {
+  if (typeof window === 'undefined') return {};
+  try {
+    return JSON.parse(localStorage.getItem(K().deleted) || '{}') as DeletedMap;
+  } catch { return {}; }
+}
+
+export function storageSaveDeleted(map: DeletedMap): void {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(K().deleted, JSON.stringify(map));
+}
+
+export function storageMarkDeleted(entity: string, id: string): void {
+  const map = storageGetDeleted();
+  if (!map[entity]) map[entity] = [];
+  if (!map[entity].includes(id)) map[entity].push(id);
+  storageSaveDeleted(map);
 }

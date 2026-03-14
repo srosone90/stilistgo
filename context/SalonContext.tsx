@@ -31,9 +31,11 @@ import {
   storageGetClientAppConfig, storageSaveClientAppConfig,
   salonGenerateId, setStorageUserId,
   getLocalSavedAt, setLocalSavedAt,
+  storageGetDeleted, storageSaveDeleted, storageMarkDeleted,
+  type DeletedMap,
 } from '@/lib/salonStorage';
 import { getCurrentUser } from '@/lib/supabase';
-import { dbGetSalonState, dbSaveSalonState, dbGetOnlineBookings, dbUpdateBookingStatus } from '@/lib/salonDb';
+import { dbGetSalonState, dbSaveSalonState, dbGetOnlineBookings, dbUpdateBookingStatus, dbSubscribeToSalonChanges } from '@/lib/salonDb';
 
 interface SalonContextValue {
   // State
@@ -147,7 +149,41 @@ interface SalonContextValue {
 
 const SalonContext = createContext<SalonContextValue | null>(null);
 
+// ─── Per-item merge helper ──────────────────────────────────────────────────────────────────
+// Merges two arrays by item id. For each id, takes the version with the
+// higher updatedAt (falls back to createdAt if updatedAt is absent).
+// Items in either deletedIds set are removed from the result.
+type WithId = { id: string; updatedAt?: string; createdAt: string };
+function mergeItems<T extends WithId>(
+  local: T[], cloud: T[],
+  localDel: string[] = [], cloudDel: string[] = [],
+): T[] {
+  const delSet = new Set([...localDel, ...cloudDel]);
+  const map = new Map<string, T>();
+  for (const item of local) {
+    if (!delSet.has(item.id)) map.set(item.id, item);
+  }
+  for (const item of cloud) {
+    if (delSet.has(item.id)) continue;
+    const ex = map.get(item.id);
+    if (!ex) {
+      map.set(item.id, item);
+    } else {
+      const localTs = ex.updatedAt ?? ex.createdAt;
+      const cloudTs = item.updatedAt ?? item.createdAt;
+      if (cloudTs > localTs) map.set(item.id, item);
+    }
+  }
+  return Array.from(map.values());
+}
+
 export function SalonProvider({ children }: { children: React.ReactNode }) {
+  // ── View-only mode: set when admin impersonates a tenant ─────────────────
+  // In this mode we load cloud data but NEVER write back (prevents localStorage
+  // contamination when the admin browser has stale data for a different user).
+  const isViewMode = typeof window !== 'undefined'
+    && new URLSearchParams(window.location.search).get('view') === '1';
+
   const [clients, setClients] = useState<Client[]>([]);
   const [technicalCards, setTechnicalCards] = useState<TechnicalCard[]>([]);
   const [services, setServices] = useState<Service[]>([]);
@@ -169,6 +205,7 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [subscriptions, setSubscriptions] = useState<ClientSubscription[]>([]);
   const [salonLoading, setSalonLoading] = useState(true);
+  const [cloudReady, setCloudReady] = useState(false);
   const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cloudLoadAttempted = useRef(false);
   // A ref always holding the latest state snapshot — used by the flush-on-hide effect
@@ -338,99 +375,136 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
         const cloudState = await dbGetSalonState(user.id as string);
         if (!cloudState) return;
         const adminState = cloudState.admin_state as Record<string, unknown> | undefined;
-        // When loading admin-configured operators, preserve any pin/privatePin already stored locally.
-        // admin_state never contains PINs (set by salon admin onboarding, not by the user).
-        if (adminState?.operators) {
-          const localOps = storageGetOperators();
-          const withPins = (adminState.operators as Operator[]).map(op => {
-            const local = localOps.find(l => l.id === op.id);
-            if (!local) return op;
-            // Preserve user-customizable fields from local copy; admin_state only sets identity/role
-            return { ...op, pin: local.pin, privatePin: local.privatePin, color: local.color || op.color, commissionRate: local.commissionRate ?? op.commissionRate, schedule: local.schedule?.length ? local.schedule : op.schedule };
-          });
-          setOperators(withPins); storageSaveOperators(withPins);
+        // ── Per-item merge: each entity is merged independently ─────────────
+        // Items are compared by updatedAt (falls back to createdAt).
+        // Items present in either the local or cloud deleted-IDs registry are removed.
+        const cloudDel = (cloudState._deleted ?? {}) as DeletedMap;
+        const localDel = storageGetDeleted();
+        // Merge the two deleted maps (union) and persist
+        const mergedDel: DeletedMap = { ...localDel };
+        for (const entity of Object.keys(cloudDel)) {
+          mergedDel[entity] = Array.from(new Set([...(mergedDel[entity] ?? []), ...(cloudDel[entity] ?? [])]));
         }
-        if (adminState?.salonConfig) {
-          // Preserve owner PINs stored in salonConfig — admin_state never contains them
-          const localCfg = storageGetSalonConfig();
-          const adminCfg = adminState.salonConfig as SalonConfig;
-          const merged = { ...adminCfg, ownerPublicPin: localCfg.ownerPublicPin, ownerPrivatePin: localCfg.ownerPrivatePin };
-          setSalonConfig(prev => ({ ...prev, ...merged })); storageSaveSalonConfig({ ...({} as SalonConfig), ...merged });
-        }
-        // Only overwrite local data if cloud has actual content (non-empty arrays).
-        // This prevents a partial/empty cloud state from wiping freshly-read local data.
+        storageSaveDeleted(mergedDel);
+
+        const mArr = <T extends WithId>(
+          localArr: T[], cloudArr: unknown, entity: string,
+        ): T[] => mergeItems(
+          localArr,
+          Array.isArray(cloudArr) ? cloudArr as T[] : [],
+          mergedDel[entity] ?? [],
+          [], // already merged into mergedDel above
+        );
+
+        const newClients  = mArr<Client>(storageGetClients(), cloudState.clients, 'clients');
+        const newTechCards = mArr<TechnicalCard>(storageGetTechnicalCards(), cloudState.technicalCards, 'technicalCards');
+        const newServices  = mArr<Service>(storageGetServices(), cloudState.services, 'services');
+        const newAbsences  = mArr<Absence>(storageGetAbsences(), cloudState.absences, 'absences');
+        const newApts      = mArr<Appointment>(storageGetAppointments(), cloudState.appointments, 'appointments');
+        const newWaiting   = mArr<WaitingListEntry>(storageGetWaitingList(), cloudState.waitingList, 'waitingList');
+        const newProducts  = mArr<Product>(storageGetProducts(), cloudState.products, 'products');
+        const newStock     = mArr<StockMovement>(storageGetStockMovements(), cloudState.stockMovements, 'stockMovements');
+        const newGiftCards = mArr<GiftCard>(storageGetGiftCards(), cloudState.giftCards, 'giftCards');
+        const newPayments  = mArr<Payment>(storageGetPayments(), cloudState.payments, 'payments');
+        const newSuppliers = mArr<Supplier>(storageGetSuppliers() as Supplier[], (cloudState as Record<string, unknown>).suppliers, 'suppliers');
+        const newSubs      = mArr<ClientSubscription>(storageGetSubscriptions() as ClientSubscription[], (cloudState as Record<string, unknown>).subscriptions, 'subscriptions');
+
+        // Operators: merge per-item but also preserve PINs (they are local-only fields)
+        const localOpsStorage = storageGetOperators();
+        const newOpsRaw = mArr<Operator>(localOpsStorage, cloudState.operators, 'operators');
+        const newOps = newOpsRaw.map(op => {
+          const local = localOpsStorage.find(l => l.id === op.id);
+          if (!local) return op;
+          return { ...op, pin: local.pin || op.pin, privatePin: local.privatePin || op.privatePin, color: local.color || op.color, commissionRate: local.commissionRate ?? op.commissionRate, schedule: local.schedule?.length ? local.schedule : op.schedule };
+        });
+
+        // cashSessions / whatsappMessages / subscriptions: merge as arrays (no updatedAt)
         const arr = <T,>(v: unknown): v is T[] => Array.isArray(v) && (v as T[]).length > 0;
+
         const cloudSavedAt = (cloudState._savedAt as number) ?? 0;
         const localSavedAt = getLocalSavedAt();
         const cloudIsNewer = cloudSavedAt >= localSavedAt;
-        if (cloudIsNewer && Array.isArray(cloudState.clients))                   { setClients(cloudState.clients as Client[]); storageSaveClients(cloudState.clients as Client[]); }
-        if (cloudIsNewer && Array.isArray(cloudState.technicalCards))     { setTechnicalCards(cloudState.technicalCards as TechnicalCard[]); storageSaveTechnicalCards(cloudState.technicalCards as TechnicalCard[]); }
-        if (cloudIsNewer && Array.isArray(cloudState.services))                 { setServices(cloudState.services as Service[]); storageSaveServices(cloudState.services as Service[]); }
-        if (cloudIsNewer && Array.isArray(cloudState.operators)) {
-          // Cloud operators may have had PINs stripped by dbSaveSalonState if admin_state was present.
-          // Always re-apply locally stored pins and user-customized fields so they are never lost.
-          const localOps = storageGetOperators();
-          const withPins = (cloudState.operators as Operator[]).map(op => {
-            const local = localOps.find(l => l.id === op.id);
-            if (!local) return op;
-            return { ...op, pin: local.pin || op.pin, privatePin: local.privatePin || op.privatePin, color: local.color || op.color, commissionRate: local.commissionRate ?? op.commissionRate, schedule: local.schedule?.length ? local.schedule : op.schedule };
-          });
-          setOperators(withPins); storageSaveOperators(withPins);
+
+        if (!isViewMode) {
+          setClients(newClients); storageSaveClients(newClients);
+          setTechnicalCards(newTechCards); storageSaveTechnicalCards(newTechCards);
+          setServices(newServices); storageSaveServices(newServices);
+          setOperators(newOps); storageSaveOperators(newOps);
+          setAbsences(newAbsences); storageSaveAbsences(newAbsences);
+          setAppointments(newApts); storageSaveAppointments(newApts);
+          setWaitingList(newWaiting); storageSaveWaitingList(newWaiting);
+          setProducts(newProducts); storageSaveProducts(newProducts);
+          setStockMovements(newStock); storageSaveStockMovements(newStock);
+          setGiftCards(newGiftCards); storageSaveGiftCards(newGiftCards);
+          setPayments(newPayments); storageSavePayments(newPayments);
+          setSuppliers(newSuppliers); storageSaveSuppliers(newSuppliers);
+          setSubscriptions(newSubs); storageSaveSubscriptions(newSubs);
+          if (arr<CashSession>(cloudState.cashSessions)) { setCashSessions(cloudState.cashSessions as CashSession[]); storageSaveCashSessions(cloudState.cashSessions as CashSession[]); }
+          if (arr<WhatsAppMessage>((cloudState as Record<string, unknown>).whatsappMessages)) { setWhatsappMessages((cloudState as Record<string, unknown>).whatsappMessages as WhatsAppMessage[]); }
+        } else {
+          // View-only (impersonation): load directly from cloud without writing localStorage
+          setClients(Array.isArray(cloudState.clients) ? cloudState.clients as Client[] : []);
+          setTechnicalCards(Array.isArray(cloudState.technicalCards) ? cloudState.technicalCards as TechnicalCard[] : []);
+          setServices(Array.isArray(cloudState.services) ? cloudState.services as Service[] : []);
+          setOperators(Array.isArray(cloudState.operators) ? cloudState.operators as Operator[] : []);
+          setAbsences(Array.isArray(cloudState.absences) ? cloudState.absences as Absence[] : []);
+          setAppointments(Array.isArray(cloudState.appointments) ? cloudState.appointments as Appointment[] : []);
+          setWaitingList(Array.isArray(cloudState.waitingList) ? cloudState.waitingList as WaitingListEntry[] : []);
+          setProducts(Array.isArray(cloudState.products) ? cloudState.products as Product[] : []);
+          setStockMovements(Array.isArray(cloudState.stockMovements) ? cloudState.stockMovements as StockMovement[] : []);
+          setGiftCards(Array.isArray(cloudState.giftCards) ? cloudState.giftCards as GiftCard[] : []);
+          setPayments(Array.isArray(cloudState.payments) ? cloudState.payments as Payment[] : []);
+          if (arr<Supplier>((cloudState as Record<string, unknown>).suppliers)) setSuppliers((cloudState as Record<string, unknown>).suppliers as Supplier[]);
+          if (arr<ClientSubscription>((cloudState as Record<string, unknown>).subscriptions)) setSubscriptions((cloudState as Record<string, unknown>).subscriptions as ClientSubscription[]);
+          if (arr<CashSession>(cloudState.cashSessions)) setCashSessions(cloudState.cashSessions as CashSession[]);
         }
-        if (cloudIsNewer && Array.isArray(cloudState.absences))                 { setAbsences(cloudState.absences as Absence[]); storageSaveAbsences(cloudState.absences as Absence[]); }
-        if (cloudIsNewer && Array.isArray(cloudState.appointments))         { setAppointments(cloudState.appointments as Appointment[]); storageSaveAppointments(cloudState.appointments as Appointment[]); }
-        if (cloudIsNewer && Array.isArray(cloudState.waitingList))     { setWaitingList(cloudState.waitingList as WaitingListEntry[]); storageSaveWaitingList(cloudState.waitingList as WaitingListEntry[]); }
-        if (cloudIsNewer && Array.isArray(cloudState.products))                 { setProducts(cloudState.products as Product[]); storageSaveProducts(cloudState.products as Product[]); }
-        if (cloudIsNewer && Array.isArray(cloudState.stockMovements))     { setStockMovements(cloudState.stockMovements as StockMovement[]); storageSaveStockMovements(cloudState.stockMovements as StockMovement[]); }
-        if (cloudIsNewer && Array.isArray(cloudState.giftCards))               { setGiftCards(cloudState.giftCards as GiftCard[]); storageSaveGiftCards(cloudState.giftCards as GiftCard[]); }
-        if (cloudIsNewer && Array.isArray(cloudState.payments))                 { setPayments(cloudState.payments as Payment[]); storageSavePayments(cloudState.payments as Payment[]); }
-        if (arr<CashSession>(cloudState.cashSessions))         { setCashSessions(cloudState.cashSessions as CashSession[]); storageSaveCashSessions(cloudState.cashSessions as CashSession[]); }
-        if (arr<WhatsAppMessage>((cloudState as Record<string, unknown>).whatsappMessages)) { setWhatsappMessages((cloudState as Record<string, unknown>).whatsappMessages as WhatsAppMessage[]); }
-        const cs = cloudState as Record<string, unknown>;
-        if (arr<Supplier>(cs.suppliers))             { setSuppliers(cs.suppliers as Supplier[]); storageSaveSuppliers(cs.suppliers as Supplier[]); }
-        if (arr<ClientSubscription>(cs.subscriptions)) { setSubscriptions(cs.subscriptions as ClientSubscription[]); storageSaveSubscriptions(cs.subscriptions as ClientSubscription[]); }
-        // For object fields (salonConfig, gamificationConfig) compare timestamps:
-        // only apply cloud data if cloud saved it MORE RECENTLY than our last local save.
-        if (cloudIsNewer) {
-          if (cloudState.salonConfig) {
-            // Always preserve owner PINs from local storage — they are never in the cloud state
-            const localCfg = storageGetSalonConfig();
-            const cloudCfg = cloudState.salonConfig as SalonConfig;
-            const mergedCfg: SalonConfig = {
-              ...cloudCfg,
-              ownerPublicPin: localCfg.ownerPublicPin || cloudCfg.ownerPublicPin,
-              ownerPrivatePin: localCfg.ownerPrivatePin || cloudCfg.ownerPrivatePin,
-            };
-            setSalonConfig(mergedCfg); storageSaveSalonConfig(mergedCfg);
-          }
-          if (cloudState.gamificationConfig) { setGamificationConfig(cloudState.gamificationConfig as GamificationConfig); storageSaveGamificationConfig(cloudState.gamificationConfig as GamificationConfig); }
-          if ((cloudState as Record<string, unknown>).clientAppConfig) { const cac = (cloudState as Record<string, unknown>).clientAppConfig as ClientAppConfig; setClientAppConfig(cac); storageSaveClientAppConfig(cac); }
-        } else if (cloudState.salonConfig) {
-          // Even if local is newer, always apply admin-set WhatsApp credentials from cloud.
-          // Admins write directly to the DB without updating _savedAt, so we must always
-          // pick up ultraMsgInstanceId/ultraMsgToken regardless of the timestamp comparison.
+
+        // salonConfig: merge with pin preservation
+        if (cloudIsNewer && cloudState.salonConfig) {
+          const localCfg = storageGetSalonConfig();
+          const cloudCfg = cloudState.salonConfig as SalonConfig;
+          const mergedCfg: SalonConfig = { ...cloudCfg, ownerPublicPin: localCfg.ownerPublicPin || cloudCfg.ownerPublicPin, ownerPrivatePin: localCfg.ownerPrivatePin || cloudCfg.ownerPrivatePin };
+          setSalonConfig(mergedCfg);
+          if (!isViewMode) storageSaveSalonConfig(mergedCfg);
+        } else if (!cloudIsNewer && cloudState.salonConfig) {
           const cloudWa = (cloudState.salonConfig as SalonConfig).whatsapp;
           if (cloudWa?.ultraMsgInstanceId || cloudWa?.ultraMsgToken) {
             setSalonConfig(prev => {
-              const merged: SalonConfig = {
-                ...prev,
-                whatsapp: {
-                  ...DEFAULT_WHATSAPP_CONFIG,
-                  ...(prev.whatsapp ?? {}),
-                  ultraMsgInstanceId: cloudWa.ultraMsgInstanceId,
-                  ultraMsgToken: cloudWa.ultraMsgToken,
-                },
-              };
-              storageSaveSalonConfig(merged);
+              const merged: SalonConfig = { ...prev, whatsapp: { ...DEFAULT_WHATSAPP_CONFIG, ...(prev.whatsapp ?? {}), ultraMsgInstanceId: cloudWa.ultraMsgInstanceId, ultraMsgToken: cloudWa.ultraMsgToken } };
+              if (!isViewMode) storageSaveSalonConfig(merged);
               return merged;
             });
           }
+        }
+        if (cloudIsNewer) {
+          if (cloudState.gamificationConfig) { setGamificationConfig(cloudState.gamificationConfig as GamificationConfig); if (!isViewMode) storageSaveGamificationConfig(cloudState.gamificationConfig as GamificationConfig); }
+          if ((cloudState as Record<string, unknown>).clientAppConfig) { const cac = (cloudState as Record<string, unknown>).clientAppConfig as ClientAppConfig; setClientAppConfig(cac); if (!isViewMode) storageSaveClientAppConfig(cac); }
+        }
+
+        // Admin state overrides (operator list + salonConfig pushed by admin panel)
+        if (adminState?.operators) {
+          const localOps2 = storageGetOperators();
+          const withPins = (adminState.operators as Operator[]).map(op => {
+            const local = localOps2.find(l => l.id === op.id);
+            if (!local) return op;
+            return { ...op, pin: local.pin, privatePin: local.privatePin, color: local.color || op.color, commissionRate: local.commissionRate ?? op.commissionRate, schedule: local.schedule?.length ? local.schedule : op.schedule };
+          });
+          setOperators(withPins);
+          if (!isViewMode) storageSaveOperators(withPins);
+        }
+        if (adminState?.salonConfig) {
+          const localCfg2 = storageGetSalonConfig();
+          const adminCfg = adminState.salonConfig as SalonConfig;
+          const merged2 = { ...adminCfg, ownerPublicPin: localCfg2.ownerPublicPin, ownerPrivatePin: localCfg2.ownerPrivatePin };
+          setSalonConfig(prev => ({ ...prev, ...merged2 }));
+          if (!isViewMode) storageSaveSalonConfig({ ...({} as SalonConfig), ...merged2 });
         }
 
         // ── Auto-import pending online bookings into the calendar ────────────
         await importPendingBookings();
       } catch { /* ignore */ } finally {
         cloudLoadAttempted.current = true;
+        setCloudReady(true);
       }
     };
     loadCloud();
@@ -439,6 +513,7 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
 
   // ─── Cloud sync: debounced save on every state change ─────────────────────
   useEffect(() => {
+    if (isViewMode) return; // never write back when impersonating
     if (!cloudLoadAttempted.current) return;
     if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
     const savedAt = Date.now();
@@ -456,6 +531,7 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
           cashSessions, salonConfig, gamificationConfig, whatsappMessages,
           suppliers, subscriptions, clientAppConfig,
           _savedAt: savedAt,
+          _deleted: storageGetDeleted(),
         });
       } catch { /* ignore */ }
     }, 1500);
@@ -488,6 +564,7 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
   // the latest data reaches Supabase even if the user logs out quickly.
   useEffect(() => {
     const flush = async () => {
+      if (isViewMode) return; // never write back when impersonating
       if (!cloudLoadAttempted.current) return;
       if (syncTimerRef.current) { clearTimeout(syncTimerRef.current); syncTimerRef.current = null; }
       try {
@@ -495,7 +572,7 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
         if (!user) return;
         const savedAt = Date.now();
         setLocalSavedAt(savedAt);
-        await dbSaveSalonState(user.id as string, { ...latestStateRef.current, _savedAt: savedAt });
+        await dbSaveSalonState(user.id as string, { ...latestStateRef.current, _savedAt: savedAt, _deleted: storageGetDeleted() });
       } catch { /* ignore */ }
     };
     const onVisChange = () => { if (document.visibilityState === 'hidden') flush(); };
@@ -507,19 +584,65 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
     };
   }, []); // empty deps — reads always-current refs
 
+  // ─── Supabase Realtime: live sync across devices ───────────────────────
+  // Once the first cloud load is done, subscribe to changes on salon_data.
+  // When another device saves, we receive the new state and merge it in.
+  useEffect(() => {
+    if (!cloudReady || isViewMode) return;
+    let unsub: (() => void) | undefined;
+    getCurrentUser().then(user => {
+      if (!user || (user.id as string).startsWith('local-')) return;
+      const userId = user.id as string;
+      unsub = dbSubscribeToSalonChanges(userId, (newState) => {
+        // Skip if this update was triggered by our own save (debounce)
+        const cloudTs = (newState._savedAt as number) ?? 0;
+        const localTs = getLocalSavedAt();
+        if (cloudTs <= localTs) return; // our own save or older — skip
+        // Merge incoming cloud state with current local state
+        const cloudDel2 = (newState._deleted ?? {}) as DeletedMap;
+        const localDel2 = storageGetDeleted();
+        const merged2: DeletedMap = { ...localDel2 };
+        for (const e of Object.keys(cloudDel2)) {
+          merged2[e] = Array.from(new Set([...(merged2[e] ?? []), ...(cloudDel2[e] ?? [])]));
+        }
+        storageSaveDeleted(merged2);
+        const ma = <T extends WithId>(local: T[], cloud: unknown, entity: string): T[] =>
+          mergeItems(local, Array.isArray(cloud) ? cloud as T[] : [], merged2[entity] ?? [], []);
+        const snap = latestStateRef.current;
+        const nc  = ma<Client>(snap.clients as Client[], newState.clients, 'clients');
+        const ns  = ma<Service>(snap.services as Service[], newState.services, 'services');
+        const no  = ma<Operator>(snap.operators as Operator[], newState.operators, 'operators');
+        const na  = ma<Appointment>(snap.appointments as Appointment[], newState.appointments, 'appointments');
+        const np  = ma<Payment>(snap.payments as Payment[], newState.payments, 'payments');
+        const nsu = ma<Supplier>(snap.suppliers as Supplier[], (newState as Record<string, unknown>).suppliers, 'suppliers');
+        setClients(nc); storageSaveClients(nc);
+        setServices(ns); storageSaveServices(ns);
+        setOperators(no); storageSaveOperators(no);
+        setAppointments(na); storageSaveAppointments(na);
+        setPayments(np); storageSavePayments(np);
+        setSuppliers(nsu); storageSaveSuppliers(nsu);
+      });
+    });
+    return () => { unsub?.(); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cloudReady]);
+
   // ─── Clients ──────────────────────────────────────────────────────────────
 
   const addClient = useCallback((c: Omit<Client, 'id' | 'createdAt'>): string => {
-    const full: Client = { ...c, id: salonGenerateId(), createdAt: new Date().toISOString() };
+    const ts = new Date().toISOString();
+    const full: Client = { ...c, id: salonGenerateId(), createdAt: ts, updatedAt: ts };
     setClients(prev => { const n = [full, ...prev]; storageSaveClients(n); return n; });
     return full.id;
   }, []);
 
   const updateClient = useCallback((c: Client) => {
-    setClients(prev => { const n = prev.map(x => x.id === c.id ? c : x); storageSaveClients(n); return n; });
+    const updated = { ...c, updatedAt: new Date().toISOString() };
+    setClients(prev => { const n = prev.map(x => x.id === c.id ? updated : x); storageSaveClients(n); return n; });
   }, []);
 
   const deleteClient = useCallback((id: string) => {
+    storageMarkDeleted('clients', id);
     setClients(prev => { const n = prev.filter(x => x.id !== id); storageSaveClients(n); return n; });
   }, []);
 
@@ -534,66 +657,78 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
   // ─── Technical Cards ──────────────────────────────────────────────────────
 
   const addTechnicalCard = useCallback((c: Omit<TechnicalCard, 'id' | 'createdAt'>) => {
-    const full: TechnicalCard = { ...c, id: salonGenerateId(), createdAt: new Date().toISOString() };
+    const ts = new Date().toISOString();
+    const full: TechnicalCard = { ...c, id: salonGenerateId(), createdAt: ts, updatedAt: ts };
     setTechnicalCards(prev => { const n = [full, ...prev]; storageSaveTechnicalCards(n); return n; });
   }, []);
 
   const updateTechnicalCard = useCallback((c: TechnicalCard) => {
-    setTechnicalCards(prev => { const n = prev.map(x => x.id === c.id ? c : x); storageSaveTechnicalCards(n); return n; });
+    const updated = { ...c, updatedAt: new Date().toISOString() };
+    setTechnicalCards(prev => { const n = prev.map(x => x.id === c.id ? updated : x); storageSaveTechnicalCards(n); return n; });
   }, []);
 
   const deleteTechnicalCard = useCallback((id: string) => {
+    storageMarkDeleted('technicalCards', id);
     setTechnicalCards(prev => { const n = prev.filter(x => x.id !== id); storageSaveTechnicalCards(n); return n; });
   }, []);
 
   // ─── Services ─────────────────────────────────────────────────────────────
 
   const addService = useCallback((s: Omit<Service, 'id' | 'createdAt'>) => {
-    const full: Service = { ...s, id: salonGenerateId(), createdAt: new Date().toISOString() };
+    const ts = new Date().toISOString();
+    const full: Service = { ...s, id: salonGenerateId(), createdAt: ts, updatedAt: ts };
     setServices(prev => { const n = [...prev, full]; storageSaveServices(n); return n; });
   }, []);
 
   const updateService = useCallback((s: Service) => {
-    setServices(prev => { const n = prev.map(x => x.id === s.id ? s : x); storageSaveServices(n); return n; });
+    const updated = { ...s, updatedAt: new Date().toISOString() };
+    setServices(prev => { const n = prev.map(x => x.id === s.id ? updated : x); storageSaveServices(n); return n; });
   }, []);
 
   const deleteService = useCallback((id: string) => {
+    storageMarkDeleted('services', id);
     setServices(prev => { const n = prev.filter(x => x.id !== id); storageSaveServices(n); return n; });
   }, []);
 
   // ─── Operators ────────────────────────────────────────────────────────────
 
   const addOperator = useCallback((o: Omit<Operator, 'id' | 'createdAt'>): string => {
-    const full: Operator = { ...o, id: salonGenerateId(), createdAt: new Date().toISOString() };
+    const ts = new Date().toISOString();
+    const full: Operator = { ...o, id: salonGenerateId(), createdAt: ts, updatedAt: ts };
     setOperators(prev => { const n = [...prev, full]; storageSaveOperators(n); return n; });
     return full.id;
   }, []);
 
   const updateOperator = useCallback((o: Operator) => {
-    setOperators(prev => { const n = prev.map(x => x.id === o.id ? o : x); storageSaveOperators(n); return n; });
+    const updated = { ...o, updatedAt: new Date().toISOString() };
+    setOperators(prev => { const n = prev.map(x => x.id === o.id ? updated : x); storageSaveOperators(n); return n; });
   }, []);
 
   const deleteOperator = useCallback((id: string) => {
+    storageMarkDeleted('operators', id);
     setOperators(prev => { const n = prev.filter(x => x.id !== id); storageSaveOperators(n); return n; });
   }, []);
 
   // ─── Absences ─────────────────────────────────────────────────────────────
 
   const addAbsence = useCallback((a: Omit<Absence, 'id' | 'createdAt'>) => {
-    const full: Absence = { ...a, id: salonGenerateId(), createdAt: new Date().toISOString() };
+    const ts = new Date().toISOString();
+    const full: Absence = { ...a, id: salonGenerateId(), createdAt: ts, updatedAt: ts };
     setAbsences(prev => { const n = [...prev, full]; storageSaveAbsences(n); return n; });
   }, []);
 
   const deleteAbsence = useCallback((id: string) => {
+    storageMarkDeleted('absences', id);
     setAbsences(prev => { const n = prev.filter(x => x.id !== id); storageSaveAbsences(n); return n; });
   }, []);
 
   // ─── Appointments ─────────────────────────────────────────────────────────
 
   const addAppointment = useCallback((a: Omit<Appointment, 'id' | 'createdAt' | 'history'>) => {
+    const ts = new Date().toISOString();
     const full: Appointment = {
-      ...a, id: salonGenerateId(), createdAt: new Date().toISOString(),
-      history: [{ timestamp: new Date().toISOString(), action: 'Appuntamento creato' }],
+      ...a, id: salonGenerateId(), createdAt: ts, updatedAt: ts,
+      history: [{ timestamp: ts, action: 'Appuntamento creato' }],
     };
     setAppointments(prev => { const n = [...prev, full]; storageSaveAppointments(n); return n; });
 
@@ -627,16 +762,18 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
   }, []); // latestStateRef è un ref — non serve come dep
 
   const updateAppointment = useCallback((a: Appointment, historyNote?: string) => {
+    const ts = new Date().toISOString();
     const updated = historyNote
-      ? { ...a, history: [...(a.history || []), { timestamp: new Date().toISOString(), action: historyNote }] }
-      : a;
+      ? { ...a, updatedAt: ts, history: [...(a.history || []), { timestamp: ts, action: historyNote }] }
+      : { ...a, updatedAt: ts };
     setAppointments(prev => { const n = prev.map(x => x.id === a.id ? updated : x); storageSaveAppointments(n); return n; });
   }, []);
 
   const changeAppointmentStatus = useCallback((id: string, status: AppointmentStatus) => {
     setAppointments(prev => {
+      const ts2 = new Date().toISOString();
       const n = prev.map(x => x.id === id
-        ? { ...x, status, history: [...(x.history || []), { timestamp: new Date().toISOString(), action: `Stato cambiato in: ${status}` }] }
+        ? { ...x, status, updatedAt: ts2, history: [...(x.history || []), { timestamp: ts2, action: `Stato cambiato in: ${status}` }] }
         : x);
       storageSaveAppointments(n);
       return n;
@@ -644,40 +781,47 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const deleteAppointment = useCallback((id: string) => {
+    storageMarkDeleted('appointments', id);
     setAppointments(prev => { const n = prev.filter(x => x.id !== id); storageSaveAppointments(n); return n; });
   }, []);
 
   // ─── Waiting List ─────────────────────────────────────────────────────────
 
   const addWaitingEntry = useCallback((e: Omit<WaitingListEntry, 'id' | 'createdAt'>) => {
-    const full: WaitingListEntry = { ...e, id: salonGenerateId(), createdAt: new Date().toISOString() };
+    const ts = new Date().toISOString();
+    const full: WaitingListEntry = { ...e, id: salonGenerateId(), createdAt: ts, updatedAt: ts };
     setWaitingList(prev => { const n = [...prev, full]; storageSaveWaitingList(n); return n; });
   }, []);
 
   const deleteWaitingEntry = useCallback((id: string) => {
+    storageMarkDeleted('waitingList', id);
     setWaitingList(prev => { const n = prev.filter(x => x.id !== id); storageSaveWaitingList(n); return n; });
   }, []);
 
   // ─── Products ─────────────────────────────────────────────────────────────
 
   const addProduct = useCallback((p: Omit<Product, 'id' | 'createdAt'>): string => {
-    const full: Product = { ...p, id: salonGenerateId(), createdAt: new Date().toISOString() };
+    const ts = new Date().toISOString();
+    const full: Product = { ...p, id: salonGenerateId(), createdAt: ts, updatedAt: ts };
     setProducts(prev => { const n = [...prev, full]; storageSaveProducts(n); return n; });
     return full.id;
   }, []);
 
   const updateProduct = useCallback((p: Product) => {
-    setProducts(prev => { const n = prev.map(x => x.id === p.id ? p : x); storageSaveProducts(n); return n; });
+    const updated = { ...p, updatedAt: new Date().toISOString() };
+    setProducts(prev => { const n = prev.map(x => x.id === p.id ? updated : x); storageSaveProducts(n); return n; });
   }, []);
 
   const deleteProduct = useCallback((id: string) => {
+    storageMarkDeleted('products', id);
     setProducts(prev => { const n = prev.filter(x => x.id !== id); storageSaveProducts(n); return n; });
   }, []);
 
   // ─── Stock Movements ──────────────────────────────────────────────────────
 
   const addStockMovement = useCallback((m: Omit<StockMovement, 'id' | 'createdAt'>) => {
-    const full: StockMovement = { ...m, id: salonGenerateId(), createdAt: new Date().toISOString() };
+    const ts = new Date().toISOString();
+    const full: StockMovement = { ...m, id: salonGenerateId(), createdAt: ts, updatedAt: ts };
     setStockMovements(prev => { const n = [...prev, full]; storageSaveStockMovements(n); return n; });
     // Update product stock
     setProducts(prev => {
@@ -692,8 +836,9 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
   // ─── Gift Cards ───────────────────────────────────────────────────────────
 
   const addGiftCard = useCallback((g: Omit<GiftCard, 'id' | 'createdAt' | 'code'>) => {
+    const ts = new Date().toISOString();
     const code = `GC-${Date.now().toString(36).toUpperCase()}`;
-    const full: GiftCard = { ...g, id: salonGenerateId(), code, createdAt: new Date().toISOString() };
+    const full: GiftCard = { ...g, id: salonGenerateId(), code, createdAt: ts, updatedAt: ts };
     setGiftCards(prev => { const n = [...prev, full]; storageSaveGiftCards(n); return n; });
   }, []);
 
@@ -701,11 +846,12 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
     const normalizedCode = code.trim().toUpperCase();
     let ok = false;
     setGiftCards(prev => {
+      const ts2 = new Date().toISOString();
       const n = prev.map(g => {
         if (g.code.trim().toUpperCase() === normalizedCode && g.isActive && g.remainingValue >= amount) {
           ok = true;
           const remaining = g.remainingValue - amount;
-          return { ...g, remainingValue: remaining, isActive: remaining > 0 };
+          return { ...g, remainingValue: remaining, isActive: remaining > 0, updatedAt: ts2 };
         }
         return g;
       });
@@ -716,7 +862,8 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const updateGiftCard = useCallback((g: GiftCard) => {
-    setGiftCards(prev => { const n = prev.map(x => x.id === g.id ? g : x); storageSaveGiftCards(n); return n; });
+    const updated = { ...g, updatedAt: new Date().toISOString() };
+    setGiftCards(prev => { const n = prev.map(x => x.id === g.id ? updated : x); storageSaveGiftCards(n); return n; });
   }, []);
 
   // ─── Config ───────────────────────────────────────────────────────────────
@@ -732,7 +879,8 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
   // ─── Payments ───────────────────────────────────────────────────────────────
 
   const addPayment = useCallback((p: Omit<Payment, 'id' | 'createdAt'>) => {
-    const full: Payment = { ...p, id: salonGenerateId(), createdAt: new Date().toISOString() };
+    const ts = new Date().toISOString();
+    const full: Payment = { ...p, id: salonGenerateId(), createdAt: ts, updatedAt: ts };
     setPayments(prev => { const n = [full, ...prev]; storageSavePayments(n); return n; });
     // Auto loyalty points: use configured multiplier (default 1pt per euro)
     if (p.clientId) {
@@ -788,6 +936,7 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
   const deletePayment = useCallback((id: string) => {
     // First, find the payment to check if it's linked to an appointment
     const pay = (latestStateRef.current.payments as Payment[] | undefined)?.find(x => x.id === id);
+    storageMarkDeleted('payments', id);
     setPayments(prev => { const n = prev.filter(x => x.id !== id); storageSavePayments(n); return n; });
     // Update localSavedAt so a rapid refresh doesn't restore the deleted entry from cloud
     setLocalSavedAt(Date.now());
@@ -880,32 +1029,38 @@ export function SalonProvider({ children }: { children: React.ReactNode }) {
   // ─── Suppliers ────────────────────────────────────────────────────────────
 
   const addSupplier = useCallback((s: Omit<Supplier, 'id' | 'createdAt'>): string => {
-    const full: Supplier = { ...s, id: salonGenerateId(), createdAt: new Date().toISOString() };
+    const ts = new Date().toISOString();
+    const full: Supplier = { ...s, id: salonGenerateId(), createdAt: ts, updatedAt: ts };
     setSuppliers(prev => { const n = [...prev, full]; storageSaveSuppliers(n); return n; });
     return full.id;
   }, []);
 
   const updateSupplier = useCallback((s: Supplier) => {
-    setSuppliers(prev => { const n = prev.map(x => x.id === s.id ? s : x); storageSaveSuppliers(n); return n; });
+    const updated = { ...s, updatedAt: new Date().toISOString() };
+    setSuppliers(prev => { const n = prev.map(x => x.id === s.id ? updated : x); storageSaveSuppliers(n); return n; });
   }, []);
 
   const deleteSupplier = useCallback((id: string) => {
+    storageMarkDeleted('suppliers', id);
     setSuppliers(prev => { const n = prev.filter(x => x.id !== id); storageSaveSuppliers(n); return n; });
   }, []);
 
   // ─── Client Subscriptions ─────────────────────────────────────────────────
 
   const addSubscription = useCallback((s: Omit<ClientSubscription, 'id' | 'createdAt'>): string => {
-    const full: ClientSubscription = { ...s, id: salonGenerateId(), createdAt: new Date().toISOString() };
+    const ts = new Date().toISOString();
+    const full: ClientSubscription = { ...s, id: salonGenerateId(), createdAt: ts, updatedAt: ts };
     setSubscriptions(prev => { const n = [...prev, full]; storageSaveSubscriptions(n); return n; });
     return full.id;
   }, []);
 
   const updateSubscription = useCallback((s: ClientSubscription) => {
-    setSubscriptions(prev => { const n = prev.map(x => x.id === s.id ? s : x); storageSaveSubscriptions(n); return n; });
+    const updated = { ...s, updatedAt: new Date().toISOString() };
+    setSubscriptions(prev => { const n = prev.map(x => x.id === s.id ? updated : x); storageSaveSubscriptions(n); return n; });
   }, []);
 
   const deleteSubscription = useCallback((id: string) => {
+    storageMarkDeleted('subscriptions', id);
     setSubscriptions(prev => { const n = prev.filter(x => x.id !== id); storageSaveSubscriptions(n); return n; });
   }, []);
 
