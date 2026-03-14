@@ -24,10 +24,17 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'salonId obbligatorio' }, { status: 400 });
   }
 
+  // Fast-fail with a clear error if Evolution API is not configured
+  if (!process.env.EVOLUTION_API_URL || !process.env.EVOLUTION_API_KEY) {
+    console.error('[whatsapp/status] EVOLUTION_API_URL o EVOLUTION_API_KEY non impostati su Vercel');
+    return NextResponse.json(
+      { connected: false, qrcode: null, error: 'Evolution API non configurata (variabili mancanti)' },
+    );
+  }
+
   try {
     const supabase = adminClient();
 
-    // Read the existing Maytapi phoneId for this salon (if already created)
     const { data: tenant } = await supabase
       .from('admin_tenants')
       .select('whatsapp_instance_name')
@@ -42,7 +49,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ connected: true });
     }
 
-    // If a new phone was created in Maytapi, persist its ID
+    // Persist deterministic instance name if not yet stored
     if (result.phoneId && result.phoneId !== existingPhoneId) {
       await supabase
         .from('admin_tenants')
@@ -50,13 +57,23 @@ export async function GET(req: NextRequest) {
         .eq('user_id', salonId);
     }
 
+    if (!result.qrcode) {
+      console.error('[whatsapp/status] QR non ottenuto — Railway raggiungibile? URL:', process.env.EVOLUTION_API_URL);
+      return NextResponse.json({
+        connected: false,
+        qrcode: null,
+        error: 'Impossibile ottenere il QR. Verifica che Railway sia attivo.',
+      });
+    }
+
     return NextResponse.json({
       connected: false,
-      qrcode: result.qrcode ?? null,
+      qrcode: result.qrcode,
     });
   } catch (e: unknown) {
+    console.error('[whatsapp/status] errore:', e);
     return NextResponse.json(
-      { error: e instanceof Error ? e.message : 'Errore sconosciuto' },
+      { connected: false, qrcode: null, error: e instanceof Error ? e.message : 'Errore sconosciuto' },
       { status: 500 },
     );
   }

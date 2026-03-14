@@ -155,6 +155,7 @@ interface WaStatus {
   qrcode?: string | null;
   phone?: string | null;
   connectedAt?: string | null;
+  error?: string | null;
 }
 
 export default function AutomationsView() {
@@ -165,6 +166,7 @@ export default function AutomationsView() {
   );
   const [connStatus, setConnStatus] = useState<ConnStatus>('loading');
   const [qrCode, setQrCode] = useState<string | null>(null);
+  const [waError, setWaError] = useState<string | null>(null);
   const [waPhone, setWaPhone] = useState<string | null>(null);
   const [waConnectedAt, setWaConnectedAt] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
@@ -185,12 +187,14 @@ export default function AutomationsView() {
     if (d.connected) {
       setConnStatus('connected');
       setQrCode(null);
+      setWaError(null);
       if (d.phone) setWaPhone(d.phone);
       if (d.connectedAt) setWaConnectedAt(d.connectedAt);
       stopPolling();
     } else {
       setConnStatus('disconnected');
       setQrCode(d.qrcode ?? null);
+      setWaError(d.error ?? null);
     }
   }, [stopPolling]);
 
@@ -424,6 +428,11 @@ export default function AutomationsView() {
                   Scansiona con il tuo telefono — il QR si aggiorna automaticamente ogni 5 secondi
                 </p>
               </>
+            ) : waError ? (
+              <div style={{ background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: 10, padding: '12px 16px', maxWidth: 340, textAlign: 'center' }}>
+                <p style={{ color: '#dc2626', fontSize: 13, fontWeight: 600, margin: '0 0 4px' }}>Errore connessione</p>
+                <p style={{ color: '#b91c1c', fontSize: 12, margin: 0 }}>{waError}</p>
+              </div>
             ) : (
               <button onClick={refresh} disabled={checking}
                 style={{ padding: '10px 28px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#6366f1,#818cf8)', color: 'white', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
